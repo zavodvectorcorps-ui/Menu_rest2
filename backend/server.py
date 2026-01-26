@@ -1,6 +1,7 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File, Depends
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -10,11 +11,14 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 import qrcode
 from io import BytesIO
 import base64
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+import secrets
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -28,6 +32,17 @@ db = client[os.environ['DB_NAME']]
 UPLOADS_DIR = ROOT_DIR / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
+# JWT Settings
+SECRET_KEY = os.environ.get('JWT_SECRET', secrets.token_hex(32))
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Security
+security = HTTPBearer(auto_error=False)
+
 # Create the main app
 app = FastAPI(title="Restaurant Dashboard API")
 
@@ -38,6 +53,10 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 api_router = APIRouter(prefix="/api")
 
 # ============ ENUMS ============
+class UserRole(str, Enum):
+    SUPERADMIN = "superadmin"
+    MANAGER = "manager"
+
 class OrderStatus(str, Enum):
     NEW = "new"
     IN_PROGRESS = "in_progress"
