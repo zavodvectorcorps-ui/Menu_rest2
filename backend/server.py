@@ -855,6 +855,122 @@ async def seed_data():
     
     return {"message": "Data seeded successfully"}
 
+# ============ FILE UPLOAD ENDPOINTS ============
+
+ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+@api_router.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Upload an image file and return URL"""
+    # Check file extension
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Недопустимый формат файла. Разрешены: {', '.join(ALLOWED_EXTENSIONS)}")
+    
+    # Read file content
+    content = await file.read()
+    
+    # Check file size
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="Файл слишком большой. Максимум 5MB")
+    
+    # Generate unique filename
+    filename = f"{uuid.uuid4()}{ext}"
+    filepath = UPLOADS_DIR / filename
+    
+    # Save file
+    with open(filepath, "wb") as f:
+        f.write(content)
+    
+    # Return URL (relative path that will work with static files)
+    return {"url": f"/uploads/{filename}", "filename": filename}
+
+@api_router.delete("/upload/{filename}")
+async def delete_file(filename: str):
+    """Delete an uploaded file"""
+    filepath = UPLOADS_DIR / filename
+    if filepath.exists():
+        filepath.unlink()
+        return {"message": "File deleted"}
+    raise HTTPException(status_code=404, detail="File not found")
+
+# ============ QR CODE ENDPOINTS ============
+
+@api_router.get("/tables/{table_id}/qr")
+async def get_table_qr(table_id: str, base_url: Optional[str] = None):
+    """Generate QR code for a table"""
+    table = await db.tables.find_one({"id": table_id}, {"_id": 0})
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    # Use provided base_url or default
+    if not base_url:
+        base_url = os.environ.get('FRONTEND_URL', 'https://example.com')
+    
+    menu_url = f"{base_url}/menu/{table['code']}"
+    
+    # Generate QR code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(menu_url)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Convert to base64
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    
+    return {
+        "table_id": table_id,
+        "table_number": table['number'],
+        "table_code": table['code'],
+        "menu_url": menu_url,
+        "qr_base64": f"data:image/png;base64,{img_base64}"
+    }
+
+@api_router.get("/tables/{table_id}/qr/download")
+async def download_table_qr(table_id: str, base_url: Optional[str] = None):
+    """Download QR code as PNG file"""
+    table = await db.tables.find_one({"id": table_id}, {"_id": 0})
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    if not base_url:
+        base_url = os.environ.get('FRONTEND_URL', 'https://example.com')
+    
+    menu_url = f"{base_url}/menu/{table['code']}"
+    
+    # Generate QR code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(menu_url)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Save to temp file
+    filename = f"qr_table_{table['number']}.png"
+    filepath = UPLOADS_DIR / filename
+    img.save(filepath)
+    
+    return FileResponse(
+        path=str(filepath),
+        filename=filename,
+        media_type="image/png"
+    )
+
 # Include the router in the main app
 app.include_router(api_router)
 
