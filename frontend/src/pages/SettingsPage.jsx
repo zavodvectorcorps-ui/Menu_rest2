@@ -33,6 +33,7 @@ export default function SettingsPage() {
   const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false);
   const [sectionDialogOpen, setSectionDialogOpen] = useState(false);
   const [callTypeDialogOpen, setCallTypeDialogOpen] = useState(false);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
   
   const [editingTable, setEditingTable] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
@@ -43,6 +44,9 @@ export default function SettingsPage() {
   const [employeeForm, setEmployeeForm] = useState({ name: '', role: '', telegram_id: '', is_active: true });
   const [sectionForm, setSectionForm] = useState({ name: '', sort_order: 0, is_active: true });
   const [callTypeForm, setCallTypeForm] = useState({ name: '', telegram_message: '', sort_order: 0, is_active: true });
+  
+  const [qrData, setQrData] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
