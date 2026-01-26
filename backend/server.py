@@ -81,6 +81,7 @@ class Category(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     section_id: Optional[str] = None  # ID блока меню
+    display_mode: str = "card"  # "card" (с картинкой) или "compact" (строка)
     sort_order: int = 0
     is_active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -88,6 +89,7 @@ class Category(BaseModel):
 class CategoryCreate(BaseModel):
     name: str
     section_id: Optional[str] = None
+    display_mode: str = "card"
     sort_order: int = 0
     is_active: bool = True
 
