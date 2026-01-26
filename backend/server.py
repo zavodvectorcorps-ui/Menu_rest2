@@ -328,9 +328,9 @@ async def get_or_create_menu_sections():
     sections = await db.menu_sections.find({}, {"_id": 0}).sort("sort_order", 1).to_list(100)
     if not sections:
         default_sections = [
-            MenuSection(id="gastro", name="Гастрономическое меню", sort_order=1),
-            MenuSection(id="bar", name="Барное меню", sort_order=2),
-            MenuSection(id="hookah", name="Кальянное меню", sort_order=3),
+            MenuSection(id="food", name="Еда", sort_order=1),
+            MenuSection(id="drinks", name="Напитки", sort_order=2),
+            MenuSection(id="hookah", name="Кальяны", sort_order=3),
         ]
         for section in default_sections:
             await db.menu_sections.insert_one(section.model_dump())
