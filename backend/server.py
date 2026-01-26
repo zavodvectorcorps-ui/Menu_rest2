@@ -744,26 +744,29 @@ async def get_call_types(restaurant_id: str, current_user: dict = Depends(get_cu
     await check_restaurant_access(current_user, restaurant_id)
     return await get_or_create_call_types(restaurant_id)
 
-@api_router.post("/call-types")
-async def create_call_type(data: CallTypeCreate):
-    call_type = CallType(**data.model_dump())
+@api_router.post("/restaurants/{restaurant_id}/call-types")
+async def create_call_type(restaurant_id: str, data: CallTypeCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    call_type = CallType(restaurant_id=restaurant_id, **data.model_dump())
     doc = call_type.model_dump()
     await db.call_types.insert_one(doc)
     doc.pop('_id', None)  # Remove MongoDB _id before returning
     return doc
 
-@api_router.put("/call-types/{type_id}")
-async def update_call_type(type_id: str, data: CallTypeCreate):
+@api_router.put("/restaurants/{restaurant_id}/call-types/{type_id}")
+async def update_call_type(restaurant_id: str, type_id: str, data: CallTypeCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
     update_data = data.model_dump()
-    result = await db.call_types.update_one({"id": type_id}, {"$set": update_data})
+    result = await db.call_types.update_one({"id": type_id, "restaurant_id": restaurant_id}, {"$set": update_data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Call type not found")
-    call_type = await db.call_types.find_one({"id": type_id}, {"_id": 0})
+    call_type = await db.call_types.find_one({"id": type_id, "restaurant_id": restaurant_id}, {"_id": 0})
     return call_type
 
-@api_router.delete("/call-types/{type_id}")
-async def delete_call_type(type_id: str):
-    result = await db.call_types.delete_one({"id": type_id})
+@api_router.delete("/restaurants/{restaurant_id}/call-types/{type_id}")
+async def delete_call_type(restaurant_id: str, type_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.call_types.delete_one({"id": type_id, "restaurant_id": restaurant_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Call type not found")
     return {"message": "Call type deleted"}
