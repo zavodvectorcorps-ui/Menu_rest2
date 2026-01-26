@@ -773,34 +773,38 @@ async def delete_call_type(restaurant_id: str, type_id: str, current_user: dict 
 
 # ============ CATEGORIES ENDPOINTS ============
 
-@api_router.get("/categories")
-async def get_categories():
-    categories = await db.categories.find({}, {"_id": 0}).sort("sort_order", 1).to_list(100)
+@api_router.get("/restaurants/{restaurant_id}/categories")
+async def get_categories(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    categories = await db.categories.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("sort_order", 1).to_list(100)
     return [serialize_doc(c) for c in categories]
 
-@api_router.post("/categories")
-async def create_category(data: CategoryCreate):
-    category = Category(**data.model_dump())
+@api_router.post("/restaurants/{restaurant_id}/categories")
+async def create_category(restaurant_id: str, data: CategoryCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    category = Category(restaurant_id=restaurant_id, **data.model_dump())
     doc = category.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.categories.insert_one(doc)
     return serialize_doc(doc)
 
-@api_router.put("/categories/{category_id}")
-async def update_category(category_id: str, data: CategoryCreate):
+@api_router.put("/restaurants/{restaurant_id}/categories/{category_id}")
+async def update_category(restaurant_id: str, category_id: str, data: CategoryCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
     update_data = data.model_dump()
-    result = await db.categories.update_one({"id": category_id}, {"$set": update_data})
+    result = await db.categories.update_one({"id": category_id, "restaurant_id": restaurant_id}, {"$set": update_data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Category not found")
-    category = await db.categories.find_one({"id": category_id}, {"_id": 0})
+    category = await db.categories.find_one({"id": category_id, "restaurant_id": restaurant_id}, {"_id": 0})
     return serialize_doc(category)
 
-@api_router.delete("/categories/{category_id}")
-async def delete_category(category_id: str):
-    result = await db.categories.delete_one({"id": category_id})
-    if result.deleted_count == 0:
+@api_router.delete("/restaurants/{restaurant_id}/categories/{category_id}")
+async def delete_category(restaurant_id: str, category_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.categories.delete_one({"id": category_id, "restaurant_id": restaurant_id})
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Category not found")
-    await db.menu_items.delete_many({"category_id": category_id})
+    await db.menu_items.delete_many({"category_id": category_id, "restaurant_id": restaurant_id})
     return {"message": "Category deleted"}
 
 class ReorderItem(BaseModel):
