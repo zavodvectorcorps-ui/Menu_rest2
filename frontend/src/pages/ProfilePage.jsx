@@ -1,29 +1,41 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, Bell, ShoppingBag, Users, Settings, ArrowRight, Utensils, Sparkles, HelpCircle } from 'lucide-react';
+import { Eye, Bell, ShoppingBag, Users, Settings, ArrowRight, Utensils, Sparkles, HelpCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useApp, API } from '@/App';
 import axios from 'axios';
 
 export default function ProfilePage() {
-  const { restaurant } = useApp();
+  const { restaurant, token, currentRestaurantId } = useApp();
   const [stats, setStats] = useState({
     views_today: 0,
-    views_month: 0,
+    views_total: 0,
     calls_today: 0,
-    calls_month: 0,
+    calls_total: 0,
     orders_today: 0,
-    orders_month: 0,
+    orders_total: 0,
     employees_count: 0
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
+      if (!currentRestaurantId || !token) return;
       try {
-        const response = await axios.get(`${API}/stats`);
-        setStats(response.data);
+        const response = await axios.get(
+          `${API}/restaurants/${currentRestaurantId}/analytics?days=30`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setStats({
+          views_today: response.data.views.today,
+          views_total: response.data.views.total,
+          calls_today: response.data.staff_calls.today,
+          calls_total: response.data.staff_calls.total,
+          orders_today: response.data.orders.today,
+          orders_total: response.data.orders.total,
+          employees_count: response.data.employees_count
+        });
       } catch (error) {
         console.error('Failed to fetch stats:', error);
       } finally {
@@ -32,7 +44,7 @@ export default function ProfilePage() {
     };
 
     fetchStats();
-  }, []);
+  }, [currentRestaurantId, token]);
 
   const statCards = [
     {
@@ -41,8 +53,8 @@ export default function ProfilePage() {
       todayLabel: 'Сегодня',
       todayValue: stats.views_today,
       monthLabel: 'За месяц',
-      monthValue: stats.views_month,
-      settingsPath: '/admin/settings',
+      monthValue: stats.views_total,
+      settingsPath: '/admin/analytics',
       color: 'text-mint-500',
       bgColor: 'bg-mint-50 dark:bg-mint-500/10'
     },
@@ -52,8 +64,8 @@ export default function ProfilePage() {
       todayLabel: 'Сегодня',
       todayValue: stats.calls_today,
       monthLabel: 'За месяц',
-      monthValue: stats.calls_month,
-      settingsPath: '/admin/settings',
+      monthValue: stats.calls_total,
+      settingsPath: '/admin/orders',
       color: 'text-brown-500',
       bgColor: 'bg-brown-50 dark:bg-brown-500/10'
     },
@@ -63,203 +75,207 @@ export default function ProfilePage() {
       todayLabel: 'Сегодня',
       todayValue: stats.orders_today,
       monthLabel: 'За месяц',
-      monthValue: stats.orders_month,
+      monthValue: stats.orders_total,
       settingsPath: '/admin/orders',
-      color: 'text-emerald-500',
-      bgColor: 'bg-emerald-50 dark:bg-emerald-500/10'
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-50 dark:bg-blue-500/10'
     },
     {
       title: 'Сотрудники',
       icon: Users,
-      singleValue: stats.employees_count,
-      singleLabel: 'Активных сотрудников',
+      todayLabel: 'Всего',
+      todayValue: stats.employees_count,
+      monthLabel: '',
+      monthValue: null,
       settingsPath: '/admin/settings',
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-50 dark:bg-blue-500/10'
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-50 dark:bg-purple-500/10'
     }
   ];
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-mint-500" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8 animate-fadeIn" data-testid="profile-page">
-      {/* Restaurant Info Card */}
-      <Card className="border-none shadow-lg" data-testid="restaurant-info-card">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-mint-500 flex items-center justify-center shadow-lg shadow-mint-500/30">
-                <Utensils className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-heading font-bold text-foreground">
-                  {restaurant?.name || 'Загрузка...'}
-                </h2>
-                <p className="text-muted-foreground">{restaurant?.address}</p>
-                <p className="text-sm text-mint-500 font-medium">{restaurant?.working_hours}</p>
-              </div>
-            </div>
-            <Link to="/admin/settings">
-              <Button 
-                variant="outline" 
-                className="gap-2 rounded-full border-mint-500 text-mint-500 hover:bg-mint-50 dark:hover:bg-mint-500/10"
-                data-testid="edit-restaurant-btn"
-              >
-                <Settings className="w-4 h-4" />
-                Редактировать
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-8" data-testid="profile-page">
+      {/* Restaurant Info */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground">
+            {restaurant?.name || 'Ресторан'}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {restaurant?.slogan || 'Добро пожаловать в личный кабинет'}
+          </p>
+        </div>
+        <Link to="/admin/settings">
+          <Button variant="outline" className="gap-2">
+            <Settings className="w-4 h-4" />
+            Настройки
+          </Button>
+        </Link>
+      </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" data-testid="stats-grid">
-        {statCards.map((card, index) => {
-          const Icon = card.icon;
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {statCards.map((stat, index) => {
+          const Icon = stat.icon;
           return (
-            <Card 
-              key={index} 
-              className="stat-card border-none shadow-md hover:shadow-xl transition-all duration-300"
-              data-testid={`stat-card-${index}`}
-            >
+            <Card key={index} className="relative overflow-hidden group hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-xl ${card.bgColor} flex items-center justify-center`}>
-                    <Icon className={`w-6 h-6 ${card.color}`} />
+                <div className="flex items-start justify-between">
+                  <div className={`p-3 rounded-xl ${stat.bgColor}`}>
+                    <Icon className={`w-6 h-6 ${stat.color}`} />
                   </div>
-                  <Link 
-                    to={card.settingsPath}
-                    className="text-sm text-muted-foreground hover:text-mint-500 transition-colors flex items-center gap-1"
-                    data-testid={`stat-settings-link-${index}`}
-                  >
-                    Настройки
-                    <ArrowRight className="w-3 h-3" />
+                  <Link to={stat.settingsPath} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Settings className="w-4 h-4" />
+                    </Button>
                   </Link>
                 </div>
-                
-                <h3 className="font-heading font-semibold text-foreground mb-3">{card.title}</h3>
-                
-                {card.singleValue !== undefined ? (
-                  <div>
-                    <p className="text-3xl font-bold text-foreground">
-                      {loading ? '—' : card.singleValue}
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">{card.singleLabel}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">{card.todayLabel}</span>
-                      <span className="text-xl font-bold text-foreground">
-                        {loading ? '—' : card.todayValue}
-                      </span>
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">{stat.title}</h3>
+                  <div className="mt-2 flex items-baseline gap-4">
+                    <div>
+                      <span className="text-2xl font-bold text-foreground">{stat.todayValue}</span>
+                      <span className="text-xs text-muted-foreground ml-1">{stat.todayLabel}</span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">{card.monthLabel}</span>
-                      <span className="text-xl font-bold text-foreground">
-                        {loading ? '—' : card.monthValue}
-                      </span>
-                    </div>
+                    {stat.monthValue !== null && (
+                      <div className="text-muted-foreground">
+                        <span className="text-lg font-semibold">{stat.monthValue}</span>
+                        <span className="text-xs ml-1">{stat.monthLabel}</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      {/* Online Menu Editor Promo */}
-      <Card 
-        className="border-none shadow-lg bg-gradient-to-br from-mint-500 to-mint-600 text-white overflow-hidden"
-        data-testid="menu-promo-card"
-      >
-        <CardContent className="p-8 relative">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
-          
-          <div className="relative z-10 max-w-2xl">
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-5 h-5" />
-              <span className="text-sm font-medium opacity-90">Онлайн-редактор меню</span>
-            </div>
-            
-            <h3 className="text-2xl md:text-3xl font-heading font-bold mb-4">
-              Заполните меню в{' '}
-              <Link to="/admin/menu" className="underline hover:no-underline">
-                онлайн-редакторе
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Menu Editor Promo */}
+        <Card className="bg-gradient-to-br from-mint-500 to-mint-600 text-white overflow-hidden">
+          <CardContent className="p-6 relative">
+            <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full" />
+            <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-white/20 rounded-xl">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-heading font-bold">Редактор меню</h3>
+              </div>
+              <p className="text-mint-100 mb-4">
+                Управляйте категориями и позициями меню, добавляйте фото и описания
+              </p>
+              <Link to="/admin/menu">
+                <Button className="bg-white text-mint-600 hover:bg-mint-50 gap-2">
+                  Открыть редактор
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
               </Link>
-            </h3>
-            
-            <p className="text-white/80 mb-6 leading-relaxed">
-              Ваши гости увидят актуальное меню, бизнес-ланч, акции и спецпредложения. 
-              В редакторе можно настроить дизайн и элементы брендинга вашего ресторана.
-            </p>
-            
-            <Link to="/admin/menu">
-              <Button 
-                className="bg-white text-mint-600 hover:bg-white/90 rounded-full px-8 py-6 text-base font-semibold shadow-lg"
-                data-testid="create-menu-btn"
-              >
-                Создать меню
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Analytics Promo */}
+        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white overflow-hidden">
+          <CardContent className="p-6 relative">
+            <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full" />
+            <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-white/10 rounded-full" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-white/20 rounded-xl">
+                  <Eye className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-heading font-bold">Аналитика</h3>
+              </div>
+              <p className="text-blue-100 mb-4">
+                Отслеживайте просмотры, заказы и популярные блюда
+              </p>
+              <Link to="/admin/analytics">
+                <Button className="bg-white text-blue-600 hover:bg-blue-50 gap-2">
+                  Смотреть статистику
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Restaurant Details */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 font-heading">
+            <Utensils className="w-5 h-5 text-mint-500" />
+            Информация о ресторане
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Адрес</p>
+                <p className="font-medium">{restaurant?.address || 'Не указан'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Телефон</p>
+                <p className="font-medium">{restaurant?.phone || 'Не указан'}</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="font-medium">{restaurant?.email || 'Не указан'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Режим работы</p>
+                <p className="font-medium">{restaurant?.working_hours || 'Не указан'}</p>
+              </div>
+            </div>
           </div>
+          {restaurant?.description && (
+            <div className="mt-6 pt-6 border-t">
+              <p className="text-sm text-muted-foreground mb-2">Описание</p>
+              <p className="text-foreground">{restaurant.description}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-none shadow-md card-hover cursor-pointer" data-testid="quick-action-orders">
-          <Link to="/admin/orders">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center">
-                  <ShoppingBag className="w-6 h-6 text-amber-500" />
-                </div>
-                <div>
-                  <h4 className="font-heading font-semibold text-foreground">Текущие заказы</h4>
-                  <p className="text-sm text-muted-foreground">Управление заказами</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
-              </div>
-            </CardContent>
-          </Link>
-        </Card>
-
-        <Card className="border-none shadow-md card-hover cursor-pointer" data-testid="quick-action-tables">
-          <Link to="/admin/settings">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center">
-                  <Settings className="w-6 h-6 text-purple-500" />
-                </div>
-                <div>
-                  <h4 className="font-heading font-semibold text-foreground">Управление столами</h4>
-                  <p className="text-sm text-muted-foreground">QR-коды и ссылки</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
-              </div>
-            </CardContent>
-          </Link>
-        </Card>
-
-        <Card className="border-none shadow-md card-hover cursor-pointer" data-testid="quick-action-help">
-          <Link to="/admin/help">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-cyan-50 dark:bg-cyan-500/10 flex items-center justify-center">
-                  <HelpCircle className="w-6 h-6 text-cyan-500" />
-                </div>
-                <div>
-                  <h4 className="font-heading font-semibold text-foreground">Справочный центр</h4>
-                  <p className="text-sm text-muted-foreground">Инструкции и FAQ</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
-              </div>
-            </CardContent>
-          </Link>
-        </Card>
-      </div>
+      {/* Help Card */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10">
+              <HelpCircle className="w-6 h-6 text-amber-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-heading font-semibold">Нужна помощь?</h3>
+              <p className="text-sm text-muted-foreground">
+                Посетите справочный центр или свяжитесь с поддержкой
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Link to="/admin/help">
+                <Button variant="outline">Справка</Button>
+              </Link>
+              <Link to="/admin/support">
+                <Button className="bg-mint-500 hover:bg-mint-600">Поддержка</Button>
+              </Link>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
