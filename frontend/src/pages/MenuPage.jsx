@@ -438,8 +438,8 @@ export default function MenuPage() {
       setCategories(newCategories);
       
       try {
-        const reorderData = newCategories.map((cat, index) => ({ id: cat.id, sort_order: index + 1 }));
-        await axios.put(`${API}/categories/reorder`, { items: reorderData });
+        const reorderIds = newCategories.map(cat => cat.id);
+        await axios.post(`${API}/restaurants/${currentRestaurantId}/categories/reorder`, reorderIds, authHeaders);
         toast.success('Порядок категорий сохранён');
       } catch (error) {
         toast.error('Ошибка сохранения порядка');
@@ -462,8 +462,8 @@ export default function MenuPage() {
       setMenuItems(newMenuItems);
       
       try {
-        const reorderData = newFilteredItems.map((item, index) => ({ id: item.id, sort_order: index + 1 }));
-        await axios.put(`${API}/menu-items/reorder`, { items: reorderData });
+        const reorderIds = newFilteredItems.map(item => item.id);
+        await axios.post(`${API}/restaurants/${currentRestaurantId}/menu-items/reorder`, reorderIds, authHeaders);
         toast.success('Порядок позиций сохранён');
       } catch (error) {
         toast.error('Ошибка сохранения порядка');
@@ -488,10 +488,10 @@ export default function MenuPage() {
     try {
       const data = { ...categoryForm, section_id: categoryForm.section_id || null };
       if (editingCategory) {
-        await axios.put(`${API}/categories/${editingCategory.id}`, data);
+        await axios.put(`${API}/restaurants/${currentRestaurantId}/categories/${editingCategory.id}`, data, authHeaders);
         toast.success('Категория обновлена');
       } else {
-        await axios.post(`${API}/categories`, data);
+        await axios.post(`${API}/restaurants/${currentRestaurantId}/categories`, data, authHeaders);
         toast.success('Категория создана');
       }
       setCategoryDialogOpen(false);
