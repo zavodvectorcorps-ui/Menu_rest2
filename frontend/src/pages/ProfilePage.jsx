@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, Bell, ShoppingBag, Users, Settings, ArrowRight, Utensils, Sparkles } from 'lucide-react';
+import { Eye, Bell, ShoppingBag, Users, Settings, ArrowRight, Utensils, Sparkles, HelpCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useApp, API } from '@/App';
