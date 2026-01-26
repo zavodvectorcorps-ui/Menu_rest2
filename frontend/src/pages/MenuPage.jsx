@@ -840,17 +840,10 @@ export default function MenuPage() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label>URL изображения</Label>
-              <Input
-                value={itemForm.image_url}
-                onChange={(e) => setItemForm({ ...itemForm, image_url: e.target.value })}
-                placeholder="https://..."
-              />
-              {itemForm.image_url && (
-                <img src={itemForm.image_url} alt="Preview" className="w-full h-32 object-cover rounded-lg mt-2" />
-              )}
-            </div>
+            <ImageUpload 
+              value={itemForm.image_url}
+              onChange={(url) => setItemForm({ ...itemForm, image_url: url })}
+            />
 
             {!itemForm.is_banner && (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-2">
