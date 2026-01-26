@@ -836,35 +836,39 @@ async def reorder_menu_items(restaurant_id: str, data: ReorderRequest, current_u
 
 # ============ MENU ITEMS ENDPOINTS ============
 
-@api_router.get("/menu-items")
-async def get_menu_items(category_id: Optional[str] = None):
-    query = {}
+@api_router.get("/restaurants/{restaurant_id}/menu-items")
+async def get_menu_items(restaurant_id: str, category_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    query = {"restaurant_id": restaurant_id}
     if category_id:
         query["category_id"] = category_id
     items = await db.menu_items.find(query, {"_id": 0}).sort("sort_order", 1).to_list(500)
     return [serialize_doc(i) for i in items]
 
-@api_router.post("/menu-items")
-async def create_menu_item(data: MenuItemCreate):
-    item = MenuItem(**data.model_dump())
+@api_router.post("/restaurants/{restaurant_id}/menu-items")
+async def create_menu_item(restaurant_id: str, data: MenuItemCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    item = MenuItem(restaurant_id=restaurant_id, **data.model_dump())
     doc = item.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.menu_items.insert_one(doc)
     return serialize_doc(doc)
 
-@api_router.put("/menu-items/{item_id}")
-async def update_menu_item(item_id: str, data: MenuItemUpdate):
+@api_router.put("/restaurants/{restaurant_id}/menu-items/{item_id}")
+async def update_menu_item(restaurant_id: str, item_id: str, data: MenuItemUpdate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
     if update_data:
-        result = await db.menu_items.update_one({"id": item_id}, {"$set": update_data})
+        result = await db.menu_items.update_one({"id": item_id, "restaurant_id": restaurant_id}, {"$set": update_data})
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Menu item not found")
-    item = await db.menu_items.find_one({"id": item_id}, {"_id": 0})
+    item = await db.menu_items.find_one({"id": item_id, "restaurant_id": restaurant_id}, {"_id": 0})
     return serialize_doc(item)
 
-@api_router.delete("/menu-items/{item_id}")
-async def delete_menu_item(item_id: str):
-    result = await db.menu_items.delete_one({"id": item_id})
+@api_router.delete("/restaurants/{restaurant_id}/menu-items/{item_id}")
+async def delete_menu_item(restaurant_id: str, item_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.menu_items.delete_one({"id": item_id, "restaurant_id": restaurant_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Menu item not found")
     return {"message": "Menu item deleted"}
