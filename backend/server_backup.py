@@ -1,0 +1,1360 @@
+from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File, Depends
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from dotenv import load_dotenv
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+import os
+import logging
+from pathlib import Path
+from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Optional
+import uuid
+from datetime import datetime, timezone, timedelta
+from enum import Enum
+import qrcode
+from io import BytesIO
+import base64
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+import secrets
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
+# MongoDB connection
+mongo_url = os.environ['MONGO_URL']
+client = AsyncIOMotorClient(mongo_url)
+db = client[os.environ['DB_NAME']]
+
+# Create uploads directory
+UPLOADS_DIR = ROOT_DIR / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
+
+# JWT Settings
+SECRET_KEY = os.environ.get('JWT_SECRET', secrets.token_hex(32))
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Security
+security = HTTPBearer(auto_error=False)
+
+# Create the main app
+app = FastAPI(title="Restaurant Dashboard API")
+
+# Mount static files for uploads
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+
+# Create a router with the /api prefix
+api_router = APIRouter(prefix="/api")
+
+# ============ ENUMS ============
+class UserRole(str, Enum):
+    SUPERADMIN = "superadmin"
+    MANAGER = "manager"
+
+class OrderStatus(str, Enum):
+    NEW = "new"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+class StaffCallStatus(str, Enum):
+    PENDING = "pending"
+    ACKNOWLEDGED = "acknowledged"
+    COMPLETED = "completed"
+
+# ============ MODELS ============
+
+# User model for authentication
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    username: str
+    password_hash: str
+    role: UserRole = UserRole.MANAGER
+    restaurant_ids: List[str] = []  # Рестораны, к которым есть доступ
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: UserRole = UserRole.MANAGER
+    restaurant_ids: List[str] = []
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[UserRole] = None
+    restaurant_ids: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: dict
+
+class Restaurant(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: Optional[str] = ""
+    address: Optional[str] = ""
+    phone: Optional[str] = ""
+    email: Optional[str] = ""
+    logo_url: Optional[str] = ""
+    working_hours: Optional[str] = ""
+    slogan: Optional[str] = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class RestaurantCreate(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    address: Optional[str] = ""
+    phone: Optional[str] = ""
+    email: Optional[str] = ""
+
+class RestaurantUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    logo_url: Optional[str] = None
+    working_hours: Optional[str] = None
+    slogan: Optional[str] = None
+
+# Menu Sections (Гастрономическое, Барное, Кальянное меню)
+class MenuSection(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
+    name: str
+    sort_order: int = 0
+    is_active: bool = True
+
+class MenuSectionCreate(BaseModel):
+    name: str
+    sort_order: int = 0
+    is_active: bool = True
+
+class Category(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
+    name: str
+    section_id: Optional[str] = None  # ID блока меню
+    display_mode: str = "card"  # "card" (с картинкой) или "compact" (строка)
+    sort_order: int = 0
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class CategoryCreate(BaseModel):
+    name: str
+    section_id: Optional[str] = None
+    display_mode: str = "card"
+    sort_order: int = 0
+    is_active: bool = True
+
+class MenuItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
+    category_id: str
+    name: str
+    description: Optional[str] = ""
+    price: float = 0
+    weight: Optional[str] = ""
+    image_url: Optional[str] = ""
+    is_available: bool = True
+    is_business_lunch: bool = False
+    is_promotion: bool = False
+    is_hit: bool = False
+    is_new: bool = False
+    is_spicy: bool = False
+    is_banner: bool = False  # Рекламный баннер
+    sort_order: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class MenuItemCreate(BaseModel):
+    category_id: str
+    name: str
+    description: Optional[str] = ""
+    price: float = 0
+    weight: Optional[str] = ""
+    image_url: Optional[str] = ""
+    is_available: bool = True
+    is_business_lunch: bool = False
+    is_promotion: bool = False
+    is_hit: bool = False
+    is_new: bool = False
+    is_spicy: bool = False
+    is_banner: bool = False
+    sort_order: int = 0
+
+class MenuItemUpdate(BaseModel):
+    category_id: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    weight: Optional[str] = None
+    image_url: Optional[str] = None
+    is_available: Optional[bool] = None
+    is_business_lunch: Optional[bool] = None
+    is_promotion: Optional[bool] = None
+    is_hit: Optional[bool] = None
+    is_new: Optional[bool] = None
+    is_spicy: Optional[bool] = None
+    is_banner: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+class Table(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
+    number: int
+    code: str = Field(default_factory=lambda: str(uuid.uuid4())[:8].upper())
+    name: Optional[str] = ""
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class TableCreate(BaseModel):
+    number: int
+    name: Optional[str] = ""
+    is_active: bool = True
+
+class OrderItem(BaseModel):
+    menu_item_id: str
+    name: str
+    quantity: int
+    price: float
+
+class Order(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
+    table_id: str
+    table_number: int
+    items: List[OrderItem]
+    total: float
+    status: OrderStatus = OrderStatus.NEW
+    notes: Optional[str] = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class OrderCreate(BaseModel):
+    table_code: str
+    items: List[OrderItem]
+    notes: Optional[str] = ""
+
+class OrderStatusUpdate(BaseModel):
+    status: OrderStatus
+
+# Call Types (Типы вызовов: Официант, Кальянщик, Счёт)
+class CallType(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
+    name: str
+    telegram_message: str = ""  # Сообщение для Telegram
+    sort_order: int = 0
+    is_active: bool = True
+
+class CallTypeCreate(BaseModel):
+    name: str
+    telegram_message: str = ""
+    sort_order: int = 0
+    is_active: bool = True
+
+class StaffCall(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
+    table_id: str
+    table_number: int
+    call_type_id: Optional[str] = None
+    call_type_name: Optional[str] = None
+    status: StaffCallStatus = StaffCallStatus.PENDING
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class StaffCallCreate(BaseModel):
+    table_code: str
+    call_type_id: Optional[str] = None
+
+class Employee(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
+    name: str
+    role: str
+    telegram_id: Optional[str] = ""
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class EmployeeCreate(BaseModel):
+    name: str
+    role: str
+    telegram_id: Optional[str] = ""
+    is_active: bool = True
+
+class Settings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
+    online_menu_enabled: bool = True
+    staff_call_enabled: bool = True
+    online_orders_enabled: bool = True
+    business_lunch_enabled: bool = True
+    promotions_enabled: bool = True
+    theme: str = "light"
+    primary_color: str = "#5DA9A4"
+    secondary_color: str = "#8D6E63"
+    currency: str = "BYN"
+    telegram_bot_token: Optional[str] = ""
+    telegram_chat_id: Optional[str] = ""
+
+class SettingsUpdate(BaseModel):
+    online_menu_enabled: Optional[bool] = None
+    staff_call_enabled: Optional[bool] = None
+    online_orders_enabled: Optional[bool] = None
+    business_lunch_enabled: Optional[bool] = None
+    promotions_enabled: Optional[bool] = None
+    theme: Optional[str] = None
+    primary_color: Optional[str] = None
+    secondary_color: Optional[str] = None
+    currency: Optional[str] = None
+    telegram_bot_token: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
+
+class SupportTicket(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    subject: str
+    description: str
+    contact_email: str
+    status: str = "open"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SupportTicketCreate(BaseModel):
+    subject: str
+    description: str
+    contact_email: str
+
+class MenuView(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
+    table_code: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Stats(BaseModel):
+    views_today: int = 0
+    views_month: int = 0
+    calls_today: int = 0
+    calls_month: int = 0
+    orders_today: int = 0
+    orders_month: int = 0
+    employees_count: int = 0
+
+# ============ AUTH HELPER FUNCTIONS ============
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current user from JWT token"""
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Неверный токен")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if user is None:
+        raise HTTPException(status_code=401, detail="Пользователь не найден")
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=401, detail="Пользователь деактивирован")
+    
+    return user
+
+async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current user if token provided, else return None"""
+    if credentials is None:
+        return None
+    try:
+        return await get_current_user(credentials)
+    except HTTPException:
+        return None
+
+async def require_superadmin(current_user: dict = Depends(get_current_user)):
+    """Require superadmin role"""
+    if current_user.get("role") != UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Требуются права суперадмина")
+    return current_user
+
+async def check_restaurant_access(user: dict, restaurant_id: str):
+    """Check if user has access to restaurant"""
+    if user.get("role") == UserRole.SUPERADMIN:
+        return True
+    if restaurant_id in user.get("restaurant_ids", []):
+        return True
+    raise HTTPException(status_code=403, detail="Нет доступа к этому ресторану")
+
+# ============ HELPER FUNCTIONS ============
+
+def serialize_doc(doc: dict) -> dict:
+    """Remove MongoDB _id and convert datetime to ISO string"""
+    if doc is None:
+        return None
+    doc.pop('_id', None)
+    for key, value in doc.items():
+        if isinstance(value, datetime):
+            doc[key] = value.isoformat()
+    return doc
+
+async def create_superadmin():
+    """Create superadmin user if not exists"""
+    admin = await db.users.find_one({"username": "admin"}, {"_id": 0})
+    if not admin:
+        user = User(
+            username="admin",
+            password_hash=get_password_hash("220066"),
+            role=UserRole.SUPERADMIN,
+            restaurant_ids=[]
+        )
+        doc = user.model_dump()
+        doc['created_at'] = doc['created_at'].isoformat()
+        await db.users.insert_one(doc)
+        print("Superadmin created: admin/220066")
+        return doc
+    return admin
+
+async def get_or_create_restaurant(restaurant_id: Optional[str] = None):
+    """Get restaurant by ID or create default restaurant"""
+    if restaurant_id:
+        restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+        if restaurant:
+            return serialize_doc(restaurant)
+    
+    # Get first restaurant if no ID specified
+    restaurant = await db.restaurants.find_one({}, {"_id": 0})
+    if not restaurant:
+        default = Restaurant(
+            name="Мята Спортивная",
+            description="Уютный ресторан с авторской кухней и кальянами",
+            address="ул. Спортивная, 15",
+            phone="+375 (29) 123-45-67",
+            email="info@myata-sport.by",
+            slogan="Вкус, который запоминается",
+            working_hours="Пн-Вс: 12:00 - 02:00"
+        )
+        doc = default.model_dump()
+        doc['created_at'] = doc['created_at'].isoformat()
+        await db.restaurants.insert_one(doc)
+        return serialize_doc(doc)
+    return serialize_doc(restaurant)
+
+async def get_or_create_settings(restaurant_id: str):
+    """Get or create settings for restaurant"""
+    settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
+    if not settings:
+        default = Settings(restaurant_id=restaurant_id)
+        doc = default.model_dump()
+        await db.settings.insert_one(doc)
+        return doc
+    return settings
+
+async def get_or_create_menu_sections(restaurant_id: str):
+    """Get or create default menu sections for restaurant"""
+    sections = await db.menu_sections.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("sort_order", 1).to_list(100)
+    if not sections:
+        default_sections = [
+            MenuSection(id="food-" + restaurant_id[:8], restaurant_id=restaurant_id, name="Еда", sort_order=1),
+            MenuSection(id="drinks-" + restaurant_id[:8], restaurant_id=restaurant_id, name="Напитки", sort_order=2),
+            MenuSection(id="hookah-" + restaurant_id[:8], restaurant_id=restaurant_id, name="Кальяны", sort_order=3),
+        ]
+        for section in default_sections:
+            await db.menu_sections.insert_one(section.model_dump())
+        sections = [s.model_dump() for s in default_sections]
+    return sections
+
+async def get_or_create_call_types(restaurant_id: str):
+    """Get or create default call types for restaurant"""
+    call_types = await db.call_types.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("sort_order", 1).to_list(100)
+    if not call_types:
+        default_types = [
+            CallType(restaurant_id=restaurant_id, name="Вызов официанта", telegram_message="🔔 Стол #{table} - Вызов официанта", sort_order=1),
+            CallType(restaurant_id=restaurant_id, name="Вызов кальянного мастера", telegram_message="💨 Стол #{table} - Вызов кальянного мастера", sort_order=2),
+            CallType(restaurant_id=restaurant_id, name="Попросить счёт", telegram_message="💳 Стол #{table} - Просят счёт", sort_order=3),
+        ]
+        for ct in default_types:
+            await db.call_types.insert_one(ct.model_dump())
+        call_types = [ct.model_dump() for ct in default_types]
+    return call_types
+
+# ============ AUTH ENDPOINTS ============
+
+@api_router.post("/auth/login")
+async def login(data: LoginRequest):
+    """Login and get JWT token"""
+    user = await db.users.find_one({"username": data.username}, {"_id": 0})
+    if not user or not verify_password(data.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Неверный логин или пароль")
+    
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=401, detail="Пользователь деактивирован")
+    
+    access_token = create_access_token(data={"sub": user["id"]})
+    
+    # Get user's restaurants
+    if user["role"] == UserRole.SUPERADMIN:
+        restaurants = await db.restaurants.find({}, {"_id": 0}).to_list(100)
+    else:
+        restaurants = await db.restaurants.find({"id": {"$in": user.get("restaurant_ids", [])}}, {"_id": 0}).to_list(100)
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "role": user["role"],
+            "restaurant_ids": user.get("restaurant_ids", [])
+        },
+        "restaurants": [serialize_doc(r) for r in restaurants]
+    }
+
+@api_router.get("/auth/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    """Get current user info"""
+    if current_user["role"] == UserRole.SUPERADMIN:
+        restaurants = await db.restaurants.find({}, {"_id": 0}).to_list(100)
+    else:
+        restaurants = await db.restaurants.find({"id": {"$in": current_user.get("restaurant_ids", [])}}, {"_id": 0}).to_list(100)
+    
+    return {
+        "user": {
+            "id": current_user["id"],
+            "username": current_user["username"],
+            "role": current_user["role"],
+            "restaurant_ids": current_user.get("restaurant_ids", [])
+        },
+        "restaurants": [serialize_doc(r) for r in restaurants]
+    }
+
+# ============ USER MANAGEMENT ENDPOINTS (SUPERADMIN ONLY) ============
+
+@api_router.get("/users")
+async def get_users(current_user: dict = Depends(require_superadmin)):
+    """Get all users (superadmin only)"""
+    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(100)
+    return [serialize_doc(u) for u in users]
+
+@api_router.post("/users")
+async def create_user(data: UserCreate, current_user: dict = Depends(require_superadmin)):
+    """Create new user (superadmin only)"""
+    existing = await db.users.find_one({"username": data.username})
+    if existing:
+        raise HTTPException(status_code=400, detail="Пользователь с таким логином уже существует")
+    
+    user = User(
+        username=data.username,
+        password_hash=get_password_hash(data.password),
+        role=data.role,
+        restaurant_ids=data.restaurant_ids
+    )
+    doc = user.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.users.insert_one(doc)
+    doc.pop('password_hash', None)
+    return serialize_doc(doc)
+
+@api_router.put("/users/{user_id}")
+async def update_user(user_id: str, data: UserUpdate, current_user: dict = Depends(require_superadmin)):
+    """Update user (superadmin only)"""
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    update_data = {}
+    if data.username is not None:
+        update_data["username"] = data.username
+    if data.password is not None:
+        update_data["password_hash"] = get_password_hash(data.password)
+    if data.role is not None:
+        update_data["role"] = data.role
+    if data.restaurant_ids is not None:
+        update_data["restaurant_ids"] = data.restaurant_ids
+    if data.is_active is not None:
+        update_data["is_active"] = data.is_active
+    
+    if update_data:
+        await db.users.update_one({"id": user_id}, {"$set": update_data})
+    
+    updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    return serialize_doc(updated)
+
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str, current_user: dict = Depends(require_superadmin)):
+    """Delete user (superadmin only)"""
+    if user_id == current_user["id"]:
+        raise HTTPException(status_code=400, detail="Нельзя удалить самого себя")
+    
+    result = await db.users.delete_one({"id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    return {"message": "Пользователь удален"}
+
+# ============ RESTAURANT ENDPOINTS ============
+
+@api_router.get("/restaurants")
+async def get_restaurants(current_user: dict = Depends(get_current_user)):
+    """Get all restaurants user has access to"""
+    if current_user["role"] == UserRole.SUPERADMIN:
+        restaurants = await db.restaurants.find({}, {"_id": 0}).to_list(100)
+    else:
+        restaurants = await db.restaurants.find(
+            {"id": {"$in": current_user.get("restaurant_ids", [])}}, 
+            {"_id": 0}
+        ).to_list(100)
+    return [serialize_doc(r) for r in restaurants]
+
+@api_router.post("/restaurants")
+async def create_restaurant(data: RestaurantCreate, current_user: dict = Depends(require_superadmin)):
+    """Create new restaurant (superadmin only)"""
+    restaurant = Restaurant(
+        name=data.name,
+        description=data.description,
+        address=data.address,
+        phone=data.phone,
+        email=data.email
+    )
+    doc = restaurant.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.restaurants.insert_one(doc)
+    
+    # Create default settings, sections, call types for new restaurant
+    await get_or_create_settings(doc['id'])
+    await get_or_create_menu_sections(doc['id'])
+    await get_or_create_call_types(doc['id'])
+    
+    return serialize_doc(doc)
+
+@api_router.get("/restaurants/{restaurant_id}")
+async def get_restaurant_by_id(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Ресторан не найден")
+    return serialize_doc(restaurant)
+
+@api_router.put("/restaurants/{restaurant_id}")
+async def update_restaurant(restaurant_id: str, data: RestaurantUpdate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if update_data:
+        await db.restaurants.update_one({"id": restaurant_id}, {"$set": update_data})
+    restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+    return serialize_doc(restaurant)
+
+@api_router.delete("/restaurants/{restaurant_id}")
+async def delete_restaurant(restaurant_id: str, current_user: dict = Depends(require_superadmin)):
+    """Delete restaurant and all related data"""
+    # Delete all related data
+    await db.menu_sections.delete_many({"restaurant_id": restaurant_id})
+    await db.categories.delete_many({"restaurant_id": restaurant_id})
+    await db.menu_items.delete_many({"restaurant_id": restaurant_id})
+    await db.tables.delete_many({"restaurant_id": restaurant_id})
+    await db.orders.delete_many({"restaurant_id": restaurant_id})
+    await db.staff_calls.delete_many({"restaurant_id": restaurant_id})
+    await db.call_types.delete_many({"restaurant_id": restaurant_id})
+    await db.employees.delete_many({"restaurant_id": restaurant_id})
+    await db.settings.delete_many({"restaurant_id": restaurant_id})
+    await db.menu_views.delete_many({"restaurant_id": restaurant_id})
+    
+    result = await db.restaurants.delete_one({"id": restaurant_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Ресторан не найден")
+    return {"message": "Ресторан удален"}
+
+# ============ MENU SECTIONS ENDPOINTS ============
+
+@api_router.get("/restaurants/{restaurant_id}/menu-sections")
+async def get_menu_sections(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    return await get_or_create_menu_sections(restaurant_id)
+
+@api_router.post("/menu-sections")
+async def create_menu_section(data: MenuSectionCreate):
+    section = MenuSection(**data.model_dump())
+    doc = section.model_dump()
+    await db.menu_sections.insert_one(doc)
+    doc.pop('_id', None)  # Remove MongoDB _id before returning
+    return doc
+
+@api_router.put("/menu-sections/{section_id}")
+async def update_menu_section(section_id: str, data: MenuSectionCreate):
+    update_data = data.model_dump()
+    result = await db.menu_sections.update_one({"id": section_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Section not found")
+    section = await db.menu_sections.find_one({"id": section_id}, {"_id": 0})
+    return section
+
+@api_router.delete("/menu-sections/{section_id}")
+async def delete_menu_section(section_id: str):
+    result = await db.menu_sections.delete_one({"id": section_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Section not found")
+    # Remove section_id from categories
+    await db.categories.update_many({"section_id": section_id}, {"$set": {"section_id": None}})
+    return {"message": "Section deleted"}
+
+# ============ CALL TYPES ENDPOINTS ============
+
+@api_router.get("/restaurants/{restaurant_id}/call-types")
+async def get_call_types(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    return await get_or_create_call_types(restaurant_id)
+
+@api_router.post("/restaurants/{restaurant_id}/call-types")
+async def create_call_type(restaurant_id: str, data: CallTypeCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    call_type = CallType(restaurant_id=restaurant_id, **data.model_dump())
+    doc = call_type.model_dump()
+    await db.call_types.insert_one(doc)
+    doc.pop('_id', None)  # Remove MongoDB _id before returning
+    return doc
+
+@api_router.put("/restaurants/{restaurant_id}/call-types/{type_id}")
+async def update_call_type(restaurant_id: str, type_id: str, data: CallTypeCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    update_data = data.model_dump()
+    result = await db.call_types.update_one({"id": type_id, "restaurant_id": restaurant_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Call type not found")
+    call_type = await db.call_types.find_one({"id": type_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    return call_type
+
+@api_router.delete("/restaurants/{restaurant_id}/call-types/{type_id}")
+async def delete_call_type(restaurant_id: str, type_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.call_types.delete_one({"id": type_id, "restaurant_id": restaurant_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Call type not found")
+    return {"message": "Call type deleted"}
+
+# ============ CATEGORIES ENDPOINTS ============
+
+@api_router.get("/restaurants/{restaurant_id}/categories")
+async def get_categories(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    categories = await db.categories.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("sort_order", 1).to_list(100)
+    return [serialize_doc(c) for c in categories]
+
+@api_router.post("/restaurants/{restaurant_id}/categories")
+async def create_category(restaurant_id: str, data: CategoryCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    category = Category(restaurant_id=restaurant_id, **data.model_dump())
+    doc = category.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.categories.insert_one(doc)
+    return serialize_doc(doc)
+
+@api_router.put("/restaurants/{restaurant_id}/categories/{category_id}")
+async def update_category(restaurant_id: str, category_id: str, data: CategoryCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    update_data = data.model_dump()
+    result = await db.categories.update_one({"id": category_id, "restaurant_id": restaurant_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Category not found")
+    category = await db.categories.find_one({"id": category_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    return serialize_doc(category)
+
+@api_router.delete("/restaurants/{restaurant_id}/categories/{category_id}")
+async def delete_category(restaurant_id: str, category_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.categories.delete_one({"id": category_id, "restaurant_id": restaurant_id})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Category not found")
+    await db.menu_items.delete_many({"category_id": category_id, "restaurant_id": restaurant_id})
+    return {"message": "Category deleted"}
+
+class ReorderItem(BaseModel):
+    id: str
+    sort_order: int
+
+class ReorderRequest(BaseModel):
+    items: List[ReorderItem]
+
+@api_router.put("/restaurants/{restaurant_id}/categories/reorder")
+async def reorder_categories(restaurant_id: str, data: ReorderRequest, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    for item in data.items:
+        await db.categories.update_one(
+            {"id": item.id, "restaurant_id": restaurant_id}, 
+            {"$set": {"sort_order": item.sort_order}}
+        )
+    return {"message": "Categories reordered"}
+
+@api_router.put("/restaurants/{restaurant_id}/menu-items/reorder")
+async def reorder_menu_items(restaurant_id: str, data: ReorderRequest, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    for item in data.items:
+        await db.menu_items.update_one(
+            {"id": item.id, "restaurant_id": restaurant_id}, 
+            {"$set": {"sort_order": item.sort_order}}
+        )
+    return {"message": "Menu items reordered"}
+
+# ============ MENU ITEMS ENDPOINTS ============
+
+@api_router.get("/restaurants/{restaurant_id}/menu-items")
+async def get_menu_items(restaurant_id: str, category_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    query = {"restaurant_id": restaurant_id}
+    if category_id:
+        query["category_id"] = category_id
+    items = await db.menu_items.find(query, {"_id": 0}).sort("sort_order", 1).to_list(500)
+    return [serialize_doc(i) for i in items]
+
+@api_router.post("/restaurants/{restaurant_id}/menu-items")
+async def create_menu_item(restaurant_id: str, data: MenuItemCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    item = MenuItem(restaurant_id=restaurant_id, **data.model_dump())
+    doc = item.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.menu_items.insert_one(doc)
+    return serialize_doc(doc)
+
+@api_router.put("/restaurants/{restaurant_id}/menu-items/{item_id}")
+async def update_menu_item(restaurant_id: str, item_id: str, data: MenuItemUpdate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if update_data:
+        result = await db.menu_items.update_one({"id": item_id, "restaurant_id": restaurant_id}, {"$set": update_data})
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Menu item not found")
+    item = await db.menu_items.find_one({"id": item_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    return serialize_doc(item)
+
+@api_router.delete("/restaurants/{restaurant_id}/menu-items/{item_id}")
+async def delete_menu_item(restaurant_id: str, item_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.menu_items.delete_one({"id": item_id, "restaurant_id": restaurant_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Menu item not found")
+    return {"message": "Menu item deleted"}
+
+# ============ TABLES ENDPOINTS ============
+
+@api_router.get("/restaurants/{restaurant_id}/tables")
+async def get_tables(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    tables = await db.tables.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("number", 1).to_list(100)
+    return [serialize_doc(t) for t in tables]
+
+@api_router.post("/restaurants/{restaurant_id}/tables")
+async def create_table(restaurant_id: str, data: TableCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    table = Table(restaurant_id=restaurant_id, **data.model_dump())
+    doc = table.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.tables.insert_one(doc)
+    return serialize_doc(doc)
+
+@api_router.put("/restaurants/{restaurant_id}/tables/{table_id}")
+async def update_table(restaurant_id: str, table_id: str, data: TableCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    update_data = data.model_dump()
+    result = await db.tables.update_one({"id": table_id, "restaurant_id": restaurant_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Table not found")
+    table = await db.tables.find_one({"id": table_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    return serialize_doc(table)
+
+@api_router.delete("/restaurants/{restaurant_id}/tables/{table_id}")
+async def delete_table(restaurant_id: str, table_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.tables.delete_one({"id": table_id, "restaurant_id": restaurant_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Table not found")
+    return {"message": "Table deleted"}
+
+@api_router.post("/restaurants/{restaurant_id}/tables/{table_id}/regenerate-code")
+async def regenerate_table_code(restaurant_id: str, table_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    new_code = str(uuid.uuid4())[:8].upper()
+    result = await db.tables.update_one({"id": table_id, "restaurant_id": restaurant_id}, {"$set": {"code": new_code}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Table not found")
+    table = await db.tables.find_one({"id": table_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    return serialize_doc(table)
+
+# ============ ORDERS ENDPOINTS ============
+
+@api_router.get("/restaurants/{restaurant_id}/orders")
+async def get_orders(restaurant_id: str, status: Optional[OrderStatus] = None, date: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    query = {"restaurant_id": restaurant_id}
+    if status:
+        query["status"] = status.value
+    if date:
+        query["created_at"] = {"$regex": f"^{date}"}
+    orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [serialize_doc(o) for o in orders]
+
+@api_router.post("/orders")
+async def create_order(data: OrderCreate):
+    table = await db.tables.find_one({"code": data.table_code}, {"_id": 0})
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    restaurant_id = table["restaurant_id"]
+    settings = await get_or_create_settings(restaurant_id)
+    if not settings.get("online_orders_enabled", True):
+        raise HTTPException(status_code=400, detail="Online orders are disabled")
+    
+    total = sum(item.price * item.quantity for item in data.items)
+    order = Order(
+        restaurant_id=restaurant_id,
+        table_id=table["id"],
+        table_number=table["number"],
+        items=[item.model_dump() for item in data.items],
+        total=total,
+        notes=data.notes
+    )
+    doc = order.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.orders.insert_one(doc)
+    return serialize_doc(doc)
+
+@api_router.put("/restaurants/{restaurant_id}/orders/{order_id}/status")
+async def update_order_status(restaurant_id: str, order_id: str, data: OrderStatusUpdate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.orders.update_one({"id": order_id, "restaurant_id": restaurant_id}, {"$set": {"status": data.status.value}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Order not found")
+    order = await db.orders.find_one({"id": order_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    return serialize_doc(order)
+
+# ============ STAFF CALLS ENDPOINTS ============
+
+@api_router.get("/restaurants/{restaurant_id}/staff-calls")
+async def get_staff_calls(restaurant_id: str, status: Optional[StaffCallStatus] = None, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    query = {"restaurant_id": restaurant_id}
+    if status:
+        query["status"] = status.value
+    calls = await db.staff_calls.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [serialize_doc(c) for c in calls]
+
+@api_router.post("/staff-calls")
+async def create_staff_call(data: StaffCallCreate):
+    table = await db.tables.find_one({"code": data.table_code}, {"_id": 0})
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    restaurant_id = table["restaurant_id"]
+    settings = await get_or_create_settings(restaurant_id)
+    if not settings.get("staff_call_enabled", True):
+        raise HTTPException(status_code=400, detail="Staff calls are disabled")
+    
+    # Get call type info
+    call_type_name = "Вызов"
+    if data.call_type_id:
+        call_type = await db.call_types.find_one({"id": data.call_type_id, "restaurant_id": restaurant_id}, {"_id": 0})
+        if call_type:
+            call_type_name = call_type.get("name", "Вызов")
+    
+    call = StaffCall(
+        restaurant_id=restaurant_id,
+        table_id=table["id"],
+        table_number=table["number"],
+        call_type_id=data.call_type_id,
+        call_type_name=call_type_name
+    )
+    doc = call.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.staff_calls.insert_one(doc)
+    return serialize_doc(doc)
+
+@api_router.put("/restaurants/{restaurant_id}/staff-calls/{call_id}/status")
+async def update_staff_call_status(restaurant_id: str, call_id: str, status: StaffCallStatus, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.staff_calls.update_one({"id": call_id, "restaurant_id": restaurant_id}, {"$set": {"status": status.value}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Staff call not found")
+    call = await db.staff_calls.find_one({"id": call_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    return serialize_doc(call)
+
+# ============ EMPLOYEES ENDPOINTS ============
+
+@api_router.get("/restaurants/{restaurant_id}/employees")
+async def get_employees(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    employees = await db.employees.find({"restaurant_id": restaurant_id}, {"_id": 0}).to_list(100)
+    return [serialize_doc(e) for e in employees]
+
+@api_router.post("/restaurants/{restaurant_id}/employees")
+async def create_employee(restaurant_id: str, data: EmployeeCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    employee = Employee(restaurant_id=restaurant_id, **data.model_dump())
+    doc = employee.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.employees.insert_one(doc)
+    return serialize_doc(doc)
+
+@api_router.put("/restaurants/{restaurant_id}/employees/{employee_id}")
+async def update_employee(restaurant_id: str, employee_id: str, data: EmployeeCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    update_data = data.model_dump()
+    result = await db.employees.update_one({"id": employee_id, "restaurant_id": restaurant_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    employee = await db.employees.find_one({"id": employee_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    return serialize_doc(employee)
+
+@api_router.delete("/restaurants/{restaurant_id}/employees/{employee_id}")
+async def delete_employee(restaurant_id: str, employee_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.employees.delete_one({"id": employee_id, "restaurant_id": restaurant_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    return {"message": "Employee deleted"}
+
+# ============ SETTINGS ENDPOINTS ============
+
+@api_router.get("/restaurants/{restaurant_id}/settings")
+async def get_settings(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    return await get_or_create_settings(restaurant_id)
+
+@api_router.put("/restaurants/{restaurant_id}/settings")
+async def update_settings(restaurant_id: str, data: SettingsUpdate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if update_data:
+        await db.settings.update_one({"restaurant_id": restaurant_id}, {"$set": update_data}, upsert=True)
+    return await get_or_create_settings(restaurant_id)
+
+# ============ STATISTICS ENDPOINTS ============
+
+@api_router.get("/restaurants/{restaurant_id}/stats")
+async def get_stats(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    
+    views_today = await db.menu_views.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": today_start}})
+    views_month = await db.menu_views.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": month_start}})
+    calls_today = await db.staff_calls.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": today_start}})
+    calls_month = await db.staff_calls.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": month_start}})
+    orders_today = await db.orders.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": today_start}})
+    orders_month = await db.orders.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": month_start}})
+    employees_count = await db.employees.count_documents({"restaurant_id": restaurant_id, "is_active": True})
+    
+    return Stats(
+        views_today=views_today,
+        views_month=views_month,
+        calls_today=calls_today,
+        calls_month=calls_month,
+        orders_today=orders_today,
+        orders_month=orders_month,
+        employees_count=employees_count
+    )
+
+# ============ SUPPORT ENDPOINTS ============
+
+@api_router.get("/support-tickets")
+async def get_support_tickets():
+    tickets = await db.support_tickets.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return [serialize_doc(t) for t in tickets]
+
+@api_router.post("/support-tickets")
+async def create_support_ticket(data: SupportTicketCreate):
+    ticket = SupportTicket(**data.model_dump())
+    doc = ticket.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.support_tickets.insert_one(doc)
+    return serialize_doc(doc)
+
+# ============ PUBLIC MENU ENDPOINTS (for guests) ============
+
+@api_router.get("/public/menu/{table_code}")
+async def get_public_menu(table_code: str):
+    table = await db.tables.find_one({"code": table_code, "is_active": True}, {"_id": 0})
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    restaurant_id = table["restaurant_id"]
+    restaurant = await get_or_create_restaurant(restaurant_id)
+    settings = await get_or_create_settings(restaurant_id)
+    
+    if not settings.get("online_menu_enabled", True):
+        raise HTTPException(status_code=400, detail="Online menu is disabled")
+    
+    # Get menu sections
+    sections = await get_or_create_menu_sections(restaurant_id)
+    
+    # Get call types
+    call_types = await get_or_create_call_types(restaurant_id)
+    active_call_types = [ct for ct in call_types if ct.get("is_active", True)]
+    
+    categories = await db.categories.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(100)
+    items = await db.menu_items.find({"restaurant_id": restaurant_id, "is_available": True}, {"_id": 0}).sort("sort_order", 1).to_list(500)
+    
+    # Filter items based on settings
+    filtered_items = []
+    for item in items:
+        if item.get("is_business_lunch") and not settings.get("business_lunch_enabled", True):
+            continue
+        if item.get("is_promotion") and not settings.get("promotions_enabled", True):
+            continue
+        filtered_items.append(serialize_doc(item))
+    
+    # Record menu view
+    view = MenuView(restaurant_id=restaurant_id, table_code=table_code)
+    view_doc = view.model_dump()
+    view_doc['created_at'] = view_doc['created_at'].isoformat()
+    await db.menu_views.insert_one(view_doc)
+    
+    return {
+        "table": serialize_doc(table),
+        "restaurant": restaurant,
+        "settings": settings,
+        "sections": sections,
+        "categories": [serialize_doc(c) for c in categories],
+        "items": filtered_items,
+        "call_types": active_call_types
+    }
+
+# ============ FAQ ENDPOINTS ============
+
+class FAQItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    question: str
+    answer: str
+    category: str
+    sort_order: int = 0
+
+@api_router.get("/faq")
+async def get_faq():
+    faqs = await db.faqs.find({}, {"_id": 0}).sort("sort_order", 1).to_list(100)
+    if not faqs:
+        default_faqs = [
+            FAQItem(question="Как добавить новую позицию в меню?", answer="Перейдите в раздел 'Меню', выберите категорию и нажмите кнопку 'Добавить позицию'.", category="Меню", sort_order=1),
+            FAQItem(question="Как настроить QR-код для стола?", answer="В разделе 'Настройки' -> 'Столы' вы можете создать стол и получить уникальный код.", category="Столы", sort_order=2),
+            FAQItem(question="Как настроить типы вызовов?", answer="В разделе 'Настройки' -> 'Типы вызовов' можно создать и редактировать типы вызовов.", category="Настройки", sort_order=3),
+            FAQItem(question="Как подключить Telegram-бота?", answer="В разделе 'Настройки' -> 'Интеграции' введите токен вашего бота и ID чата.", category="Интеграции", sort_order=4),
+        ]
+        for faq in default_faqs:
+            await db.faqs.insert_one(faq.model_dump())
+        faqs = [f.model_dump() for f in default_faqs]
+    return faqs
+
+# ============ SEED DATA ENDPOINT ============
+
+@api_router.post("/restaurants/{restaurant_id}/seed")
+async def seed_data(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    
+    await get_or_create_restaurant(restaurant_id)
+    await get_or_create_settings(restaurant_id)
+    await get_or_create_menu_sections(restaurant_id)
+    await get_or_create_call_types(restaurant_id)
+    
+    # Create tables if none exist for this restaurant
+    existing_tables = await db.tables.count_documents({"restaurant_id": restaurant_id})
+    if existing_tables == 0:
+        for i in range(1, 11):
+            table = Table(restaurant_id=restaurant_id, number=i, name=f"Стол {i}")
+            doc = table.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            await db.tables.insert_one(doc)
+    
+    # Create employees if none exist for this restaurant
+    existing_employees = await db.employees.count_documents({"restaurant_id": restaurant_id})
+    if existing_employees == 0:
+        employees_data = [
+            {"name": "Иван Петров", "role": "Официант"},
+            {"name": "Мария Сидорова", "role": "Официант"},
+            {"name": "Алексей Козлов", "role": "Администратор"},
+        ]
+        for emp_data in employees_data:
+            emp = Employee(restaurant_id=restaurant_id, **emp_data)
+            doc = emp.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            await db.employees.insert_one(doc)
+    
+    await get_faq()
+    
+    return {"message": "Data seeded successfully"}
+
+# ============ FILE UPLOAD ENDPOINTS ============
+
+ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+@api_router.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Upload an image file and return URL"""
+    # Check file extension
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Недопустимый формат файла. Разрешены: {', '.join(ALLOWED_EXTENSIONS)}")
+    
+    # Read file content
+    content = await file.read()
+    
+    # Check file size
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="Файл слишком большой. Максимум 5MB")
+    
+    # Generate unique filename
+    filename = f"{uuid.uuid4()}{ext}"
+    filepath = UPLOADS_DIR / filename
+    
+    # Save file
+    with open(filepath, "wb") as f:
+        f.write(content)
+    
+    # Return URL (relative path that will work with static files)
+    return {"url": f"/uploads/{filename}", "filename": filename}
+
+@api_router.delete("/upload/{filename}")
+async def delete_file(filename: str):
+    """Delete an uploaded file"""
+    filepath = UPLOADS_DIR / filename
+    if filepath.exists():
+        filepath.unlink()
+        return {"message": "File deleted"}
+    raise HTTPException(status_code=404, detail="File not found")
+
+# ============ QR CODE ENDPOINTS ============
+
+@api_router.get("/restaurants/{restaurant_id}/tables/{table_id}/qr")
+async def get_table_qr(restaurant_id: str, table_id: str, base_url: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Generate QR code for a table"""
+    await check_restaurant_access(current_user, restaurant_id)
+    table = await db.tables.find_one({"id": table_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    # Use provided base_url or default
+    if not base_url:
+        base_url = os.environ.get('FRONTEND_URL', 'https://example.com')
+    
+    menu_url = f"{base_url}/menu/{table['code']}"
+    
+    # Generate QR code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(menu_url)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Convert to base64
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    
+    return {
+        "table_id": table_id,
+        "table_number": table['number'],
+        "table_code": table['code'],
+        "menu_url": menu_url,
+        "qr_base64": f"data:image/png;base64,{img_base64}"
+    }
+
+@api_router.get("/restaurants/{restaurant_id}/tables/{table_id}/qr/download")
+async def download_table_qr(restaurant_id: str, table_id: str, base_url: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Download QR code as PNG file"""
+    await check_restaurant_access(current_user, restaurant_id)
+    table = await db.tables.find_one({"id": table_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    if not base_url:
+        base_url = os.environ.get('FRONTEND_URL', 'https://example.com')
+    
+    menu_url = f"{base_url}/menu/{table['code']}"
+    
+    # Generate QR code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(menu_url)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Save to temp file
+    filename = f"qr_table_{table['number']}.png"
+    filepath = UPLOADS_DIR / filename
+    img.save(filepath)
+    
+    return FileResponse(
+        path=str(filepath),
+        filename=filename,
+        media_type="image/png"
+    )
+
+# Include the router in the main app
+app.include_router(api_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()
