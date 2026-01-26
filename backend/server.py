@@ -1262,10 +1262,11 @@ async def delete_file(filename: str):
 
 # ============ QR CODE ENDPOINTS ============
 
-@api_router.get("/tables/{table_id}/qr")
-async def get_table_qr(table_id: str, base_url: Optional[str] = None):
+@api_router.get("/restaurants/{restaurant_id}/tables/{table_id}/qr")
+async def get_table_qr(restaurant_id: str, table_id: str, base_url: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Generate QR code for a table"""
-    table = await db.tables.find_one({"id": table_id}, {"_id": 0})
+    await check_restaurant_access(current_user, restaurant_id)
+    table = await db.tables.find_one({"id": table_id, "restaurant_id": restaurant_id}, {"_id": 0})
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
     
@@ -1301,10 +1302,11 @@ async def get_table_qr(table_id: str, base_url: Optional[str] = None):
         "qr_base64": f"data:image/png;base64,{img_base64}"
     }
 
-@api_router.get("/tables/{table_id}/qr/download")
-async def download_table_qr(table_id: str, base_url: Optional[str] = None):
+@api_router.get("/restaurants/{restaurant_id}/tables/{table_id}/qr/download")
+async def download_table_qr(restaurant_id: str, table_id: str, base_url: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Download QR code as PNG file"""
-    table = await db.tables.find_one({"id": table_id}, {"_id": 0})
+    await check_restaurant_access(current_user, restaurant_id)
+    table = await db.tables.find_one({"id": table_id, "restaurant_id": restaurant_id}, {"_id": 0})
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
     
