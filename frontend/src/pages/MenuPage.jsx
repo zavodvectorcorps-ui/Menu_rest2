@@ -366,7 +366,7 @@ export default function MenuPage() {
   const [editingItem, setEditingItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   
-  const [categoryForm, setCategoryForm] = useState({ name: '', section_id: '', sort_order: 0, is_active: true });
+  const [categoryForm, setCategoryForm] = useState({ name: '', section_id: '', display_mode: 'card', sort_order: 0, is_active: true });
   const [itemForm, setItemForm] = useState({
     category_id: '',
     name: '',
@@ -384,6 +384,10 @@ export default function MenuPage() {
     sort_order: 0
   });
 
+  // Get context
+  const { currentRestaurantId, token } = useApp();
+  const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -391,16 +395,19 @@ export default function MenuPage() {
   );
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (currentRestaurantId) {
+      fetchData();
+    }
+  }, [currentRestaurantId]);
 
   const fetchData = async () => {
+    if (!currentRestaurantId) return;
     try {
       const [categoriesRes, itemsRes, sectionsRes, settingsRes] = await Promise.all([
-        axios.get(`${API}/categories`),
-        axios.get(`${API}/menu-items`),
-        axios.get(`${API}/menu-sections`),
-        axios.get(`${API}/settings`)
+        axios.get(`${API}/restaurants/${currentRestaurantId}/categories`, authHeaders),
+        axios.get(`${API}/restaurants/${currentRestaurantId}/menu-items`, authHeaders),
+        axios.get(`${API}/restaurants/${currentRestaurantId}/menu-sections`, authHeaders),
+        axios.get(`${API}/restaurants/${currentRestaurantId}/settings`, authHeaders)
       ]);
       setCategories(categoriesRes.data);
       setMenuItems(itemsRes.data);
