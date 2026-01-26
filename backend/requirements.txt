@@ -27,3 +27,6 @@ typer>=0.9.0
 emergentintegrations==0.1.0
 python-multipart==0.0.21
 qrcode==8.2
+passlib==1.7.4
+PyJWT==2.10.1
+python-jose==3.5.0
