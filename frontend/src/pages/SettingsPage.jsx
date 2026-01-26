@@ -295,10 +295,10 @@ export default function SettingsPage() {
   const saveCallTypeHandler = async () => {
     try {
       if (editingCallType) {
-        await axios.put(`${API}/call-types/${editingCallType.id}`, callTypeForm);
+        await axios.put(`${API}/restaurants/${currentRestaurantId}/call-types/${editingCallType.id}`, callTypeForm, authHeaders);
         toast.success('Тип вызова обновлён');
       } else {
-        await axios.post(`${API}/call-types`, callTypeForm);
+        await axios.post(`${API}/restaurants/${currentRestaurantId}/call-types`, callTypeForm, authHeaders);
         toast.success('Тип вызова добавлен');
       }
       setCallTypeDialogOpen(false);
@@ -310,7 +310,7 @@ export default function SettingsPage() {
 
   const deleteCallType = async (typeId) => {
     try {
-      await axios.delete(`${API}/call-types/${typeId}`);
+      await axios.delete(`${API}/restaurants/${currentRestaurantId}/call-types/${typeId}`, authHeaders);
       toast.success('Тип вызова удалён');
       fetchData();
     } catch (error) {
