@@ -1244,6 +1244,62 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* QR Code Dialog */}
+      <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+        <DialogContent className="max-w-md" data-testid="qr-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-center">
+              QR-код для стола
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {qrLoading ? (
+              <div className="flex flex-col items-center gap-4 py-8">
+                <Loader2 className="w-12 h-12 text-mint-500 animate-spin" />
+                <p className="text-muted-foreground">Генерация QR-кода...</p>
+              </div>
+            ) : qrData ? (
+              <div className="flex flex-col items-center gap-4">
+                <div className="text-center mb-2">
+                  <h3 className="text-xl font-semibold">Стол №{qrData.table_number}</h3>
+                  <p className="text-sm text-muted-foreground">Код: {qrData.table_code}</p>
+                </div>
+                
+                <div className="bg-white p-4 rounded-xl shadow-lg">
+                  <img 
+                    src={qrData.qr_base64} 
+                    alt={`QR код для стола ${qrData.table_number}`}
+                    className="w-64 h-64"
+                  />
+                </div>
+                
+                <p className="text-xs text-muted-foreground text-center max-w-xs">
+                  Отсканируйте QR-код камерой телефона для перехода в меню
+                </p>
+                
+                <div className="text-xs text-muted-foreground bg-muted px-3 py-2 rounded-lg break-all">
+                  {qrData.menu_url}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setQrDialogOpen(false)}>
+              Закрыть
+            </Button>
+            <Button 
+              className="bg-mint-500 hover:bg-mint-600"
+              onClick={downloadQrCode}
+              disabled={!qrData}
+              data-testid="download-qr-btn"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Скачать PNG
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
