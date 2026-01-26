@@ -440,5 +440,144 @@ class TestMenuItems:
         requests.delete(f"{BASE_URL}/api/menu-items/{data['id']}")
 
 
+class TestImageUpload:
+    """Image upload endpoint tests - POST /api/upload"""
+    
+    def test_upload_valid_image(self):
+        """Test POST /api/upload with valid PNG image"""
+        import io
+        
+        # Create a minimal valid PNG file
+        png_header = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82'
+        
+        files = {'file': ('test.png', io.BytesIO(png_header), 'image/png')}
+        response = requests.post(f"{BASE_URL}/api/upload", files=files)
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert 'url' in data
+        assert 'filename' in data
+        assert data['url'].startswith('/uploads/')
+        assert data['filename'].endswith('.png')
+    
+    def test_upload_invalid_file_type(self):
+        """Test POST /api/upload rejects non-image files"""
+        import io
+        
+        files = {'file': ('test.txt', io.BytesIO(b'test content'), 'text/plain')}
+        response = requests.post(f"{BASE_URL}/api/upload", files=files)
+        
+        assert response.status_code == 400
+        data = response.json()
+        assert 'detail' in data
+        assert 'формат' in data['detail'].lower() or 'разрешены' in data['detail'].lower()
+    
+    def test_upload_file_too_large(self):
+        """Test POST /api/upload rejects files over 5MB"""
+        import io
+        
+        # Create a 6MB file
+        large_content = b'\x89PNG\r\n\x1a\n' + (b'\x00' * (6 * 1024 * 1024))
+        files = {'file': ('large.png', io.BytesIO(large_content), 'image/png')}
+        response = requests.post(f"{BASE_URL}/api/upload", files=files)
+        
+        assert response.status_code == 400
+        data = response.json()
+        assert 'detail' in data
+        assert '5MB' in data['detail'] or 'большой' in data['detail'].lower()
+    
+    def test_upload_jpeg_image(self):
+        """Test POST /api/upload accepts JPEG images"""
+        import io
+        
+        # Minimal JPEG header
+        jpeg_header = b'\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.\' ",#\x1c\x1c(7),01444\x1f\'9telegrambot_token=telegrambot_token=telegrambot_token=\xff\xd9'
+        
+        files = {'file': ('test.jpg', io.BytesIO(jpeg_header), 'image/jpeg')}
+        response = requests.post(f"{BASE_URL}/api/upload", files=files)
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert 'url' in data
+        assert data['filename'].endswith('.jpg')
+
+
+class TestQRCode:
+    """QR code generation endpoint tests - GET /api/tables/{id}/qr"""
+    
+    TABLE_ID = "827c810f-6da7-4d0b-9cbb-833bf4490d34"
+    TABLE_CODE = "697DCAA5"
+    
+    def test_get_qr_code_valid_table(self):
+        """Test GET /api/tables/{id}/qr returns QR code data"""
+        response = requests.get(
+            f"{BASE_URL}/api/tables/{self.TABLE_ID}/qr",
+            params={"base_url": BASE_URL}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Verify response structure
+        assert 'table_id' in data
+        assert 'table_number' in data
+        assert 'table_code' in data
+        assert 'menu_url' in data
+        assert 'qr_base64' in data
+        
+        # Verify values
+        assert data['table_id'] == self.TABLE_ID
+        assert data['table_code'] == self.TABLE_CODE
+        assert data['table_number'] == 1
+        
+        # Verify QR code is base64 PNG
+        assert data['qr_base64'].startswith('data:image/png;base64,')
+        
+        # Verify menu URL is correct
+        assert f"/menu/{self.TABLE_CODE}" in data['menu_url']
+    
+    def test_get_qr_code_invalid_table(self):
+        """Test GET /api/tables/{invalid_id}/qr returns 404"""
+        response = requests.get(f"{BASE_URL}/api/tables/non-existent-id/qr")
+        
+        assert response.status_code == 404
+        data = response.json()
+        assert 'detail' in data
+        assert 'not found' in data['detail'].lower()
+    
+    def test_qr_code_menu_url_format(self):
+        """Test QR code contains correct menu URL format"""
+        response = requests.get(
+            f"{BASE_URL}/api/tables/{self.TABLE_ID}/qr",
+            params={"base_url": "https://example.com"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Menu URL should be base_url + /menu/ + table_code
+        expected_url = f"https://example.com/menu/{self.TABLE_CODE}"
+        assert data['menu_url'] == expected_url
+    
+    def test_qr_code_download_endpoint(self):
+        """Test GET /api/tables/{id}/qr/download returns PNG file"""
+        response = requests.get(
+            f"{BASE_URL}/api/tables/{self.TABLE_ID}/qr/download",
+            params={"base_url": BASE_URL}
+        )
+        
+        assert response.status_code == 200
+        assert response.headers.get('content-type') == 'image/png'
+        
+        # Verify it's a valid PNG (starts with PNG signature)
+        assert response.content[:8] == b'\x89PNG\r\n\x1a\n'
+    
+    def test_qr_code_download_invalid_table(self):
+        """Test GET /api/tables/{invalid_id}/qr/download returns 404"""
+        response = requests.get(f"{BASE_URL}/api/tables/non-existent-id/qr/download")
+        
+        assert response.status_code == 404
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
