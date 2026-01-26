@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Palette, Building2, Bot, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2 } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Building2, Bot, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
