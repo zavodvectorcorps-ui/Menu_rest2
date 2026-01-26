@@ -875,42 +875,47 @@ async def delete_menu_item(restaurant_id: str, item_id: str, current_user: dict 
 
 # ============ TABLES ENDPOINTS ============
 
-@api_router.get("/tables")
-async def get_tables():
-    tables = await db.tables.find({}, {"_id": 0}).sort("number", 1).to_list(100)
+@api_router.get("/restaurants/{restaurant_id}/tables")
+async def get_tables(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    tables = await db.tables.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("number", 1).to_list(100)
     return [serialize_doc(t) for t in tables]
 
-@api_router.post("/tables")
-async def create_table(data: TableCreate):
-    table = Table(**data.model_dump())
+@api_router.post("/restaurants/{restaurant_id}/tables")
+async def create_table(restaurant_id: str, data: TableCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    table = Table(restaurant_id=restaurant_id, **data.model_dump())
     doc = table.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.tables.insert_one(doc)
     return serialize_doc(doc)
 
-@api_router.put("/tables/{table_id}")
-async def update_table(table_id: str, data: TableCreate):
+@api_router.put("/restaurants/{restaurant_id}/tables/{table_id}")
+async def update_table(restaurant_id: str, table_id: str, data: TableCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
     update_data = data.model_dump()
-    result = await db.tables.update_one({"id": table_id}, {"$set": update_data})
+    result = await db.tables.update_one({"id": table_id, "restaurant_id": restaurant_id}, {"$set": update_data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Table not found")
-    table = await db.tables.find_one({"id": table_id}, {"_id": 0})
+    table = await db.tables.find_one({"id": table_id, "restaurant_id": restaurant_id}, {"_id": 0})
     return serialize_doc(table)
 
-@api_router.delete("/tables/{table_id}")
-async def delete_table(table_id: str):
-    result = await db.tables.delete_one({"id": table_id})
+@api_router.delete("/restaurants/{restaurant_id}/tables/{table_id}")
+async def delete_table(restaurant_id: str, table_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.tables.delete_one({"id": table_id, "restaurant_id": restaurant_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Table not found")
     return {"message": "Table deleted"}
 
-@api_router.post("/tables/{table_id}/regenerate-code")
-async def regenerate_table_code(table_id: str):
+@api_router.post("/restaurants/{restaurant_id}/tables/{table_id}/regenerate-code")
+async def regenerate_table_code(restaurant_id: str, table_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
     new_code = str(uuid.uuid4())[:8].upper()
-    result = await db.tables.update_one({"id": table_id}, {"$set": {"code": new_code}})
+    result = await db.tables.update_one({"id": table_id, "restaurant_id": restaurant_id}, {"$set": {"code": new_code}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Table not found")
-    table = await db.tables.find_one({"id": table_id}, {"_id": 0})
+    table = await db.tables.find_one({"id": table_id, "restaurant_id": restaurant_id}, {"_id": 0})
     return serialize_doc(table)
 
 # ============ ORDERS ENDPOINTS ============
