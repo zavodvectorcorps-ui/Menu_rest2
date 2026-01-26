@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, ChevronDown, ChevronUp, GripVertical, Check, X, ImageIcon, Flame, Star, Sparkles, Tag, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, GripVertical, ImageIcon, Flame, Star, Sparkles, Tag, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,212 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { API } from '@/App';
 import axios from 'axios';
+
+// DnD Kit imports
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Sortable Category Item
+function SortableCategoryItem({ category, isSelected, itemCount, onSelect, onEdit, onDelete }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: category.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${
+        isSelected 
+          ? 'bg-mint-500 text-white' 
+          : 'hover:bg-accent'
+      } ${isDragging ? 'shadow-lg' : ''}`}
+      onClick={() => onSelect(category.id)}
+      data-testid={`category-${category.id}`}
+    >
+      <div className="flex items-center gap-2">
+        <button
+          className={`cursor-grab active:cursor-grabbing p-1 rounded hover:bg-black/10 ${isSelected ? 'hover:bg-white/20' : ''}`}
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          data-testid={`drag-category-${category.id}`}
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+        <span className="font-medium">{category.name}</span>
+        {!category.is_active && (
+          <Badge variant="secondary" className="text-xs">Скрыта</Badge>
+        )}
+      </div>
+      <div className="flex items-center gap-1">
+        <span className={`text-sm ${isSelected ? 'text-white/80' : 'text-muted-foreground'}`}>
+          {itemCount}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-7 w-7 ${isSelected ? 'hover:bg-white/20' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onEdit(category); }}
+          data-testid={`edit-category-${category.id}`}
+        >
+          <Edit2 className="w-3.5 h-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-7 w-7 ${isSelected ? 'hover:bg-white/20' : 'hover:text-destructive'}`}
+          onClick={(e) => { e.stopPropagation(); onDelete(category); }}
+          data-testid={`delete-category-${category.id}`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// Sortable Menu Item
+function SortableMenuItem({ item, onEdit, onDelete, onToggleAvailability }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <Card 
+      ref={setNodeRef}
+      style={style}
+      className={`border-none shadow-md transition-all ${!item.is_available ? 'opacity-60' : ''} ${isDragging ? 'shadow-xl z-50' : ''}`}
+      data-testid={`menu-item-${item.id}`}
+    >
+      <CardContent className="p-4">
+        <div className="flex gap-4">
+          {/* Drag Handle */}
+          <button
+            className="cursor-grab active:cursor-grabbing p-1 self-center text-muted-foreground hover:text-foreground"
+            {...attributes}
+            {...listeners}
+            data-testid={`drag-item-${item.id}`}
+          >
+            <GripVertical className="w-5 h-5" />
+          </button>
+
+          {/* Image */}
+          <div className="w-20 h-20 rounded-xl bg-muted flex-shrink-0 overflow-hidden">
+            {item.image_url ? (
+              <img 
+                src={item.image_url} 
+                alt={item.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <ImageIcon className="w-6 h-6 text-muted-foreground/50" />
+              </div>
+            )}
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h3 className="font-heading font-semibold text-foreground truncate text-sm">
+                  {item.name}
+                </h3>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {item.is_hit && <Badge className="bg-red-500 text-white text-xs px-1.5 py-0">Хит</Badge>}
+                  {item.is_new && <Badge className="bg-emerald-500 text-white text-xs px-1.5 py-0">Новинка</Badge>}
+                  {item.is_spicy && <Badge className="bg-orange-500 text-white text-xs px-1.5 py-0">Острое</Badge>}
+                  {item.is_promotion && <Badge className="bg-purple-500 text-white text-xs px-1.5 py-0">Акция</Badge>}
+                  {item.is_business_lunch && <Badge className="bg-blue-500 text-white text-xs px-1.5 py-0">Бизнес-ланч</Badge>}
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <Switch
+                  checked={item.is_available}
+                  onCheckedChange={() => onToggleAvailability(item)}
+                  data-testid={`toggle-availability-${item.id}`}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => onEdit(item)}
+                  data-testid={`edit-item-${item.id}`}
+                >
+                  <Edit2 className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:text-destructive"
+                  onClick={() => onDelete(item)}
+                  data-testid={`delete-item-${item.id}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            
+            {item.description && (
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                {item.description}
+              </p>
+            )}
+            
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-base font-bold text-mint-500">
+                {item.price} ₽
+              </span>
+              {item.weight && (
+                <span className="text-xs text-muted-foreground">
+                  {item.weight}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function MenuPage() {
   const [categories, setCategories] = useState([]);
@@ -47,6 +253,18 @@ export default function MenuPage() {
     sort_order: 0
   });
 
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -66,6 +284,63 @@ export default function MenuPage() {
       toast.error('Ошибка загрузки данных');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle category drag end
+  const handleCategoryDragEnd = async (event) => {
+    const { active, over } = event;
+    
+    if (active.id !== over?.id) {
+      const oldIndex = categories.findIndex(c => c.id === active.id);
+      const newIndex = categories.findIndex(c => c.id === over.id);
+      
+      const newCategories = arrayMove(categories, oldIndex, newIndex);
+      setCategories(newCategories);
+      
+      // Update sort_order in backend
+      try {
+        const reorderData = newCategories.map((cat, index) => ({
+          id: cat.id,
+          sort_order: index + 1
+        }));
+        await axios.put(`${API}/categories/reorder`, { items: reorderData });
+        toast.success('Порядок категорий сохранён');
+      } catch (error) {
+        toast.error('Ошибка сохранения порядка');
+        fetchData(); // Revert on error
+      }
+    }
+  };
+
+  // Handle menu item drag end
+  const handleItemDragEnd = async (event) => {
+    const { active, over } = event;
+    
+    if (active.id !== over?.id) {
+      const filteredItems = menuItems.filter(item => item.category_id === selectedCategory);
+      const oldIndex = filteredItems.findIndex(i => i.id === active.id);
+      const newIndex = filteredItems.findIndex(i => i.id === over.id);
+      
+      const newFilteredItems = arrayMove(filteredItems, oldIndex, newIndex);
+      
+      // Update full menu items array
+      const otherItems = menuItems.filter(item => item.category_id !== selectedCategory);
+      const newMenuItems = [...otherItems, ...newFilteredItems];
+      setMenuItems(newMenuItems);
+      
+      // Update sort_order in backend
+      try {
+        const reorderData = newFilteredItems.map((item, index) => ({
+          id: item.id,
+          sort_order: index + 1
+        }));
+        await axios.put(`${API}/menu-items/reorder`, { items: reorderData });
+        toast.success('Порядок позиций сохранён');
+      } catch (error) {
+        toast.error('Ошибка сохранения порядка');
+        fetchData(); // Revert on error
+      }
     }
   };
 
@@ -216,7 +491,7 @@ export default function MenuPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-heading font-bold text-foreground">Управление меню</h1>
-          <p className="text-muted-foreground">Категории и позиции вашего ресторана</p>
+          <p className="text-muted-foreground">Перетаскивайте для изменения порядка</p>
         </div>
         <div className="flex gap-3">
           <Button
@@ -253,64 +528,47 @@ export default function MenuPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Categories sidebar */}
-        <Card className="lg:col-span-1 border-none shadow-md h-fit" data-testid="categories-list">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-heading">Категории</CardTitle>
+        {/* Categories sidebar with DnD */}
+        <Card className="lg:col-span-1 border-none shadow-md h-fit max-h-[70vh] overflow-hidden flex flex-col" data-testid="categories-list">
+          <CardHeader className="pb-3 flex-shrink-0">
+            <CardTitle className="text-lg font-heading flex items-center gap-2">
+              <GripVertical className="w-4 h-4 text-muted-foreground" />
+              Категории
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-2 overflow-y-auto flex-1">
             {categories.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 Нет категорий
               </p>
             ) : (
-              categories.map((category) => (
-                <div
-                  key={category.id}
-                  className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${
-                    selectedCategory === category.id 
-                      ? 'bg-mint-500 text-white' 
-                      : 'hover:bg-accent'
-                  }`}
-                  onClick={() => setSelectedCategory(category.id)}
-                  data-testid={`category-${category.id}`}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleCategoryDragEnd}
+              >
+                <SortableContext
+                  items={categories.map(c => c.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{category.name}</span>
-                    {!category.is_active && (
-                      <Badge variant="secondary" className="text-xs">Скрыта</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className={`text-sm ${selectedCategory === category.id ? 'text-white/80' : 'text-muted-foreground'}`}>
-                      {menuItems.filter(i => i.category_id === category.id).length}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`h-7 w-7 ${selectedCategory === category.id ? 'hover:bg-white/20' : ''}`}
-                      onClick={(e) => { e.stopPropagation(); openCategoryDialog(category); }}
-                      data-testid={`edit-category-${category.id}`}
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`h-7 w-7 ${selectedCategory === category.id ? 'hover:bg-white/20' : 'hover:text-destructive'}`}
-                      onClick={(e) => { e.stopPropagation(); openDeleteDialog(category, 'category'); }}
-                      data-testid={`delete-category-${category.id}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))
+                  {categories.map((category) => (
+                    <SortableCategoryItem
+                      key={category.id}
+                      category={category}
+                      isSelected={selectedCategory === category.id}
+                      itemCount={menuItems.filter(i => i.category_id === category.id).length}
+                      onSelect={setSelectedCategory}
+                      onEdit={openCategoryDialog}
+                      onDelete={(cat) => openDeleteDialog(cat, 'category')}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             )}
           </CardContent>
         </Card>
 
-        {/* Menu items */}
+        {/* Menu items with DnD */}
         <div className="lg:col-span-3 space-y-4" data-testid="menu-items-list">
           {filteredItems.length === 0 ? (
             <Card className="border-none shadow-md">
@@ -332,92 +590,26 @@ export default function MenuPage() {
               </CardContent>
             </Card>
           ) : (
-            filteredItems.map((item) => (
-              <Card 
-                key={item.id} 
-                className={`border-none shadow-md transition-all ${!item.is_available ? 'opacity-60' : ''}`}
-                data-testid={`menu-item-${item.id}`}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleItemDragEnd}
+            >
+              <SortableContext
+                items={filteredItems.map(i => i.id)}
+                strategy={verticalListSortingStrategy}
               >
-                <CardContent className="p-4">
-                  <div className="flex gap-4">
-                    {/* Image */}
-                    <div className="w-24 h-24 rounded-xl bg-muted flex-shrink-0 overflow-hidden">
-                      {item.image_url ? (
-                        <img 
-                          src={item.image_url} 
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <ImageIcon className="w-8 h-8 text-muted-foreground/50" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="font-heading font-semibold text-foreground truncate">
-                            {item.name}
-                          </h3>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {item.is_hit && <Badge className="bg-red-500 text-white text-xs">Хит</Badge>}
-                            {item.is_new && <Badge className="bg-emerald-500 text-white text-xs">Новинка</Badge>}
-                            {item.is_spicy && <Badge className="bg-orange-500 text-white text-xs">Острое</Badge>}
-                            {item.is_promotion && <Badge className="bg-purple-500 text-white text-xs">Акция</Badge>}
-                            {item.is_business_lunch && <Badge className="bg-blue-500 text-white text-xs">Бизнес-ланч</Badge>}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Switch
-                            checked={item.is_available}
-                            onCheckedChange={() => toggleItemAvailability(item)}
-                            data-testid={`toggle-availability-${item.id}`}
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openItemDialog(item)}
-                            data-testid={`edit-item-${item.id}`}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 hover:text-destructive"
-                            onClick={() => openDeleteDialog(item, 'item')}
-                            data-testid={`delete-item-${item.id}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {item.description && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                          {item.description}
-                        </p>
-                      )}
-                      
-                      <div className="flex items-center justify-between mt-3">
-                        <span className="text-lg font-bold text-mint-500">
-                          {item.price} ₽
-                        </span>
-                        {item.weight && (
-                          <span className="text-sm text-muted-foreground">
-                            {item.weight}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                {filteredItems.map((item) => (
+                  <SortableMenuItem
+                    key={item.id}
+                    item={item}
+                    onEdit={openItemDialog}
+                    onDelete={(it) => openDeleteDialog(it, 'item')}
+                    onToggleAvailability={toggleItemAvailability}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       </div>
@@ -438,15 +630,6 @@ export default function MenuPage() {
                 onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
                 placeholder="Например: Горячие блюда"
                 data-testid="category-name-input"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Порядок сортировки</Label>
-              <Input
-                type="number"
-                value={categoryForm.sort_order}
-                onChange={(e) => setCategoryForm({ ...categoryForm, sort_order: parseInt(e.target.value) || 0 })}
-                data-testid="category-sort-input"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -522,7 +705,7 @@ export default function MenuPage() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Цена (₽)</Label>
                 <Input
@@ -540,15 +723,6 @@ export default function MenuPage() {
                   onChange={(e) => setItemForm({ ...itemForm, weight: e.target.value })}
                   placeholder="200 г"
                   data-testid="item-weight-input"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Сортировка</Label>
-                <Input
-                  type="number"
-                  value={itemForm.sort_order}
-                  onChange={(e) => setItemForm({ ...itemForm, sort_order: e.target.value })}
-                  data-testid="item-sort-input"
                 />
               </div>
             </div>
@@ -570,9 +744,7 @@ export default function MenuPage() {
                   onCheckedChange={(checked) => setItemForm({ ...itemForm, is_available: checked })}
                   data-testid="item-available-switch"
                 />
-                <Label className="flex items-center gap-1">
-                  <Check className="w-4 h-4" /> В наличии
-                </Label>
+                <Label className="flex items-center gap-1">В наличии</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch
