@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Palette, Building2, Bot, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Building2, Bot, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,8 @@ export default function SettingsPage() {
   
   const [tables, setTables] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [menuSections, setMenuSections] = useState([]);
+  const [callTypes, setCallTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -29,11 +31,18 @@ export default function SettingsPage() {
   // Dialogs
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
   const [employeeDialogOpen, setEmployeeDialogOpen] = useState(false);
+  const [sectionDialogOpen, setSectionDialogOpen] = useState(false);
+  const [callTypeDialogOpen, setCallTypeDialogOpen] = useState(false);
+  
   const [editingTable, setEditingTable] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [editingSection, setEditingSection] = useState(null);
+  const [editingCallType, setEditingCallType] = useState(null);
   
   const [tableForm, setTableForm] = useState({ number: '', name: '', is_active: true });
   const [employeeForm, setEmployeeForm] = useState({ name: '', role: '', telegram_id: '', is_active: true });
+  const [sectionForm, setSectionForm] = useState({ name: '', sort_order: 0, is_active: true });
+  const [callTypeForm, setCallTypeForm] = useState({ name: '', telegram_message: '', sort_order: 0, is_active: true });
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -52,12 +61,16 @@ export default function SettingsPage() {
 
   const fetchData = async () => {
     try {
-      const [tablesRes, employeesRes] = await Promise.all([
+      const [tablesRes, employeesRes, sectionsRes, callTypesRes] = await Promise.all([
         axios.get(`${API}/tables`),
-        axios.get(`${API}/employees`)
+        axios.get(`${API}/employees`),
+        axios.get(`${API}/menu-sections`),
+        axios.get(`${API}/call-types`)
       ]);
       setTables(tablesRes.data);
       setEmployees(employeesRes.data);
+      setMenuSections(sectionsRes.data);
+      setCallTypes(callTypesRes.data);
     } catch (error) {
       toast.error('Ошибка загрузки данных');
     } finally {
@@ -139,7 +152,7 @@ export default function SettingsPage() {
   };
 
   const copyTableLink = (code) => {
-    const link = `${BACKEND_URL}/menu/${code}`;
+    const link = `${window.location.origin}/menu/${code}`;
     navigator.clipboard.writeText(link);
     toast.success('Ссылка скопирована');
   };
@@ -187,6 +200,87 @@ export default function SettingsPage() {
     }
   };
 
+  // Menu Section handlers
+  const openSectionDialog = (section = null) => {
+    if (section) {
+      setEditingSection(section);
+      setSectionForm({ name: section.name, sort_order: section.sort_order, is_active: section.is_active });
+    } else {
+      setEditingSection(null);
+      setSectionForm({ name: '', sort_order: menuSections.length + 1, is_active: true });
+    }
+    setSectionDialogOpen(true);
+  };
+
+  const saveSectionHandler = async () => {
+    try {
+      if (editingSection) {
+        await axios.put(`${API}/menu-sections/${editingSection.id}`, sectionForm);
+        toast.success('Раздел меню обновлён');
+      } else {
+        await axios.post(`${API}/menu-sections`, sectionForm);
+        toast.success('Раздел меню добавлен');
+      }
+      setSectionDialogOpen(false);
+      fetchData();
+    } catch (error) {
+      toast.error('Ошибка сохранения');
+    }
+  };
+
+  const deleteSection = async (sectionId) => {
+    try {
+      await axios.delete(`${API}/menu-sections/${sectionId}`);
+      toast.success('Раздел меню удалён');
+      fetchData();
+    } catch (error) {
+      toast.error('Ошибка удаления');
+    }
+  };
+
+  // Call Type handlers
+  const openCallTypeDialog = (callType = null) => {
+    if (callType) {
+      setEditingCallType(callType);
+      setCallTypeForm({ 
+        name: callType.name, 
+        telegram_message: callType.telegram_message || '',
+        sort_order: callType.sort_order,
+        is_active: callType.is_active 
+      });
+    } else {
+      setEditingCallType(null);
+      setCallTypeForm({ name: '', telegram_message: '', sort_order: callTypes.length + 1, is_active: true });
+    }
+    setCallTypeDialogOpen(true);
+  };
+
+  const saveCallTypeHandler = async () => {
+    try {
+      if (editingCallType) {
+        await axios.put(`${API}/call-types/${editingCallType.id}`, callTypeForm);
+        toast.success('Тип вызова обновлён');
+      } else {
+        await axios.post(`${API}/call-types`, callTypeForm);
+        toast.success('Тип вызова добавлен');
+      }
+      setCallTypeDialogOpen(false);
+      fetchData();
+    } catch (error) {
+      toast.error('Ошибка сохранения');
+    }
+  };
+
+  const deleteCallType = async (typeId) => {
+    try {
+      await axios.delete(`${API}/call-types/${typeId}`);
+      toast.success('Тип вызова удалён');
+      fetchData();
+    } catch (error) {
+      toast.error('Ошибка удаления');
+    }
+  };
+
   const handleThemeToggle = async () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
@@ -222,6 +316,14 @@ export default function SettingsPage() {
           <TabsTrigger value="restaurant" className="gap-2" data-testid="tab-restaurant">
             <Building2 className="w-4 h-4" />
             О ресторане
+          </TabsTrigger>
+          <TabsTrigger value="menu-sections" className="gap-2" data-testid="tab-menu-sections">
+            <Layers className="w-4 h-4" />
+            Разделы меню
+          </TabsTrigger>
+          <TabsTrigger value="call-types" className="gap-2" data-testid="tab-call-types">
+            <Bell className="w-4 h-4" />
+            Типы вызовов
           </TabsTrigger>
           <TabsTrigger value="tables" className="gap-2" data-testid="tab-tables">
             <QrCode className="w-4 h-4" />
@@ -377,7 +479,7 @@ export default function SettingsPage() {
                   <Input
                     value={restaurantForm.phone || ''}
                     onChange={(e) => setRestaurantForm({ ...restaurantForm, phone: e.target.value })}
-                    placeholder="+7 (999) 123-45-67"
+                    placeholder="+375 (29) 123-45-67"
                     data-testid="restaurant-phone-input"
                   />
                 </div>
@@ -390,7 +492,7 @@ export default function SettingsPage() {
                     type="email"
                     value={restaurantForm.email || ''}
                     onChange={(e) => setRestaurantForm({ ...restaurantForm, email: e.target.value })}
-                    placeholder="info@restaurant.ru"
+                    placeholder="info@restaurant.by"
                     data-testid="restaurant-email-input"
                   />
                 </div>
@@ -424,6 +526,140 @@ export default function SettingsPage() {
                 <Save className="w-4 h-4 mr-2" />
                 {saving ? 'Сохранение...' : 'Сохранить информацию'}
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Menu Sections Tab */}
+        <TabsContent value="menu-sections" className="mt-6">
+          <Card className="border-none shadow-md" data-testid="menu-sections-card">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="font-heading">Разделы меню</CardTitle>
+                <CardDescription>Блоки меню для клиентов (Гастрономическое, Барное, Кальянное)</CardDescription>
+              </div>
+              <Button 
+                className="bg-mint-500 hover:bg-mint-600 rounded-full"
+                onClick={() => openSectionDialog()}
+                data-testid="add-section-btn"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Добавить раздел
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {menuSections.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Разделы меню не созданы
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {menuSections.map((section) => (
+                    <div key={section.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/50" data-testid={`section-${section.id}`}>
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-mint-100 dark:bg-mint-900/30 flex items-center justify-center">
+                          <Layers className="w-5 h-5 text-mint-500" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-foreground">{section.name}</h4>
+                          <p className="text-sm text-muted-foreground">Порядок: {section.sort_order}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded-full text-xs ${section.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
+                          {section.is_active ? 'Активен' : 'Неактивен'}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openSectionDialog(section)}
+                          data-testid={`edit-section-${section.id}`}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:text-destructive"
+                          onClick={() => deleteSection(section.id)}
+                          data-testid={`delete-section-${section.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Call Types Tab */}
+        <TabsContent value="call-types" className="mt-6">
+          <Card className="border-none shadow-md" data-testid="call-types-card">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="font-heading">Типы вызовов</CardTitle>
+                <CardDescription>Варианты для кнопки "Вызов" в клиентском меню</CardDescription>
+              </div>
+              <Button 
+                className="bg-mint-500 hover:bg-mint-600 rounded-full"
+                onClick={() => openCallTypeDialog()}
+                data-testid="add-call-type-btn"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Добавить тип
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {callTypes.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Типы вызовов не созданы
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {callTypes.map((callType) => (
+                    <div key={callType.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/50" data-testid={`call-type-${callType.id}`}>
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                          <Bell className="w-5 h-5 text-amber-500" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-foreground">{callType.name}</h4>
+                          {callType.telegram_message && (
+                            <p className="text-sm text-muted-foreground truncate max-w-xs">{callType.telegram_message}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded-full text-xs ${callType.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700'}`}>
+                          {callType.is_active ? 'Активен' : 'Неактивен'}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openCallTypeDialog(callType)}
+                          data-testid={`edit-call-type-${callType.id}`}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:text-destructive"
+                          onClick={() => deleteCallType(callType.id)}
+                          data-testid={`delete-call-type-${callType.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -513,7 +749,7 @@ export default function SettingsPage() {
                               onClick={() => openTableDialog(table)}
                               data-testid={`edit-table-${table.id}`}
                             >
-                              <SettingsIcon className="w-4 h-4" />
+                              <Edit2 className="w-4 h-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -588,7 +824,7 @@ export default function SettingsPage() {
                           onClick={() => openEmployeeDialog(emp)}
                           data-testid={`edit-employee-${emp.id}`}
                         >
-                          <SettingsIcon className="w-4 h-4" />
+                          <Edit2 className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -844,6 +1080,121 @@ export default function SettingsPage() {
               className="bg-mint-500 hover:bg-mint-600"
               disabled={!employeeForm.name || !employeeForm.role}
               data-testid="save-employee-btn"
+            >
+              Сохранить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Menu Section Dialog */}
+      <Dialog open={sectionDialogOpen} onOpenChange={setSectionDialogOpen}>
+        <DialogContent data-testid="section-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading">
+              {editingSection ? 'Редактировать раздел' : 'Новый раздел меню'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Название</Label>
+              <Input
+                value={sectionForm.name}
+                onChange={(e) => setSectionForm({ ...sectionForm, name: e.target.value })}
+                placeholder="Например: Барное меню"
+                data-testid="section-name-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Порядок сортировки</Label>
+              <Input
+                type="number"
+                value={sectionForm.sort_order}
+                onChange={(e) => setSectionForm({ ...sectionForm, sort_order: parseInt(e.target.value) || 0 })}
+                data-testid="section-sort-input"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={sectionForm.is_active}
+                onCheckedChange={(checked) => setSectionForm({ ...sectionForm, is_active: checked })}
+                data-testid="section-active-switch"
+              />
+              <Label>Активен</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSectionDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button 
+              onClick={saveSectionHandler}
+              className="bg-mint-500 hover:bg-mint-600"
+              disabled={!sectionForm.name}
+              data-testid="save-section-btn"
+            >
+              Сохранить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Call Type Dialog */}
+      <Dialog open={callTypeDialogOpen} onOpenChange={setCallTypeDialogOpen}>
+        <DialogContent data-testid="call-type-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading">
+              {editingCallType ? 'Редактировать тип вызова' : 'Новый тип вызова'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Название</Label>
+              <Input
+                value={callTypeForm.name}
+                onChange={(e) => setCallTypeForm({ ...callTypeForm, name: e.target.value })}
+                placeholder="Например: Вызов официанта"
+                data-testid="call-type-name-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Сообщение для Telegram</Label>
+              <Textarea
+                value={callTypeForm.telegram_message}
+                onChange={(e) => setCallTypeForm({ ...callTypeForm, telegram_message: e.target.value })}
+                placeholder="🔔 Стол #{table} - Вызов официанта"
+                rows={2}
+                data-testid="call-type-message-input"
+              />
+              <p className="text-xs text-muted-foreground">Используйте {'{table}'} для номера стола</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Порядок сортировки</Label>
+              <Input
+                type="number"
+                value={callTypeForm.sort_order}
+                onChange={(e) => setCallTypeForm({ ...callTypeForm, sort_order: parseInt(e.target.value) || 0 })}
+                data-testid="call-type-sort-input"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={callTypeForm.is_active}
+                onCheckedChange={(checked) => setCallTypeForm({ ...callTypeForm, is_active: checked })}
+                data-testid="call-type-active-switch"
+              />
+              <Label>Активен</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCallTypeDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button 
+              onClick={saveCallTypeHandler}
+              className="bg-mint-500 hover:bg-mint-600"
+              disabled={!callTypeForm.name}
+              data-testid="save-call-type-btn"
             >
               Сохранить
             </Button>
