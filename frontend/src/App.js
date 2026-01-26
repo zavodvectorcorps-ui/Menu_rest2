@@ -5,6 +5,7 @@ import axios from "axios";
 import { Toaster } from "@/components/ui/sonner";
 
 // Pages
+import LoginPage from "@/pages/LoginPage";
 import AdminLayout from "@/pages/AdminLayout";
 import ProfilePage from "@/pages/ProfilePage";
 import MenuPage from "@/pages/MenuPage";
@@ -13,6 +14,8 @@ import SettingsPage from "@/pages/SettingsPage";
 import HelpCenterPage from "@/pages/HelpCenterPage";
 import SupportPage from "@/pages/SupportPage";
 import ClientMenuPage from "@/pages/ClientMenuPage";
+import AnalyticsPage from "@/pages/AnalyticsPage";
+import UsersPage from "@/pages/UsersPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -28,7 +31,7 @@ export const useTheme = () => {
   return context;
 };
 
-// API Context for sharing data
+// App Context for sharing data
 export const AppContext = createContext();
 
 export const useApp = () => {
@@ -44,26 +47,49 @@ function App() {
   const [settings, setSettings] = useState(null);
   const [restaurant, setRestaurant] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Auth state
+  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [restaurants, setRestaurants] = useState(() => {
+    const saved = localStorage.getItem('restaurants');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [currentRestaurantId, setCurrentRestaurantId] = useState(
+    localStorage.getItem('currentRestaurantId')
+  );
 
-  // Fetch initial data
+  // Initialize app
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Seed data first
+        // Seed data
         await axios.post(`${API}/seed`);
         
-        // Fetch settings and restaurant info
-        const [settingsRes, restaurantRes] = await Promise.all([
-          axios.get(`${API}/settings`),
-          axios.get(`${API}/restaurant`)
-        ]);
-        
-        setSettings(settingsRes.data);
-        setRestaurant(restaurantRes.data);
-        
-        // Apply theme from settings
-        if (settingsRes.data?.theme) {
-          setTheme(settingsRes.data.theme);
+        // If we have a token, verify it and fetch data
+        if (token) {
+          try {
+            const response = await axios.get(`${API}/auth/me`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            setUser(response.data.user);
+            setRestaurants(response.data.restaurants);
+            localStorage.setItem('user', JSON.stringify(response.data.user));
+            localStorage.setItem('restaurants', JSON.stringify(response.data.restaurants));
+            
+            // Set current restaurant if not set
+            if (!currentRestaurantId && response.data.restaurants.length > 0) {
+              const firstRestaurantId = response.data.restaurants[0].id;
+              setCurrentRestaurantId(firstRestaurantId);
+              localStorage.setItem('currentRestaurantId', firstRestaurantId);
+            }
+          } catch (error) {
+            // Token invalid, clear auth
+            handleLogout();
+          }
         }
       } catch (error) {
         console.error('Failed to initialize app:', error);
@@ -75,7 +101,38 @@ function App() {
     initializeApp();
   }, []);
 
-  // Apply theme to document
+  // Fetch restaurant data when currentRestaurantId changes
+  useEffect(() => {
+    if (token && currentRestaurantId) {
+      fetchRestaurantData();
+    }
+  }, [currentRestaurantId, token]);
+
+  const fetchRestaurantData = async () => {
+    if (!currentRestaurantId || !token) return;
+    
+    try {
+      const [restaurantRes, settingsRes] = await Promise.all([
+        axios.get(`${API}/restaurants/${currentRestaurantId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API}/restaurants/${currentRestaurantId}/settings`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+      
+      setRestaurant(restaurantRes.data);
+      setSettings(settingsRes.data);
+      
+      if (settingsRes.data?.theme) {
+        setTheme(settingsRes.data.theme);
+      }
+    } catch (error) {
+      console.error('Failed to fetch restaurant data:', error);
+    }
+  };
+
+  // Apply theme
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -84,9 +141,41 @@ function App() {
     }
   }, [theme]);
 
+  const handleLogin = (accessToken, userData, restaurantsList) => {
+    setToken(accessToken);
+    setUser(userData);
+    setRestaurants(restaurantsList);
+    if (restaurantsList.length > 0) {
+      setCurrentRestaurantId(restaurantsList[0].id);
+    }
+  };
+
+  const handleLogout = () => {
+    setToken(null);
+    setUser(null);
+    setRestaurants([]);
+    setCurrentRestaurantId(null);
+    setRestaurant(null);
+    setSettings(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('restaurants');
+    localStorage.removeItem('currentRestaurantId');
+  };
+
+  const switchRestaurant = (restaurantId) => {
+    setCurrentRestaurantId(restaurantId);
+    localStorage.setItem('currentRestaurantId', restaurantId);
+  };
+
   const updateSettings = async (newSettings) => {
+    if (!currentRestaurantId || !token) return;
     try {
-      const response = await axios.put(`${API}/settings`, newSettings);
+      const response = await axios.put(
+        `${API}/restaurants/${currentRestaurantId}/settings`, 
+        newSettings,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setSettings(response.data);
       if (newSettings.theme) {
         setTheme(newSettings.theme);
@@ -99,9 +188,16 @@ function App() {
   };
 
   const updateRestaurant = async (newData) => {
+    if (!currentRestaurantId || !token) return;
     try {
-      const response = await axios.put(`${API}/restaurant`, newData);
+      const response = await axios.put(
+        `${API}/restaurants/${currentRestaurantId}`, 
+        newData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setRestaurant(response.data);
+      // Update in restaurants list
+      setRestaurants(prev => prev.map(r => r.id === currentRestaurantId ? response.data : r));
       return response.data;
     } catch (error) {
       console.error('Failed to update restaurant:', error);
@@ -122,29 +218,56 @@ function App() {
     );
   }
 
+  const appContextValue = {
+    settings,
+    updateSettings,
+    restaurant,
+    updateRestaurant,
+    token,
+    user,
+    restaurants,
+    currentRestaurantId,
+    switchRestaurant,
+    handleLogout,
+    fetchRestaurantData
+  };
+
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
-      <AppContext.Provider value={{ settings, updateSettings, restaurant, updateRestaurant }}>
+      <AppContext.Provider value={appContextValue}>
         <div className="App">
           <BrowserRouter>
             <Routes>
-              {/* Admin Routes */}
-              <Route path="/admin" element={<AdminLayout />}>
+              {/* Login Route */}
+              <Route 
+                path="/login" 
+                element={
+                  token ? <Navigate to="/admin/profile" replace /> : <LoginPage onLogin={handleLogin} />
+                } 
+              />
+              
+              {/* Admin Routes (Protected) */}
+              <Route 
+                path="/admin" 
+                element={token ? <AdminLayout /> : <Navigate to="/login" replace />}
+              >
                 <Route index element={<Navigate to="/admin/profile" replace />} />
                 <Route path="profile" element={<ProfilePage />} />
                 <Route path="menu" element={<MenuPage />} />
                 <Route path="orders" element={<OrdersPage />} />
+                <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="users" element={user?.role === 'superadmin' ? <UsersPage /> : <Navigate to="/admin/profile" replace />} />
                 <Route path="help" element={<HelpCenterPage />} />
                 <Route path="support" element={<SupportPage />} />
               </Route>
               
-              {/* Client Menu Route */}
+              {/* Client Menu Route (Public) */}
               <Route path="/menu/:tableCode" element={<ClientMenuPage />} />
               
               {/* Default redirect */}
-              <Route path="/" element={<Navigate to="/admin/profile" replace />} />
-              <Route path="*" element={<Navigate to="/admin/profile" replace />} />
+              <Route path="/" element={<Navigate to={token ? "/admin/profile" : "/login"} replace />} />
+              <Route path="*" element={<Navigate to={token ? "/admin/profile" : "/login"} replace />} />
             </Routes>
           </BrowserRouter>
           <Toaster position="top-right" richColors />
