@@ -161,6 +161,35 @@ export default function SettingsPage() {
     toast.success('Ссылка скопирована');
   };
 
+  // QR Code handlers
+  const showQrCode = async (table) => {
+    setQrLoading(true);
+    setQrDialogOpen(true);
+    try {
+      const baseUrl = window.location.origin;
+      const response = await axios.get(`${API}/tables/${table.id}/qr?base_url=${encodeURIComponent(baseUrl)}`);
+      setQrData(response.data);
+    } catch (error) {
+      toast.error('Ошибка генерации QR-кода');
+      setQrDialogOpen(false);
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const downloadQrCode = () => {
+    if (!qrData) return;
+    
+    // Create download link from base64
+    const link = document.createElement('a');
+    link.href = qrData.qr_base64;
+    link.download = `qr_table_${qrData.table_number}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('QR-код скачан');
+  };
+
   // Employee handlers
   const openEmployeeDialog = (employee = null) => {
     if (employee) {
