@@ -739,9 +739,10 @@ async def delete_menu_section(section_id: str):
 
 # ============ CALL TYPES ENDPOINTS ============
 
-@api_router.get("/call-types")
-async def get_call_types():
-    return await get_or_create_call_types()
+@api_router.get("/restaurants/{restaurant_id}/call-types")
+async def get_call_types(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    return await get_or_create_call_types(restaurant_id)
 
 @api_router.post("/call-types")
 async def create_call_type(data: CallTypeCreate):
