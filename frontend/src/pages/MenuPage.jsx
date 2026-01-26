@@ -358,10 +358,10 @@ export default function MenuPage() {
   const openCategoryDialog = (category = null) => {
     if (category) {
       setEditingCategory(category);
-      setCategoryForm({ name: category.name, section_id: category.section_id || '', sort_order: category.sort_order, is_active: category.is_active });
+      setCategoryForm({ name: category.name, section_id: category.section_id || '', display_mode: category.display_mode || 'card', sort_order: category.sort_order, is_active: category.is_active });
     } else {
       setEditingCategory(null);
-      setCategoryForm({ name: '', section_id: menuSections[0]?.id || '', sort_order: categories.length, is_active: true });
+      setCategoryForm({ name: '', section_id: menuSections[0]?.id || '', display_mode: 'card', sort_order: categories.length, is_active: true });
     }
     setCategoryDialogOpen(true);
   };
