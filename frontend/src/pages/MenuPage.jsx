@@ -629,6 +629,26 @@ export default function MenuPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Режим отображения</Label>
+              <Select
+                value={categoryForm.display_mode}
+                onValueChange={(value) => setCategoryForm({ ...categoryForm, display_mode: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите режим" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="card">Карточка с картинкой</SelectItem>
+                  <SelectItem value="compact">Компактный список</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {categoryForm.display_mode === 'card' 
+                  ? 'Позиции будут отображаться с картинками (для коктейлей, блюд)' 
+                  : 'Позиции будут отображаться строкой: название, цена, объём (для виски, вина)'}
+              </p>
+            </div>
             <div className="flex items-center gap-2">
               <Switch
                 checked={categoryForm.is_active}
