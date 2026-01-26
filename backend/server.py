@@ -1188,7 +1188,7 @@ async def get_faq():
 async def seed_data(restaurant_id: str, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
     
-    restaurant = await get_or_create_restaurant(restaurant_id)
+    await get_or_create_restaurant(restaurant_id)
     await get_or_create_settings(restaurant_id)
     await get_or_create_menu_sections(restaurant_id)
     await get_or_create_call_types(restaurant_id)
