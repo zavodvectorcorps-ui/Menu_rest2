@@ -62,7 +62,7 @@ export default function OrdersPage() {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      await axios.put(`${API}/orders/${orderId}/status`, { status: newStatus });
+      await axios.put(`${API}/restaurants/${currentRestaurantId}/orders/${orderId}/status`, { status: newStatus }, authHeaders);
       toast.success('Статус обновлён');
       fetchData();
     } catch (error) {
@@ -72,7 +72,7 @@ export default function OrdersPage() {
 
   const updateCallStatus = async (callId, newStatus) => {
     try {
-      await axios.put(`${API}/staff-calls/${callId}/status?status=${newStatus}`);
+      await axios.put(`${API}/restaurants/${currentRestaurantId}/staff-calls/${callId}/status?status=${newStatus}`, {}, authHeaders);
       toast.success('Статус обновлён');
       fetchData();
     } catch (error) {
