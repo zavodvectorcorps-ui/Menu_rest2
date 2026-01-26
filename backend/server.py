@@ -1017,31 +1017,35 @@ async def update_staff_call_status(restaurant_id: str, call_id: str, status: Sta
 
 # ============ EMPLOYEES ENDPOINTS ============
 
-@api_router.get("/employees")
-async def get_employees():
-    employees = await db.employees.find({}, {"_id": 0}).to_list(100)
+@api_router.get("/restaurants/{restaurant_id}/employees")
+async def get_employees(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    employees = await db.employees.find({"restaurant_id": restaurant_id}, {"_id": 0}).to_list(100)
     return [serialize_doc(e) for e in employees]
 
-@api_router.post("/employees")
-async def create_employee(data: EmployeeCreate):
-    employee = Employee(**data.model_dump())
+@api_router.post("/restaurants/{restaurant_id}/employees")
+async def create_employee(restaurant_id: str, data: EmployeeCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    employee = Employee(restaurant_id=restaurant_id, **data.model_dump())
     doc = employee.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.employees.insert_one(doc)
     return serialize_doc(doc)
 
-@api_router.put("/employees/{employee_id}")
-async def update_employee(employee_id: str, data: EmployeeCreate):
+@api_router.put("/restaurants/{restaurant_id}/employees/{employee_id}")
+async def update_employee(restaurant_id: str, employee_id: str, data: EmployeeCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
     update_data = data.model_dump()
-    result = await db.employees.update_one({"id": employee_id}, {"$set": update_data})
+    result = await db.employees.update_one({"id": employee_id, "restaurant_id": restaurant_id}, {"$set": update_data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Employee not found")
-    employee = await db.employees.find_one({"id": employee_id}, {"_id": 0})
+    employee = await db.employees.find_one({"id": employee_id, "restaurant_id": restaurant_id}, {"_id": 0})
     return serialize_doc(employee)
 
-@api_router.delete("/employees/{employee_id}")
-async def delete_employee(employee_id: str):
-    result = await db.employees.delete_one({"id": employee_id})
+@api_router.delete("/restaurants/{restaurant_id}/employees/{employee_id}")
+async def delete_employee(restaurant_id: str, employee_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.employees.delete_one({"id": employee_id, "restaurant_id": restaurant_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Employee not found")
     return {"message": "Employee deleted"}
