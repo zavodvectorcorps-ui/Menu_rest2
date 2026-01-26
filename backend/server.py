@@ -331,6 +331,33 @@ async def delete_category(category_id: str):
     await db.menu_items.delete_many({"category_id": category_id})
     return {"message": "Category deleted"}
 
+class ReorderItem(BaseModel):
+    id: str
+    sort_order: int
+
+class ReorderRequest(BaseModel):
+    items: List[ReorderItem]
+
+@api_router.put("/categories/reorder")
+async def reorder_categories(data: ReorderRequest):
+    """Reorder categories by updating their sort_order"""
+    for item in data.items:
+        await db.categories.update_one(
+            {"id": item.id}, 
+            {"$set": {"sort_order": item.sort_order}}
+        )
+    return {"message": "Categories reordered"}
+
+@api_router.put("/menu-items/reorder")
+async def reorder_menu_items(data: ReorderRequest):
+    """Reorder menu items by updating their sort_order"""
+    for item in data.items:
+        await db.menu_items.update_one(
+            {"id": item.id}, 
+            {"$set": {"sort_order": item.sort_order}}
+        )
+    return {"message": "Menu items reordered"}
+
 # ============ MENU ITEMS ENDPOINTS ============
 
 @api_router.get("/menu-items", response_model=List[MenuItem])
