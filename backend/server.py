@@ -63,16 +63,31 @@ class RestaurantUpdate(BaseModel):
     working_hours: Optional[str] = None
     slogan: Optional[str] = None
 
+# Menu Sections (Гастрономическое, Барное, Кальянное меню)
+class MenuSection(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    sort_order: int = 0
+    is_active: bool = True
+
+class MenuSectionCreate(BaseModel):
+    name: str
+    sort_order: int = 0
+    is_active: bool = True
+
 class Category(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
+    section_id: Optional[str] = None  # ID блока меню
     sort_order: int = 0
     is_active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class CategoryCreate(BaseModel):
     name: str
+    section_id: Optional[str] = None
     sort_order: int = 0
     is_active: bool = True
 
@@ -82,7 +97,7 @@ class MenuItem(BaseModel):
     category_id: str
     name: str
     description: Optional[str] = ""
-    price: float
+    price: float = 0
     weight: Optional[str] = ""
     image_url: Optional[str] = ""
     is_available: bool = True
@@ -91,6 +106,7 @@ class MenuItem(BaseModel):
     is_hit: bool = False
     is_new: bool = False
     is_spicy: bool = False
+    is_banner: bool = False  # Рекламный баннер
     sort_order: int = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -98,7 +114,7 @@ class MenuItemCreate(BaseModel):
     category_id: str
     name: str
     description: Optional[str] = ""
-    price: float
+    price: float = 0
     weight: Optional[str] = ""
     image_url: Optional[str] = ""
     is_available: bool = True
@@ -107,6 +123,7 @@ class MenuItemCreate(BaseModel):
     is_hit: bool = False
     is_new: bool = False
     is_spicy: bool = False
+    is_banner: bool = False
     sort_order: int = 0
 
 class MenuItemUpdate(BaseModel):
@@ -122,6 +139,7 @@ class MenuItemUpdate(BaseModel):
     is_hit: Optional[bool] = None
     is_new: Optional[bool] = None
     is_spicy: Optional[bool] = None
+    is_banner: Optional[bool] = None
     sort_order: Optional[int] = None
 
 class Table(BaseModel):
@@ -163,16 +181,34 @@ class OrderCreate(BaseModel):
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus
 
+# Call Types (Типы вызовов: Официант, Кальянщик, Счёт)
+class CallType(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    telegram_message: str = ""  # Сообщение для Telegram
+    sort_order: int = 0
+    is_active: bool = True
+
+class CallTypeCreate(BaseModel):
+    name: str
+    telegram_message: str = ""
+    sort_order: int = 0
+    is_active: bool = True
+
 class StaffCall(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     table_id: str
     table_number: int
+    call_type_id: Optional[str] = None
+    call_type_name: Optional[str] = None
     status: StaffCallStatus = StaffCallStatus.PENDING
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class StaffCallCreate(BaseModel):
     table_code: str
+    call_type_id: Optional[str] = None
 
 class Employee(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -200,6 +236,7 @@ class Settings(BaseModel):
     theme: str = "light"
     primary_color: str = "#5DA9A4"
     secondary_color: str = "#8D6E63"
+    currency: str = "BYN"
     telegram_bot_token: Optional[str] = ""
     telegram_chat_id: Optional[str] = ""
 
@@ -212,6 +249,7 @@ class SettingsUpdate(BaseModel):
     theme: Optional[str] = None
     primary_color: Optional[str] = None
     secondary_color: Optional[str] = None
+    currency: Optional[str] = None
     telegram_bot_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
 
@@ -264,8 +302,8 @@ async def get_or_create_restaurant():
             name="Мята Спортивная",
             description="Уютный ресторан с авторской кухней и кальянами",
             address="ул. Спортивная, 15",
-            phone="+7 (999) 123-45-67",
-            email="info@myata-sport.ru",
+            phone="+375 (29) 123-45-67",
+            email="info@myata-sport.by",
             slogan="Вкус, который запоминается",
             working_hours="Пн-Вс: 12:00 - 02:00"
         )
@@ -285,6 +323,34 @@ async def get_or_create_settings():
         return doc
     return settings
 
+async def get_or_create_menu_sections():
+    """Get or create default menu sections"""
+    sections = await db.menu_sections.find({}, {"_id": 0}).sort("sort_order", 1).to_list(100)
+    if not sections:
+        default_sections = [
+            MenuSection(id="gastro", name="Гастрономическое меню", sort_order=1),
+            MenuSection(id="bar", name="Барное меню", sort_order=2),
+            MenuSection(id="hookah", name="Кальянное меню", sort_order=3),
+        ]
+        for section in default_sections:
+            await db.menu_sections.insert_one(section.model_dump())
+        sections = [s.model_dump() for s in default_sections]
+    return sections
+
+async def get_or_create_call_types():
+    """Get or create default call types"""
+    call_types = await db.call_types.find({}, {"_id": 0}).sort("sort_order", 1).to_list(100)
+    if not call_types:
+        default_types = [
+            CallType(name="Вызов официанта", telegram_message="🔔 Стол #{table} - Вызов официанта", sort_order=1),
+            CallType(name="Вызов кальянного мастера", telegram_message="💨 Стол #{table} - Вызов кальянного мастера", sort_order=2),
+            CallType(name="Попросить счёт", telegram_message="💳 Стол #{table} - Просят счёт", sort_order=3),
+        ]
+        for ct in default_types:
+            await db.call_types.insert_one(ct.model_dump())
+        call_types = [ct.model_dump() for ct in default_types]
+    return call_types
+
 # ============ RESTAURANT ENDPOINTS ============
 
 @api_router.get("/restaurant")
@@ -298,14 +364,74 @@ async def update_restaurant(data: RestaurantUpdate):
         await db.restaurants.update_one({}, {"$set": update_data})
     return await get_or_create_restaurant()
 
+# ============ MENU SECTIONS ENDPOINTS ============
+
+@api_router.get("/menu-sections")
+async def get_menu_sections():
+    return await get_or_create_menu_sections()
+
+@api_router.post("/menu-sections")
+async def create_menu_section(data: MenuSectionCreate):
+    section = MenuSection(**data.model_dump())
+    doc = section.model_dump()
+    await db.menu_sections.insert_one(doc)
+    return doc
+
+@api_router.put("/menu-sections/{section_id}")
+async def update_menu_section(section_id: str, data: MenuSectionCreate):
+    update_data = data.model_dump()
+    result = await db.menu_sections.update_one({"id": section_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Section not found")
+    section = await db.menu_sections.find_one({"id": section_id}, {"_id": 0})
+    return section
+
+@api_router.delete("/menu-sections/{section_id}")
+async def delete_menu_section(section_id: str):
+    result = await db.menu_sections.delete_one({"id": section_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Section not found")
+    # Remove section_id from categories
+    await db.categories.update_many({"section_id": section_id}, {"$set": {"section_id": None}})
+    return {"message": "Section deleted"}
+
+# ============ CALL TYPES ENDPOINTS ============
+
+@api_router.get("/call-types")
+async def get_call_types():
+    return await get_or_create_call_types()
+
+@api_router.post("/call-types")
+async def create_call_type(data: CallTypeCreate):
+    call_type = CallType(**data.model_dump())
+    doc = call_type.model_dump()
+    await db.call_types.insert_one(doc)
+    return doc
+
+@api_router.put("/call-types/{type_id}")
+async def update_call_type(type_id: str, data: CallTypeCreate):
+    update_data = data.model_dump()
+    result = await db.call_types.update_one({"id": type_id}, {"$set": update_data})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Call type not found")
+    call_type = await db.call_types.find_one({"id": type_id}, {"_id": 0})
+    return call_type
+
+@api_router.delete("/call-types/{type_id}")
+async def delete_call_type(type_id: str):
+    result = await db.call_types.delete_one({"id": type_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Call type not found")
+    return {"message": "Call type deleted"}
+
 # ============ CATEGORIES ENDPOINTS ============
 
-@api_router.get("/categories", response_model=List[Category])
+@api_router.get("/categories")
 async def get_categories():
     categories = await db.categories.find({}, {"_id": 0}).sort("sort_order", 1).to_list(100)
     return [serialize_doc(c) for c in categories]
 
-@api_router.post("/categories", response_model=Category)
+@api_router.post("/categories")
 async def create_category(data: CategoryCreate):
     category = Category(**data.model_dump())
     doc = category.model_dump()
@@ -327,7 +453,6 @@ async def delete_category(category_id: str):
     result = await db.categories.delete_one({"id": category_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Category not found")
-    # Also delete all menu items in this category
     await db.menu_items.delete_many({"category_id": category_id})
     return {"message": "Category deleted"}
 
@@ -340,7 +465,6 @@ class ReorderRequest(BaseModel):
 
 @api_router.put("/categories/reorder")
 async def reorder_categories(data: ReorderRequest):
-    """Reorder categories by updating their sort_order"""
     for item in data.items:
         await db.categories.update_one(
             {"id": item.id}, 
@@ -350,7 +474,6 @@ async def reorder_categories(data: ReorderRequest):
 
 @api_router.put("/menu-items/reorder")
 async def reorder_menu_items(data: ReorderRequest):
-    """Reorder menu items by updating their sort_order"""
     for item in data.items:
         await db.menu_items.update_one(
             {"id": item.id}, 
@@ -360,7 +483,7 @@ async def reorder_menu_items(data: ReorderRequest):
 
 # ============ MENU ITEMS ENDPOINTS ============
 
-@api_router.get("/menu-items", response_model=List[MenuItem])
+@api_router.get("/menu-items")
 async def get_menu_items(category_id: Optional[str] = None):
     query = {}
     if category_id:
@@ -368,7 +491,7 @@ async def get_menu_items(category_id: Optional[str] = None):
     items = await db.menu_items.find(query, {"_id": 0}).sort("sort_order", 1).to_list(500)
     return [serialize_doc(i) for i in items]
 
-@api_router.post("/menu-items", response_model=MenuItem)
+@api_router.post("/menu-items")
 async def create_menu_item(data: MenuItemCreate):
     item = MenuItem(**data.model_dump())
     doc = item.model_dump()
@@ -395,12 +518,12 @@ async def delete_menu_item(item_id: str):
 
 # ============ TABLES ENDPOINTS ============
 
-@api_router.get("/tables", response_model=List[Table])
+@api_router.get("/tables")
 async def get_tables():
     tables = await db.tables.find({}, {"_id": 0}).sort("number", 1).to_list(100)
     return [serialize_doc(t) for t in tables]
 
-@api_router.post("/tables", response_model=Table)
+@api_router.post("/tables")
 async def create_table(data: TableCreate):
     table = Table(**data.model_dump())
     doc = table.model_dump()
@@ -435,7 +558,7 @@ async def regenerate_table_code(table_id: str):
 
 # ============ ORDERS ENDPOINTS ============
 
-@api_router.get("/orders", response_model=List[Order])
+@api_router.get("/orders")
 async def get_orders(status: Optional[OrderStatus] = None, date: Optional[str] = None):
     query = {}
     if status:
@@ -445,14 +568,12 @@ async def get_orders(status: Optional[OrderStatus] = None, date: Optional[str] =
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
     return [serialize_doc(o) for o in orders]
 
-@api_router.post("/orders", response_model=Order)
+@api_router.post("/orders")
 async def create_order(data: OrderCreate):
-    # Find table by code
     table = await db.tables.find_one({"code": data.table_code}, {"_id": 0})
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
     
-    # Check if online orders are enabled
     settings = await get_or_create_settings()
     if not settings.get("online_orders_enabled", True):
         raise HTTPException(status_code=400, detail="Online orders are disabled")
@@ -480,7 +601,7 @@ async def update_order_status(order_id: str, data: OrderStatusUpdate):
 
 # ============ STAFF CALLS ENDPOINTS ============
 
-@api_router.get("/staff-calls", response_model=List[StaffCall])
+@api_router.get("/staff-calls")
 async def get_staff_calls(status: Optional[StaffCallStatus] = None):
     query = {}
     if status:
@@ -488,21 +609,28 @@ async def get_staff_calls(status: Optional[StaffCallStatus] = None):
     calls = await db.staff_calls.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
     return [serialize_doc(c) for c in calls]
 
-@api_router.post("/staff-calls", response_model=StaffCall)
+@api_router.post("/staff-calls")
 async def create_staff_call(data: StaffCallCreate):
-    # Find table by code
     table = await db.tables.find_one({"code": data.table_code}, {"_id": 0})
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
     
-    # Check if staff calls are enabled
     settings = await get_or_create_settings()
     if not settings.get("staff_call_enabled", True):
         raise HTTPException(status_code=400, detail="Staff calls are disabled")
     
+    # Get call type info
+    call_type_name = "Вызов"
+    if data.call_type_id:
+        call_type = await db.call_types.find_one({"id": data.call_type_id}, {"_id": 0})
+        if call_type:
+            call_type_name = call_type.get("name", "Вызов")
+    
     call = StaffCall(
         table_id=table["id"],
-        table_number=table["number"]
+        table_number=table["number"],
+        call_type_id=data.call_type_id,
+        call_type_name=call_type_name
     )
     doc = call.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
@@ -519,12 +647,12 @@ async def update_staff_call_status(call_id: str, status: StaffCallStatus):
 
 # ============ EMPLOYEES ENDPOINTS ============
 
-@api_router.get("/employees", response_model=List[Employee])
+@api_router.get("/employees")
 async def get_employees():
     employees = await db.employees.find({}, {"_id": 0}).to_list(100)
     return [serialize_doc(e) for e in employees]
 
-@api_router.post("/employees", response_model=Employee)
+@api_router.post("/employees")
 async def create_employee(data: EmployeeCreate):
     employee = Employee(**data.model_dump())
     doc = employee.model_dump()
@@ -563,45 +691,18 @@ async def update_settings(data: SettingsUpdate):
 
 # ============ STATISTICS ENDPOINTS ============
 
-@api_router.get("/stats", response_model=Stats)
+@api_router.get("/stats")
 async def get_stats():
-    from datetime import timedelta
-    
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
     
-    # Views today
-    views_today = await db.menu_views.count_documents({
-        "created_at": {"$gte": today_start}
-    })
-    
-    # Views this month
-    views_month = await db.menu_views.count_documents({
-        "created_at": {"$gte": month_start}
-    })
-    
-    # Staff calls today
-    calls_today = await db.staff_calls.count_documents({
-        "created_at": {"$gte": today_start}
-    })
-    
-    # Staff calls this month
-    calls_month = await db.staff_calls.count_documents({
-        "created_at": {"$gte": month_start}
-    })
-    
-    # Orders today
-    orders_today = await db.orders.count_documents({
-        "created_at": {"$gte": today_start}
-    })
-    
-    # Orders this month
-    orders_month = await db.orders.count_documents({
-        "created_at": {"$gte": month_start}
-    })
-    
-    # Employees count
+    views_today = await db.menu_views.count_documents({"created_at": {"$gte": today_start}})
+    views_month = await db.menu_views.count_documents({"created_at": {"$gte": month_start}})
+    calls_today = await db.staff_calls.count_documents({"created_at": {"$gte": today_start}})
+    calls_month = await db.staff_calls.count_documents({"created_at": {"$gte": month_start}})
+    orders_today = await db.orders.count_documents({"created_at": {"$gte": today_start}})
+    orders_month = await db.orders.count_documents({"created_at": {"$gte": month_start}})
     employees_count = await db.employees.count_documents({"is_active": True})
     
     return Stats(
@@ -616,12 +717,12 @@ async def get_stats():
 
 # ============ SUPPORT ENDPOINTS ============
 
-@api_router.get("/support-tickets", response_model=List[SupportTicket])
+@api_router.get("/support-tickets")
 async def get_support_tickets():
     tickets = await db.support_tickets.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return [serialize_doc(t) for t in tickets]
 
-@api_router.post("/support-tickets", response_model=SupportTicket)
+@api_router.post("/support-tickets")
 async def create_support_ticket(data: SupportTicketCreate):
     ticket = SupportTicket(**data.model_dump())
     doc = ticket.model_dump()
@@ -633,25 +734,24 @@ async def create_support_ticket(data: SupportTicketCreate):
 
 @api_router.get("/public/menu/{table_code}")
 async def get_public_menu(table_code: str):
-    # Find table
     table = await db.tables.find_one({"code": table_code, "is_active": True}, {"_id": 0})
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
     
-    # Get restaurant info
     restaurant = await get_or_create_restaurant()
-    
-    # Get settings
     settings = await get_or_create_settings()
     
-    # Check if online menu is enabled
     if not settings.get("online_menu_enabled", True):
         raise HTTPException(status_code=400, detail="Online menu is disabled")
     
-    # Get categories
-    categories = await db.categories.find({"is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(100)
+    # Get menu sections
+    sections = await get_or_create_menu_sections()
     
-    # Get menu items
+    # Get call types
+    call_types = await get_or_create_call_types()
+    active_call_types = [ct for ct in call_types if ct.get("is_active", True)]
+    
+    categories = await db.categories.find({"is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(100)
     items = await db.menu_items.find({"is_available": True}, {"_id": 0}).sort("sort_order", 1).to_list(500)
     
     # Filter items based on settings
@@ -673,8 +773,10 @@ async def get_public_menu(table_code: str):
         "table": serialize_doc(table),
         "restaurant": restaurant,
         "settings": settings,
+        "sections": sections,
         "categories": [serialize_doc(c) for c in categories],
-        "items": filtered_items
+        "items": filtered_items,
+        "call_types": active_call_types
     }
 
 # ============ FAQ ENDPOINTS ============
@@ -687,17 +789,15 @@ class FAQItem(BaseModel):
     category: str
     sort_order: int = 0
 
-@api_router.get("/faq", response_model=List[FAQItem])
+@api_router.get("/faq")
 async def get_faq():
     faqs = await db.faqs.find({}, {"_id": 0}).sort("sort_order", 1).to_list(100)
     if not faqs:
-        # Create default FAQs
         default_faqs = [
-            FAQItem(question="Как добавить новую позицию в меню?", answer="Перейдите в раздел 'Меню', выберите категорию и нажмите кнопку 'Добавить позицию'. Заполните все необходимые поля и сохраните.", category="Меню", sort_order=1),
-            FAQItem(question="Как настроить QR-код для стола?", answer="В разделе 'Настройки' -> 'Столы' вы можете создать стол и получить уникальный код/ссылку для QR-кода.", category="Столы", sort_order=2),
-            FAQItem(question="Как включить/выключить онлайн-заказы?", answer="Перейдите в 'Настройки' -> 'Функции' и переключите опцию 'Онлайн-заказы'.", category="Настройки", sort_order=3),
-            FAQItem(question="Как подключить Telegram-бота?", answer="В разделе 'Настройки' -> 'Интеграции' введите токен вашего бота и ID чата для получения уведомлений.", category="Интеграции", sort_order=4),
-            FAQItem(question="Как изменить тему оформления?", answer="В 'Настройки' -> 'Оформление' выберите светлую или тёмную тему и настройте цвета.", category="Настройки", sort_order=5),
+            FAQItem(question="Как добавить новую позицию в меню?", answer="Перейдите в раздел 'Меню', выберите категорию и нажмите кнопку 'Добавить позицию'.", category="Меню", sort_order=1),
+            FAQItem(question="Как настроить QR-код для стола?", answer="В разделе 'Настройки' -> 'Столы' вы можете создать стол и получить уникальный код.", category="Столы", sort_order=2),
+            FAQItem(question="Как настроить типы вызовов?", answer="В разделе 'Настройки' -> 'Типы вызовов' можно создать и редактировать типы вызовов.", category="Настройки", sort_order=3),
+            FAQItem(question="Как подключить Telegram-бота?", answer="В разделе 'Настройки' -> 'Интеграции' введите токен вашего бота и ID чата.", category="Интеграции", sort_order=4),
         ]
         for faq in default_faqs:
             await db.faqs.insert_one(faq.model_dump())
@@ -708,73 +808,10 @@ async def get_faq():
 
 @api_router.post("/seed")
 async def seed_data():
-    """Seed database with test data"""
-    
-    # Create restaurant
     await get_or_create_restaurant()
-    
-    # Create settings
     await get_or_create_settings()
-    
-    # Create categories if none exist
-    existing_categories = await db.categories.count_documents({})
-    if existing_categories == 0:
-        categories_data = [
-            {"name": "Закуски", "sort_order": 1},
-            {"name": "Салаты", "sort_order": 2},
-            {"name": "Горячее", "sort_order": 3},
-            {"name": "Гриль", "sort_order": 4},
-            {"name": "Паста", "sort_order": 5},
-            {"name": "Десерты", "sort_order": 6},
-            {"name": "Напитки", "sort_order": 7},
-            {"name": "Кальяны", "sort_order": 8},
-        ]
-        created_categories = []
-        for cat_data in categories_data:
-            cat = Category(**cat_data)
-            doc = cat.model_dump()
-            doc['created_at'] = doc['created_at'].isoformat()
-            await db.categories.insert_one(doc)
-            created_categories.append(doc)
-        
-        # Create menu items
-        menu_items_data = [
-            {"category_id": created_categories[0]["id"], "name": "Брускетта с томатами", "description": "Хрустящий тост с томатами, базиликом и оливковым маслом", "price": 350, "weight": "150 г", "is_hit": True},
-            {"category_id": created_categories[0]["id"], "name": "Карпаччо из говядины", "description": "Тонко нарезанная говядина с рукколой и пармезаном", "price": 590, "weight": "120 г", "is_new": True},
-            {"category_id": created_categories[0]["id"], "name": "Сырная тарелка", "description": "Ассорти из 4 видов сыра с мёдом и орехами", "price": 650, "weight": "200 г"},
-            
-            {"category_id": created_categories[1]["id"], "name": "Цезарь с курицей", "description": "Классический салат с куриной грудкой, сыром пармезан и соусом цезарь", "price": 420, "weight": "250 г", "is_hit": True, "image_url": "https://images.unsplash.com/photo-1765894711192-d35787eee3b6"},
-            {"category_id": created_categories[1]["id"], "name": "Греческий салат", "description": "Свежие овощи с сыром фета и оливками", "price": 380, "weight": "220 г"},
-            {"category_id": created_categories[1]["id"], "name": "Тёплый салат с говядиной", "description": "Микс салатов с тёплой говядиной и овощами гриль", "price": 520, "weight": "280 г", "is_spicy": True},
-            
-            {"category_id": created_categories[2]["id"], "name": "Стейк рибай", "description": "Сочный стейк из мраморной говядины", "price": 1890, "weight": "300 г", "is_hit": True},
-            {"category_id": created_categories[2]["id"], "name": "Лосось на гриле", "description": "Филе лосося с овощами и лимонным соусом", "price": 890, "weight": "200 г"},
-            {"category_id": created_categories[2]["id"], "name": "Куриная грудка", "description": "Сочная куриная грудка с картофельным пюре", "price": 490, "weight": "250 г"},
-            
-            {"category_id": created_categories[3]["id"], "name": "Шашлык из свинины", "description": "Маринованная свинина на углях с луком", "price": 590, "weight": "250 г"},
-            {"category_id": created_categories[3]["id"], "name": "Люля-кебаб", "description": "Из говядины и баранины с лавашом", "price": 450, "weight": "200 г", "is_spicy": True},
-            
-            {"category_id": created_categories[4]["id"], "name": "Паста Карбонара", "description": "Спагетти с беконом, яйцом и пармезаном", "price": 420, "weight": "300 г", "is_hit": True},
-            {"category_id": created_categories[4]["id"], "name": "Паста с морепродуктами", "description": "Феттучине с креветками, мидиями и кальмарами", "price": 620, "weight": "320 г", "is_new": True},
-            
-            {"category_id": created_categories[5]["id"], "name": "Чизкейк Нью-Йорк", "description": "Классический чизкейк с ягодным соусом", "price": 320, "weight": "150 г"},
-            {"category_id": created_categories[5]["id"], "name": "Тирамису", "description": "Итальянский десерт с маскарпоне и кофе", "price": 350, "weight": "160 г", "is_hit": True},
-            {"category_id": created_categories[5]["id"], "name": "Мороженое ассорти", "description": "3 шарика мороженого на выбор", "price": 250, "weight": "150 г"},
-            
-            {"category_id": created_categories[6]["id"], "name": "Мятный лимонад", "description": "Освежающий лимонад с мятой и лаймом", "price": 220, "weight": "400 мл", "is_hit": True, "image_url": "https://images.unsplash.com/photo-1660225411990-6d5a97be1966"},
-            {"category_id": created_categories[6]["id"], "name": "Свежевыжатый апельсин", "description": "100% натуральный апельсиновый сок", "price": 280, "weight": "300 мл"},
-            {"category_id": created_categories[6]["id"], "name": "Капучино", "description": "Классический итальянский кофе", "price": 180, "weight": "200 мл"},
-            {"category_id": created_categories[6]["id"], "name": "Чай в чайнике", "description": "Чёрный, зелёный или травяной чай", "price": 220, "weight": "500 мл"},
-            
-            {"category_id": created_categories[7]["id"], "name": "Кальян классический", "description": "На выбор: яблоко, виноград, мята, персик", "price": 1200, "weight": ""},
-            {"category_id": created_categories[7]["id"], "name": "Кальян премиум", "description": "Авторские миксы от нашего кальянного мастера", "price": 1500, "weight": "", "is_hit": True},
-        ]
-        
-        for item_data in menu_items_data:
-            item = MenuItem(**item_data)
-            doc = item.model_dump()
-            doc['created_at'] = doc['created_at'].isoformat()
-            await db.menu_items.insert_one(doc)
+    await get_or_create_menu_sections()
+    await get_or_create_call_types()
     
     # Create tables if none exist
     existing_tables = await db.tables.count_documents({})
@@ -799,7 +836,6 @@ async def seed_data():
             doc['created_at'] = doc['created_at'].isoformat()
             await db.employees.insert_one(doc)
     
-    # Create FAQ
     await get_faq()
     
     return {"message": "Data seeded successfully"}
@@ -815,7 +851,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
