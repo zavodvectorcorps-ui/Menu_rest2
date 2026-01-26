@@ -814,20 +814,22 @@ class ReorderItem(BaseModel):
 class ReorderRequest(BaseModel):
     items: List[ReorderItem]
 
-@api_router.put("/categories/reorder")
-async def reorder_categories(data: ReorderRequest):
+@api_router.put("/restaurants/{restaurant_id}/categories/reorder")
+async def reorder_categories(restaurant_id: str, data: ReorderRequest, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
     for item in data.items:
         await db.categories.update_one(
-            {"id": item.id}, 
+            {"id": item.id, "restaurant_id": restaurant_id}, 
             {"$set": {"sort_order": item.sort_order}}
         )
     return {"message": "Categories reordered"}
 
-@api_router.put("/menu-items/reorder")
-async def reorder_menu_items(data: ReorderRequest):
+@api_router.put("/restaurants/{restaurant_id}/menu-items/reorder")
+async def reorder_menu_items(restaurant_id: str, data: ReorderRequest, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
     for item in data.items:
         await db.menu_items.update_one(
-            {"id": item.id}, 
+            {"id": item.id, "restaurant_id": restaurant_id}, 
             {"$set": {"sort_order": item.sort_order}}
         )
     return {"message": "Menu items reordered"}
