@@ -1,0 +1,157 @@
+{
+  "design_system": {
+    "typography": {
+      "font_family": {
+        "headings": "Manrope, sans-serif",
+        "body": "Inter, sans-serif",
+        "mono": "JetBrains Mono, monospace"
+      },
+      "scale": {
+        "h1": "text-4xl md:text-5xl font-bold tracking-tight",
+        "h2": "text-3xl md:text-4xl font-semibold tracking-tight",
+        "h3": "text-2xl md:text-3xl font-semibold",
+        "h4": "text-xl md:text-2xl font-medium",
+        "body_lg": "text-lg leading-relaxed",
+        "body_base": "text-base leading-relaxed",
+        "body_sm": "text-sm leading-relaxed",
+        "caption": "text-xs text-muted-foreground"
+      }
+    },
+    "colors": {
+      "primary": {
+        "DEFAULT": "#5DA9A4",
+        "foreground": "#FFFFFF",
+        "hover": "#4A8F8A",
+        "active": "#3B7570"
+      },
+      "secondary": {
+        "DEFAULT": "#8D6E63",
+        "foreground": "#FFFFFF",
+        "hover": "#795C52",
+        "active": "#654A41"
+      },
+      "background": {
+        "DEFAULT": "#F9FAFB",
+        "paper": "#FFFFFF",
+        "subtle": "#F3F4F6"
+      },
+      "text": {
+        "primary": "#1F2937",
+        "secondary": "#4B5563",
+        "muted": "#9CA3AF"
+      },
+      "status": {
+        "success": "#10B981",
+        "warning": "#F59E0B",
+        "error": "#EF4444",
+        "info": "#3B82F6"
+      }
+    },
+    "spacing": {
+      "container_padding": "p-4 md:p-8 lg:p-12",
+      "section_gap": "gap-8 md:gap-12",
+      "component_gap": "gap-4"
+    },
+    "radius": {
+      "default": "rounded-lg",
+      "card": "rounded-xl",
+      "button": "rounded-full",
+      "input": "rounded-md"
+    },
+    "shadows": {
+      "card": "shadow-sm hover:shadow-md transition-shadow duration-200",
+      "dropdown": "shadow-lg border border-border/50",
+      "modal": "shadow-2xl"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#5DA9A4] text-white hover:bg-[#4A8F8A] rounded-full px-6 py-2 font-medium transition-all active:scale-95",
+      "secondary": "bg-[#8D6E63] text-white hover:bg-[#795C52] rounded-full px-6 py-2 font-medium transition-all active:scale-95",
+      "outline": "border-2 border-[#5DA9A4] text-[#5DA9A4] hover:bg-[#5DA9A4]/10 rounded-full px-6 py-2 font-medium transition-all",
+      "ghost": "hover:bg-gray-100 text-gray-700 rounded-lg px-4 py-2 transition-colors"
+    },
+    "cards": {
+      "default": "bg-white rounded-xl border border-gray-100 shadow-sm p-6",
+      "interactive": "bg-white rounded-xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:border-[#5DA9A4]/30 transition-all cursor-pointer",
+      "stat": "bg-white rounded-xl border border-gray-100 p-6 flex flex-col gap-2"
+    },
+    "inputs": {
+      "default": "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5DA9A4] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    }
+  },
+  "layout_strategies": {
+    "admin_dashboard": {
+      "structure": "Sidebar Navigation (Left) + Top Header + Main Content Area",
+      "grid": "Bento Grid (grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6)",
+      "widgets": {
+        "stats": "col-span-1",
+        "chart": "col-span-2 row-span-2",
+        "list": "col-span-1 row-span-2"
+      }
+    },
+    "client_menu": {
+      "structure": "Sticky Header (Category Nav) + Scrollable Menu List + Sticky Bottom Cart",
+      "grid": "Masonry or List View (grid-cols-1 md:grid-cols-2 gap-4)",
+      "item_card": "Image Top/Left + Title + Description + Price + Add Button"
+    }
+  },
+  "assets": {
+    "images": {
+      "atmosphere": {
+        "url": "https://images.unsplash.com/photo-1766678003078-c8f7110c82d5",
+        "alt": "Cozy Hookah Lounge Interior",
+        "usage": "Login background, Hero section"
+      },
+      "food": {
+        "burger": {
+          "url": "https://images.unsplash.com/photo-1632898657999-ae6920976661",
+          "alt": "Gourmet Burger",
+          "usage": "Menu Item Example"
+        },
+        "salad": {
+          "url": "https://images.unsplash.com/photo-1765894711192-d35787eee3b6",
+          "alt": "Caesar Salad",
+          "usage": "Menu Item Example"
+        },
+        "drink": {
+          "url": "https://images.unsplash.com/photo-1660225411990-6d5a97be1966",
+          "alt": "Mint Lemonade",
+          "usage": "Menu Item Example"
+        }
+      },
+      "staff": {
+        "waiter": {
+          "url": "https://images.unsplash.com/photo-1713965588378-4771f415f2f7",
+          "alt": "Friendly Waiter",
+          "usage": "Support/Help Center"
+        }
+      }
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5px, rounded caps"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Implement the 'Mint & Brown' theme using the specified hex codes in tailwind.config.js.",
+    "Use 'Manrope' for all headings to give a modern, friendly feel.",
+    "For the Admin Dashboard, use a Sidebar layout. For the Client Menu, use a Mobile-First layout.",
+    "Ensure all interactive elements have 'data-testid' attributes.",
+    "Use 'sonner' for all toast notifications.",
+    "Do not use gradients for backgrounds; stick to solid colors or subtle textures.",
+    "Ensure high contrast for text readability, especially on the mint background.",
+    "The 'Client Menu' must be accessible without login (Guest Mode).",
+    "Implement 'Theme Switching' capability in the Admin Settings (Light/Dark/System), but default to the Mint/Brown Light theme."
+  ],
+  "universal_guidelines": [
+    "Avoid generic 'AI slop' designs; use generous spacing and unique layouts.",
+    "Dark colors should be used independently, not in gradients.",
+    "Create depth with z-index and shadows, not just borders.",
+    "Use glassmorphism for sticky headers (backdrop-blur-md).",
+    "No 'transition: all'; animate specific properties only.",
+    "No center-aligned app containers.",
+    "Use modern button styles (pill/rounded).",
+    "Micro-animations for all interactions (hover, click, focus)."
+  ]
+}
