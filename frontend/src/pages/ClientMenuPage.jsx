@@ -54,6 +54,22 @@ export default function ClientMenuPage() {
     fetchMenu();
   }, [tableCode]);
 
+  // Apply theme from settings
+  useEffect(() => {
+    if (data?.settings?.theme) {
+      if (data.settings.theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+    
+    // Cleanup - restore to light when leaving
+    return () => {
+      document.documentElement.classList.remove('dark');
+    };
+  }, [data?.settings?.theme]);
+
   // Get categories for selected section
   const sectionCategories = data?.categories.filter(cat => cat.section_id === selectedSection) || [];
   
