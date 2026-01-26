@@ -749,6 +749,16 @@ export default function SettingsPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
+                              onClick={() => showQrCode(table)}
+                              title="QR-код"
+                              data-testid={`qr-code-${table.id}`}
+                            >
+                              <QrCode className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => copyTableLink(table.code)}
                               title="Копировать ссылку"
                               data-testid={`copy-link-${table.id}`}
