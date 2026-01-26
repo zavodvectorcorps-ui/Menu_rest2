@@ -1115,21 +1115,22 @@ async def get_public_menu(table_code: str):
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
     
-    restaurant = await get_or_create_restaurant()
-    settings = await get_or_create_settings()
+    restaurant_id = table["restaurant_id"]
+    restaurant = await get_or_create_restaurant(restaurant_id)
+    settings = await get_or_create_settings(restaurant_id)
     
     if not settings.get("online_menu_enabled", True):
         raise HTTPException(status_code=400, detail="Online menu is disabled")
     
     # Get menu sections
-    sections = await get_or_create_menu_sections()
+    sections = await get_or_create_menu_sections(restaurant_id)
     
     # Get call types
-    call_types = await get_or_create_call_types()
+    call_types = await get_or_create_call_types(restaurant_id)
     active_call_types = [ct for ct in call_types if ct.get("is_active", True)]
     
-    categories = await db.categories.find({"is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(100)
-    items = await db.menu_items.find({"is_available": True}, {"_id": 0}).sort("sort_order", 1).to_list(500)
+    categories = await db.categories.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(100)
+    items = await db.menu_items.find({"restaurant_id": restaurant_id, "is_available": True}, {"_id": 0}).sort("sort_order", 1).to_list(500)
     
     # Filter items based on settings
     filtered_items = []
@@ -1141,7 +1142,7 @@ async def get_public_menu(table_code: str):
         filtered_items.append(serialize_doc(item))
     
     # Record menu view
-    view = MenuView(table_code=table_code)
+    view = MenuView(restaurant_id=restaurant_id, table_code=table_code)
     view_doc = view.model_dump()
     view_doc['created_at'] = view_doc['created_at'].isoformat()
     await db.menu_views.insert_one(view_doc)
