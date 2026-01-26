@@ -552,10 +552,10 @@ export default function MenuPage() {
       };
       
       if (editingItem) {
-        await axios.put(`${API}/menu-items/${editingItem.id}`, data);
+        await axios.put(`${API}/restaurants/${currentRestaurantId}/menu-items/${editingItem.id}`, data, authHeaders);
         toast.success('Позиция обновлена');
       } else {
-        await axios.post(`${API}/menu-items`, data);
+        await axios.post(`${API}/restaurants/${currentRestaurantId}/menu-items`, data, authHeaders);
         toast.success('Позиция добавлена');
       }
       setItemDialogOpen(false);
@@ -574,13 +574,13 @@ export default function MenuPage() {
   const confirmDelete = async () => {
     try {
       if (deleteTarget.type === 'category') {
-        await axios.delete(`${API}/categories/${deleteTarget.id}`);
+        await axios.delete(`${API}/restaurants/${currentRestaurantId}/categories/${deleteTarget.id}`, authHeaders);
         toast.success('Категория удалена');
         if (selectedCategory === deleteTarget.id) {
           setSelectedCategory(categories.find(c => c.id !== deleteTarget.id)?.id || null);
         }
       } else {
-        await axios.delete(`${API}/menu-items/${deleteTarget.id}`);
+        await axios.delete(`${API}/restaurants/${currentRestaurantId}/menu-items/${deleteTarget.id}`, authHeaders);
         toast.success('Позиция удалена');
       }
       setDeleteDialogOpen(false);
@@ -592,7 +592,7 @@ export default function MenuPage() {
 
   const toggleItemAvailability = async (item) => {
     try {
-      await axios.put(`${API}/menu-items/${item.id}`, { is_available: !item.is_available });
+      await axios.put(`${API}/restaurants/${currentRestaurantId}/menu-items/${item.id}`, { is_available: !item.is_available }, authHeaders);
       fetchData();
       toast.success(item.is_available ? 'Позиция скрыта' : 'Позиция доступна');
     } catch (error) {
