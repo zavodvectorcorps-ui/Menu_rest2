@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, GripVertical, ImageIcon, Flame, Star, Sparkles, Tag, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, GripVertical, ImageIcon, Flame, Star, Sparkles, Tag, Search, Image, Layers } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,6 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragOverlay,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -33,7 +32,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 // Sortable Category Item
-function SortableCategoryItem({ category, isSelected, itemCount, onSelect, onEdit, onDelete }) {
+function SortableCategoryItem({ category, isSelected, itemCount, sectionName, onSelect, onEdit, onDelete }) {
   const {
     attributes,
     listeners,
@@ -61,22 +60,23 @@ function SortableCategoryItem({ category, isSelected, itemCount, onSelect, onEdi
       onClick={() => onSelect(category.id)}
       data-testid={`category-${category.id}`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0">
         <button
           className={`cursor-grab active:cursor-grabbing p-1 rounded hover:bg-black/10 ${isSelected ? 'hover:bg-white/20' : ''}`}
           {...attributes}
           {...listeners}
           onClick={(e) => e.stopPropagation()}
-          data-testid={`drag-category-${category.id}`}
         >
           <GripVertical className="w-4 h-4" />
         </button>
-        <span className="font-medium">{category.name}</span>
-        {!category.is_active && (
-          <Badge variant="secondary" className="text-xs">Скрыта</Badge>
-        )}
+        <div className="min-w-0">
+          <span className="font-medium block truncate">{category.name}</span>
+          {sectionName && (
+            <span className={`text-xs ${isSelected ? 'text-white/70' : 'text-muted-foreground'}`}>{sectionName}</span>
+          )}
+        </div>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-shrink-0">
         <span className={`text-sm ${isSelected ? 'text-white/80' : 'text-muted-foreground'}`}>
           {itemCount}
         </span>
@@ -85,7 +85,6 @@ function SortableCategoryItem({ category, isSelected, itemCount, onSelect, onEdi
           size="icon"
           className={`h-7 w-7 ${isSelected ? 'hover:bg-white/20' : ''}`}
           onClick={(e) => { e.stopPropagation(); onEdit(category); }}
-          data-testid={`edit-category-${category.id}`}
         >
           <Edit2 className="w-3.5 h-3.5" />
         </Button>
@@ -94,7 +93,6 @@ function SortableCategoryItem({ category, isSelected, itemCount, onSelect, onEdi
           size="icon"
           className={`h-7 w-7 ${isSelected ? 'hover:bg-white/20' : 'hover:text-destructive'}`}
           onClick={(e) => { e.stopPropagation(); onDelete(category); }}
-          data-testid={`delete-category-${category.id}`}
         >
           <Trash2 className="w-3.5 h-3.5" />
         </Button>
@@ -104,7 +102,7 @@ function SortableCategoryItem({ category, isSelected, itemCount, onSelect, onEdi
 }
 
 // Sortable Menu Item
-function SortableMenuItem({ item, onEdit, onDelete, onToggleAvailability }) {
+function SortableMenuItem({ item, onEdit, onDelete, onToggleAvailability, currency }) {
   const {
     attributes,
     listeners,
@@ -120,6 +118,59 @@ function SortableMenuItem({ item, onEdit, onDelete, onToggleAvailability }) {
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // Banner item
+  if (item.is_banner) {
+    return (
+      <Card 
+        ref={setNodeRef}
+        style={style}
+        className={`border-none shadow-md transition-all ${!item.is_available ? 'opacity-60' : ''} ${isDragging ? 'shadow-xl z-50' : ''}`}
+        data-testid={`banner-${item.id}`}
+      >
+        <CardContent className="p-4">
+          <div className="flex gap-4">
+            <button
+              className="cursor-grab active:cursor-grabbing p-1 self-start text-muted-foreground hover:text-foreground"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="w-5 h-5" />
+            </button>
+
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
+                <Badge className="bg-purple-500 text-white">
+                  <Image className="w-3 h-3 mr-1" />
+                  Баннер
+                </Badge>
+                <div className="flex items-center gap-1">
+                  <Switch
+                    checked={item.is_available}
+                    onCheckedChange={() => onToggleAvailability(item)}
+                  />
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(item)}>
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" onClick={() => onDelete(item)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              {item.image_url && (
+                <img src={item.image_url} alt={item.name} className="w-full h-32 object-cover rounded-lg mb-2" />
+              )}
+              
+              {item.name && <h3 className="font-heading font-semibold text-foreground">{item.name}</h3>}
+              {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Regular menu item
   return (
     <Card 
       ref={setNodeRef}
@@ -129,24 +180,17 @@ function SortableMenuItem({ item, onEdit, onDelete, onToggleAvailability }) {
     >
       <CardContent className="p-4">
         <div className="flex gap-4">
-          {/* Drag Handle */}
           <button
             className="cursor-grab active:cursor-grabbing p-1 self-center text-muted-foreground hover:text-foreground"
             {...attributes}
             {...listeners}
-            data-testid={`drag-item-${item.id}`}
           >
             <GripVertical className="w-5 h-5" />
           </button>
 
-          {/* Image */}
           <div className="w-20 h-20 rounded-xl bg-muted flex-shrink-0 overflow-hidden">
             {item.image_url ? (
-              <img 
-                src={item.image_url} 
-                alt={item.name}
-                className="w-full h-full object-cover"
-              />
+              <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <ImageIcon className="w-6 h-6 text-muted-foreground/50" />
@@ -154,13 +198,10 @@ function SortableMenuItem({ item, onEdit, onDelete, onToggleAvailability }) {
             )}
           </div>
 
-          {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <h3 className="font-heading font-semibold text-foreground truncate text-sm">
-                  {item.name}
-                </h3>
+                <h3 className="font-heading font-semibold text-foreground truncate text-sm">{item.name}</h3>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {item.is_hit && <Badge className="bg-red-500 text-white text-xs px-1.5 py-0">Хит</Badge>}
                   {item.is_new && <Badge className="bg-emerald-500 text-white text-xs px-1.5 py-0">Новинка</Badge>}
@@ -170,47 +211,23 @@ function SortableMenuItem({ item, onEdit, onDelete, onToggleAvailability }) {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <Switch
-                  checked={item.is_available}
-                  onCheckedChange={() => onToggleAvailability(item)}
-                  data-testid={`toggle-availability-${item.id}`}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => onEdit(item)}
-                  data-testid={`edit-item-${item.id}`}
-                >
+                <Switch checked={item.is_available} onCheckedChange={() => onToggleAvailability(item)} />
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(item)}>
                   <Edit2 className="w-4 h-4" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 hover:text-destructive"
-                  onClick={() => onDelete(item)}
-                  data-testid={`delete-item-${item.id}`}
-                >
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" onClick={() => onDelete(item)}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
             </div>
             
             {item.description && (
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
-                {item.description}
-              </p>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{item.description}</p>
             )}
             
             <div className="flex items-center justify-between mt-2">
-              <span className="text-base font-bold text-mint-500">
-                {item.price} ₽
-              </span>
-              {item.weight && (
-                <span className="text-xs text-muted-foreground">
-                  {item.weight}
-                </span>
-              )}
+              <span className="text-base font-bold text-mint-500">{item.price} {currency}</span>
+              {item.weight && <span className="text-xs text-muted-foreground">{item.weight}</span>}
             </div>
           </div>
         </div>
@@ -222,9 +239,11 @@ function SortableMenuItem({ item, onEdit, onDelete, onToggleAvailability }) {
 export default function MenuPage() {
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
+  const [menuSections, setMenuSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currency, setCurrency] = useState('BYN');
   
   // Dialog states
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -236,7 +255,7 @@ export default function MenuPage() {
   const [editingItem, setEditingItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   
-  const [categoryForm, setCategoryForm] = useState({ name: '', sort_order: 0, is_active: true });
+  const [categoryForm, setCategoryForm] = useState({ name: '', section_id: '', sort_order: 0, is_active: true });
   const [itemForm, setItemForm] = useState({
     category_id: '',
     name: '',
@@ -250,19 +269,14 @@ export default function MenuPage() {
     is_hit: false,
     is_new: false,
     is_spicy: false,
+    is_banner: false,
     sort_order: 0
   });
 
   // DnD sensors
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   useEffect(() => {
@@ -271,12 +285,16 @@ export default function MenuPage() {
 
   const fetchData = async () => {
     try {
-      const [categoriesRes, itemsRes] = await Promise.all([
+      const [categoriesRes, itemsRes, sectionsRes, settingsRes] = await Promise.all([
         axios.get(`${API}/categories`),
-        axios.get(`${API}/menu-items`)
+        axios.get(`${API}/menu-items`),
+        axios.get(`${API}/menu-sections`),
+        axios.get(`${API}/settings`)
       ]);
       setCategories(categoriesRes.data);
       setMenuItems(itemsRes.data);
+      setMenuSections(sectionsRes.data);
+      setCurrency(settingsRes.data?.currency || 'BYN');
       if (categoriesRes.data.length > 0 && !selectedCategory) {
         setSelectedCategory(categoriesRes.data[0].id);
       }
@@ -287,28 +305,27 @@ export default function MenuPage() {
     }
   };
 
+  const getSectionName = (sectionId) => {
+    const section = menuSections.find(s => s.id === sectionId);
+    return section?.name || '';
+  };
+
   // Handle category drag end
   const handleCategoryDragEnd = async (event) => {
     const { active, over } = event;
-    
     if (active.id !== over?.id) {
       const oldIndex = categories.findIndex(c => c.id === active.id);
       const newIndex = categories.findIndex(c => c.id === over.id);
-      
       const newCategories = arrayMove(categories, oldIndex, newIndex);
       setCategories(newCategories);
       
-      // Update sort_order in backend
       try {
-        const reorderData = newCategories.map((cat, index) => ({
-          id: cat.id,
-          sort_order: index + 1
-        }));
+        const reorderData = newCategories.map((cat, index) => ({ id: cat.id, sort_order: index + 1 }));
         await axios.put(`${API}/categories/reorder`, { items: reorderData });
         toast.success('Порядок категорий сохранён');
       } catch (error) {
         toast.error('Ошибка сохранения порядка');
-        fetchData(); // Revert on error
+        fetchData();
       }
     }
   };
@@ -316,30 +333,23 @@ export default function MenuPage() {
   // Handle menu item drag end
   const handleItemDragEnd = async (event) => {
     const { active, over } = event;
-    
     if (active.id !== over?.id) {
       const filteredItems = menuItems.filter(item => item.category_id === selectedCategory);
       const oldIndex = filteredItems.findIndex(i => i.id === active.id);
       const newIndex = filteredItems.findIndex(i => i.id === over.id);
-      
       const newFilteredItems = arrayMove(filteredItems, oldIndex, newIndex);
       
-      // Update full menu items array
       const otherItems = menuItems.filter(item => item.category_id !== selectedCategory);
       const newMenuItems = [...otherItems, ...newFilteredItems];
       setMenuItems(newMenuItems);
       
-      // Update sort_order in backend
       try {
-        const reorderData = newFilteredItems.map((item, index) => ({
-          id: item.id,
-          sort_order: index + 1
-        }));
+        const reorderData = newFilteredItems.map((item, index) => ({ id: item.id, sort_order: index + 1 }));
         await axios.put(`${API}/menu-items/reorder`, { items: reorderData });
         toast.success('Порядок позиций сохранён');
       } catch (error) {
         toast.error('Ошибка сохранения порядка');
-        fetchData(); // Revert on error
+        fetchData();
       }
     }
   };
@@ -348,21 +358,22 @@ export default function MenuPage() {
   const openCategoryDialog = (category = null) => {
     if (category) {
       setEditingCategory(category);
-      setCategoryForm({ name: category.name, sort_order: category.sort_order, is_active: category.is_active });
+      setCategoryForm({ name: category.name, section_id: category.section_id || '', sort_order: category.sort_order, is_active: category.is_active });
     } else {
       setEditingCategory(null);
-      setCategoryForm({ name: '', sort_order: categories.length, is_active: true });
+      setCategoryForm({ name: '', section_id: menuSections[0]?.id || '', sort_order: categories.length, is_active: true });
     }
     setCategoryDialogOpen(true);
   };
 
   const saveCategoryHandler = async () => {
     try {
+      const data = { ...categoryForm, section_id: categoryForm.section_id || null };
       if (editingCategory) {
-        await axios.put(`${API}/categories/${editingCategory.id}`, categoryForm);
+        await axios.put(`${API}/categories/${editingCategory.id}`, data);
         toast.success('Категория обновлена');
       } else {
-        await axios.post(`${API}/categories`, categoryForm);
+        await axios.post(`${API}/categories`, data);
         toast.success('Категория создана');
       }
       setCategoryDialogOpen(false);
@@ -373,14 +384,14 @@ export default function MenuPage() {
   };
 
   // Item handlers
-  const openItemDialog = (item = null) => {
+  const openItemDialog = (item = null, isBanner = false) => {
     if (item) {
       setEditingItem(item);
       setItemForm({
         category_id: item.category_id,
         name: item.name,
         description: item.description || '',
-        price: item.price.toString(),
+        price: item.price?.toString() || '0',
         weight: item.weight || '',
         image_url: item.image_url || '',
         is_available: item.is_available,
@@ -389,6 +400,7 @@ export default function MenuPage() {
         is_hit: item.is_hit,
         is_new: item.is_new,
         is_spicy: item.is_spicy,
+        is_banner: item.is_banner,
         sort_order: item.sort_order
       });
     } else {
@@ -397,7 +409,7 @@ export default function MenuPage() {
         category_id: selectedCategory || '',
         name: '',
         description: '',
-        price: '',
+        price: '0',
         weight: '',
         image_url: '',
         is_available: true,
@@ -406,6 +418,7 @@ export default function MenuPage() {
         is_hit: false,
         is_new: false,
         is_spicy: false,
+        is_banner: isBanner,
         sort_order: menuItems.filter(i => i.category_id === selectedCategory).length
       });
     }
@@ -416,8 +429,8 @@ export default function MenuPage() {
     try {
       const data = {
         ...itemForm,
-        price: parseFloat(itemForm.price),
-        sort_order: parseInt(itemForm.sort_order)
+        price: parseFloat(itemForm.price) || 0,
+        sort_order: parseInt(itemForm.sort_order) || 0
       };
       
       if (editingItem) {
@@ -493,22 +506,16 @@ export default function MenuPage() {
           <h1 className="text-2xl font-heading font-bold text-foreground">Управление меню</h1>
           <p className="text-muted-foreground">Перетаскивайте для изменения порядка</p>
         </div>
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            className="gap-2 rounded-full"
-            onClick={() => openCategoryDialog()}
-            data-testid="add-category-btn"
-          >
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" className="gap-2 rounded-full" onClick={() => openCategoryDialog()}>
             <Plus className="w-4 h-4" />
             Категория
           </Button>
-          <Button
-            className="gap-2 rounded-full bg-mint-500 hover:bg-mint-600"
-            onClick={() => openItemDialog()}
-            disabled={!selectedCategory}
-            data-testid="add-item-btn"
-          >
+          <Button variant="outline" className="gap-2 rounded-full" onClick={() => openItemDialog(null, true)} disabled={!selectedCategory}>
+            <Image className="w-4 h-4" />
+            Баннер
+          </Button>
+          <Button className="gap-2 rounded-full bg-mint-500 hover:bg-mint-600" onClick={() => openItemDialog(null, false)} disabled={!selectedCategory}>
             <Plus className="w-4 h-4" />
             Позиция
           </Button>
@@ -523,40 +530,31 @@ export default function MenuPage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-10 rounded-full"
-          data-testid="menu-search-input"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Categories sidebar with DnD */}
-        <Card className="lg:col-span-1 border-none shadow-md h-fit max-h-[70vh] overflow-hidden flex flex-col" data-testid="categories-list">
+        {/* Categories sidebar */}
+        <Card className="lg:col-span-1 border-none shadow-md h-fit max-h-[70vh] overflow-hidden flex flex-col">
           <CardHeader className="pb-3 flex-shrink-0">
             <CardTitle className="text-lg font-heading flex items-center gap-2">
-              <GripVertical className="w-4 h-4 text-muted-foreground" />
+              <Layers className="w-4 h-4 text-muted-foreground" />
               Категории
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 overflow-y-auto flex-1">
             {categories.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Нет категорий
-              </p>
+              <p className="text-sm text-muted-foreground text-center py-4">Нет категорий</p>
             ) : (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleCategoryDragEnd}
-              >
-                <SortableContext
-                  items={categories.map(c => c.id)}
-                  strategy={verticalListSortingStrategy}
-                >
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
+                <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
                   {categories.map((category) => (
                     <SortableCategoryItem
                       key={category.id}
                       category={category}
                       isSelected={selectedCategory === category.id}
                       itemCount={menuItems.filter(i => i.category_id === category.id).length}
+                      sectionName={getSectionName(category.section_id)}
                       onSelect={setSelectedCategory}
                       onEdit={openCategoryDialog}
                       onDelete={(cat) => openDeleteDialog(cat, 'category')}
@@ -568,8 +566,8 @@ export default function MenuPage() {
           </CardContent>
         </Card>
 
-        {/* Menu items with DnD */}
-        <div className="lg:col-span-3 space-y-4" data-testid="menu-items-list">
+        {/* Menu items */}
+        <div className="lg:col-span-3 space-y-4">
           {filteredItems.length === 0 ? (
             <Card className="border-none shadow-md">
               <CardContent className="py-12 text-center">
@@ -577,32 +575,16 @@ export default function MenuPage() {
                 <p className="text-muted-foreground">
                   {searchQuery ? 'Ничего не найдено' : 'В этой категории пока нет позиций'}
                 </p>
-                {!searchQuery && selectedCategory && (
-                  <Button
-                    className="mt-4 rounded-full bg-mint-500 hover:bg-mint-600"
-                    onClick={() => openItemDialog()}
-                    data-testid="add-first-item-btn"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Добавить первую позицию
-                  </Button>
-                )}
               </CardContent>
             </Card>
           ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleItemDragEnd}
-            >
-              <SortableContext
-                items={filteredItems.map(i => i.id)}
-                strategy={verticalListSortingStrategy}
-              >
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleItemDragEnd}>
+              <SortableContext items={filteredItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
                 {filteredItems.map((item) => (
                   <SortableMenuItem
                     key={item.id}
                     item={item}
+                    currency={currency}
                     onEdit={openItemDialog}
                     onDelete={(it) => openDeleteDialog(it, 'item')}
                     onToggleAvailability={toggleItemAvailability}
@@ -616,7 +598,7 @@ export default function MenuPage() {
 
       {/* Category Dialog */}
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-        <DialogContent data-testid="category-dialog">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="font-heading">
               {editingCategory ? 'Редактировать категорию' : 'Новая категория'}
@@ -629,28 +611,35 @@ export default function MenuPage() {
                 value={categoryForm.name}
                 onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
                 placeholder="Например: Горячие блюда"
-                data-testid="category-name-input"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Раздел меню</Label>
+              <Select
+                value={categoryForm.section_id}
+                onValueChange={(value) => setCategoryForm({ ...categoryForm, section_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите раздел" />
+                </SelectTrigger>
+                <SelectContent>
+                  {menuSections.map((section) => (
+                    <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-2">
               <Switch
                 checked={categoryForm.is_active}
                 onCheckedChange={(checked) => setCategoryForm({ ...categoryForm, is_active: checked })}
-                data-testid="category-active-switch"
               />
               <Label>Активна</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>
-              Отмена
-            </Button>
-            <Button 
-              onClick={saveCategoryHandler}
-              className="bg-mint-500 hover:bg-mint-600"
-              disabled={!categoryForm.name}
-              data-testid="save-category-btn"
-            >
+            <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>Отмена</Button>
+            <Button onClick={saveCategoryHandler} className="bg-mint-500 hover:bg-mint-600" disabled={!categoryForm.name}>
               Сохранить
             </Button>
           </DialogFooter>
@@ -659,23 +648,18 @@ export default function MenuPage() {
 
       {/* Item Dialog */}
       <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="item-dialog">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading">
-              {editingItem ? 'Редактировать позицию' : 'Новая позиция'}
+              {editingItem ? (itemForm.is_banner ? 'Редактировать баннер' : 'Редактировать позицию') : (itemForm.is_banner ? 'Новый баннер' : 'Новая позиция')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Категория</Label>
-                <Select
-                  value={itemForm.category_id}
-                  onValueChange={(value) => setItemForm({ ...itemForm, category_id: value })}
-                >
-                  <SelectTrigger data-testid="item-category-select">
-                    <SelectValue placeholder="Выберите категорию" />
-                  </SelectTrigger>
+                <Select value={itemForm.category_id} onValueChange={(value) => setItemForm({ ...itemForm, category_id: value })}>
+                  <SelectTrigger><SelectValue placeholder="Выберите категорию" /></SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
@@ -684,12 +668,11 @@ export default function MenuPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Название</Label>
+                <Label>{itemForm.is_banner ? 'Заголовок (опционально)' : 'Название'}</Label>
                 <Input
                   value={itemForm.name}
                   onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
-                  placeholder="Название блюда"
-                  data-testid="item-name-input"
+                  placeholder={itemForm.is_banner ? 'Заголовок баннера' : 'Название блюда'}
                 />
               </div>
             </div>
@@ -699,33 +682,32 @@ export default function MenuPage() {
               <Textarea
                 value={itemForm.description}
                 onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
-                placeholder="Описание блюда, состав..."
+                placeholder={itemForm.is_banner ? 'Текст баннера' : 'Описание блюда, состав...'}
                 rows={3}
-                data-testid="item-description-input"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Цена (₽)</Label>
-                <Input
-                  type="number"
-                  value={itemForm.price}
-                  onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })}
-                  placeholder="0"
-                  data-testid="item-price-input"
-                />
+            {!itemForm.is_banner && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Цена ({currency})</Label>
+                  <Input
+                    type="number"
+                    value={itemForm.price}
+                    onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Объём / Выход</Label>
+                  <Input
+                    value={itemForm.weight}
+                    onChange={(e) => setItemForm({ ...itemForm, weight: e.target.value })}
+                    placeholder="200 г"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Объём / Выход</Label>
-                <Input
-                  value={itemForm.weight}
-                  onChange={(e) => setItemForm({ ...itemForm, weight: e.target.value })}
-                  placeholder="200 г"
-                  data-testid="item-weight-input"
-                />
-              </div>
-            </div>
+            )}
 
             <div className="space-y-2">
               <Label>URL изображения</Label>
@@ -733,78 +715,54 @@ export default function MenuPage() {
                 value={itemForm.image_url}
                 onChange={(e) => setItemForm({ ...itemForm, image_url: e.target.value })}
                 placeholder="https://..."
-                data-testid="item-image-input"
               />
+              {itemForm.image_url && (
+                <img src={itemForm.image_url} alt="Preview" className="w-full h-32 object-cover rounded-lg mt-2" />
+              )}
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-2">
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={itemForm.is_available}
-                  onCheckedChange={(checked) => setItemForm({ ...itemForm, is_available: checked })}
-                  data-testid="item-available-switch"
-                />
-                <Label className="flex items-center gap-1">В наличии</Label>
+            {!itemForm.is_banner && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-2">
+                <div className="flex items-center gap-2">
+                  <Switch checked={itemForm.is_available} onCheckedChange={(checked) => setItemForm({ ...itemForm, is_available: checked })} />
+                  <Label>В наличии</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={itemForm.is_hit} onCheckedChange={(checked) => setItemForm({ ...itemForm, is_hit: checked })} />
+                  <Label className="flex items-center gap-1"><Star className="w-4 h-4" /> Хит</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={itemForm.is_new} onCheckedChange={(checked) => setItemForm({ ...itemForm, is_new: checked })} />
+                  <Label className="flex items-center gap-1"><Sparkles className="w-4 h-4" /> Новинка</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={itemForm.is_spicy} onCheckedChange={(checked) => setItemForm({ ...itemForm, is_spicy: checked })} />
+                  <Label className="flex items-center gap-1"><Flame className="w-4 h-4" /> Острое</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={itemForm.is_promotion} onCheckedChange={(checked) => setItemForm({ ...itemForm, is_promotion: checked })} />
+                  <Label className="flex items-center gap-1"><Tag className="w-4 h-4" /> Акция</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={itemForm.is_business_lunch} onCheckedChange={(checked) => setItemForm({ ...itemForm, is_business_lunch: checked })} />
+                  <Label>Бизнес-ланч</Label>
+                </div>
               </div>
+            )}
+
+            {itemForm.is_banner && (
               <div className="flex items-center gap-2">
-                <Switch
-                  checked={itemForm.is_hit}
-                  onCheckedChange={(checked) => setItemForm({ ...itemForm, is_hit: checked })}
-                  data-testid="item-hit-switch"
-                />
-                <Label className="flex items-center gap-1">
-                  <Star className="w-4 h-4" /> Хит
-                </Label>
+                <Switch checked={itemForm.is_available} onCheckedChange={(checked) => setItemForm({ ...itemForm, is_available: checked })} />
+                <Label>Показывать баннер</Label>
               </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={itemForm.is_new}
-                  onCheckedChange={(checked) => setItemForm({ ...itemForm, is_new: checked })}
-                  data-testid="item-new-switch"
-                />
-                <Label className="flex items-center gap-1">
-                  <Sparkles className="w-4 h-4" /> Новинка
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={itemForm.is_spicy}
-                  onCheckedChange={(checked) => setItemForm({ ...itemForm, is_spicy: checked })}
-                  data-testid="item-spicy-switch"
-                />
-                <Label className="flex items-center gap-1">
-                  <Flame className="w-4 h-4" /> Острое
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={itemForm.is_promotion}
-                  onCheckedChange={(checked) => setItemForm({ ...itemForm, is_promotion: checked })}
-                  data-testid="item-promotion-switch"
-                />
-                <Label className="flex items-center gap-1">
-                  <Tag className="w-4 h-4" /> Акция
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={itemForm.is_business_lunch}
-                  onCheckedChange={(checked) => setItemForm({ ...itemForm, is_business_lunch: checked })}
-                  data-testid="item-lunch-switch"
-                />
-                <Label>Бизнес-ланч</Label>
-              </div>
-            </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setItemDialogOpen(false)}>
-              Отмена
-            </Button>
+            <Button variant="outline" onClick={() => setItemDialogOpen(false)}>Отмена</Button>
             <Button 
               onClick={saveItemHandler}
               className="bg-mint-500 hover:bg-mint-600"
-              disabled={!itemForm.name || !itemForm.category_id || !itemForm.price}
-              data-testid="save-item-btn"
+              disabled={!itemForm.category_id || (!itemForm.is_banner && !itemForm.name)}
             >
               Сохранить
             </Button>
@@ -812,9 +770,9 @@ export default function MenuPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent data-testid="delete-dialog">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="font-heading">Подтверждение удаления</DialogTitle>
           </DialogHeader>
@@ -822,22 +780,12 @@ export default function MenuPage() {
             Вы уверены, что хотите удалить {deleteTarget?.type === 'category' ? 'категорию' : 'позицию'}{' '}
             <strong>"{deleteTarget?.name}"</strong>?
             {deleteTarget?.type === 'category' && (
-              <span className="block mt-2 text-destructive">
-                Все позиции в этой категории также будут удалены!
-              </span>
+              <span className="block mt-2 text-destructive">Все позиции в этой категории также будут удалены!</span>
             )}
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Отмена
-            </Button>
-            <Button 
-              variant="destructive"
-              onClick={confirmDelete}
-              data-testid="confirm-delete-btn"
-            >
-              Удалить
-            </Button>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Отмена</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Удалить</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
