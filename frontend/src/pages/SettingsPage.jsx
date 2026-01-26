@@ -214,10 +214,10 @@ export default function SettingsPage() {
   const saveEmployeeHandler = async () => {
     try {
       if (editingEmployee) {
-        await axios.put(`${API}/employees/${editingEmployee.id}`, employeeForm);
+        await axios.put(`${API}/restaurants/${currentRestaurantId}/employees/${editingEmployee.id}`, employeeForm, authHeaders);
         toast.success('Сотрудник обновлён');
       } else {
-        await axios.post(`${API}/employees`, employeeForm);
+        await axios.post(`${API}/restaurants/${currentRestaurantId}/employees`, employeeForm, authHeaders);
         toast.success('Сотрудник добавлен');
       }
       setEmployeeDialogOpen(false);
@@ -229,7 +229,7 @@ export default function SettingsPage() {
 
   const deleteEmployee = async (employeeId) => {
     try {
-      await axios.delete(`${API}/employees/${employeeId}`);
+      await axios.delete(`${API}/restaurants/${currentRestaurantId}/employees/${employeeId}`, authHeaders);
       toast.success('Сотрудник удалён');
       fetchData();
     } catch (error) {
@@ -252,10 +252,10 @@ export default function SettingsPage() {
   const saveSectionHandler = async () => {
     try {
       if (editingSection) {
-        await axios.put(`${API}/menu-sections/${editingSection.id}`, sectionForm);
+        await axios.put(`${API}/restaurants/${currentRestaurantId}/menu-sections/${editingSection.id}`, sectionForm, authHeaders);
         toast.success('Раздел меню обновлён');
       } else {
-        await axios.post(`${API}/menu-sections`, sectionForm);
+        await axios.post(`${API}/restaurants/${currentRestaurantId}/menu-sections`, sectionForm, authHeaders);
         toast.success('Раздел меню добавлен');
       }
       setSectionDialogOpen(false);
@@ -267,7 +267,7 @@ export default function SettingsPage() {
 
   const deleteSection = async (sectionId) => {
     try {
-      await axios.delete(`${API}/menu-sections/${sectionId}`);
+      await axios.delete(`${API}/restaurants/${currentRestaurantId}/menu-sections/${sectionId}`, authHeaders);
       toast.success('Раздел меню удалён');
       fetchData();
     } catch (error) {
