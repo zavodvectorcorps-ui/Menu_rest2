@@ -375,6 +375,7 @@ async def create_menu_section(data: MenuSectionCreate):
     section = MenuSection(**data.model_dump())
     doc = section.model_dump()
     await db.menu_sections.insert_one(doc)
+    doc.pop('_id', None)  # Remove MongoDB _id before returning
     return doc
 
 @api_router.put("/menu-sections/{section_id}")
@@ -406,6 +407,7 @@ async def create_call_type(data: CallTypeCreate):
     call_type = CallType(**data.model_dump())
     doc = call_type.model_dump()
     await db.call_types.insert_one(doc)
+    doc.pop('_id', None)  # Remove MongoDB _id before returning
     return doc
 
 @api_router.put("/call-types/{type_id}")
