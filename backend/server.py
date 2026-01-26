@@ -410,7 +410,7 @@ async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = 
         return None
     try:
         return await get_current_user(credentials)
-    except:
+    except HTTPException:
         return None
 
 async def require_superadmin(current_user: dict = Depends(get_current_user)):
