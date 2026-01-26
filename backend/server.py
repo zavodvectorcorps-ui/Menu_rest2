@@ -262,6 +262,7 @@ class OrderStatusUpdate(BaseModel):
 class CallType(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
     name: str
     telegram_message: str = ""  # Сообщение для Telegram
     sort_order: int = 0
@@ -276,6 +277,7 @@ class CallTypeCreate(BaseModel):
 class StaffCall(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
     table_id: str
     table_number: int
     call_type_id: Optional[str] = None
@@ -290,6 +292,7 @@ class StaffCallCreate(BaseModel):
 class Employee(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
     name: str
     role: str
     telegram_id: Optional[str] = ""
@@ -304,7 +307,8 @@ class EmployeeCreate(BaseModel):
 
 class Settings(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    id: str = "main"
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
     online_menu_enabled: bool = True
     staff_call_enabled: bool = True
     online_orders_enabled: bool = True
