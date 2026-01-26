@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-01-26T17:45:56.386165",
+  "total_tests": 36,
+  "passed_tests": 34,
+  "failed_tests": [
+    {
+      "name": "Update Table",
+      "expected": 200,
+      "actual": 422,
+      "response": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"number\"],\"msg\":\"Field required\",\"input\":{\"name\":\"Обновлённый стол\",\"is_active\":false},\"url\":\"https://errors.pydantic.dev/2.12/v/missing\"}]}"
+    },
+    {
+      "name": "Update Employee",
+      "expected": 200,
+      "actual": 422,
+      "response": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"name\"],\"msg\":\"Field required\",\"input\":{\"role\":\"Старший тестер\",\"is_active\":false},\"url\":\"https://errors.pydantic.dev/2.12/v/missing\"}]}"
+    }
+  ],
+  "success_rate": 94.44444444444444,
+  "test_data_samples": {
+    "restaurant": "{'id': 'aa25189d-d668-4838-915a-c5d936547f3f', 'name': 'Мята Спортивная', 'description': 'Уютный рес...",
+    "categories": "[{'id': '5923eba9-31ec-412d-affe-ffffc295e8e9', 'name': 'Закуски', 'sort_order': 1, 'is_active': Tru...",
+    "test_category": "{'id': '61754ad6-6cfb-4622-8025-4c0c60f4c482', 'name': 'Тестовая категория', 'sort_order': 99, 'is_a...",
+    "menu_items": "[{'id': '926b9f1e-c65c-40de-a79a-3461a56834e6', 'category_id': '5923eba9-31ec-412d-affe-ffffc295e8e9...",
+    "test_item": "{'id': '63148240-6481-4875-89eb-d4725716bc05', 'category_id': '5923eba9-31ec-412d-affe-ffffc295e8e9'...",
+    "tables": "[{'id': '827c810f-6da7-4d0b-9cbb-833bf4490d34', 'number': 1, 'code': '697DCAA5', 'name': 'Стол 1', '...",
+    "test_table": "{'id': '267b83bc-addd-4223-82c9-82a9a61f99e3', 'number': 999, 'code': 'F4C149E7', 'name': 'Тестовый ...",
+    "orders": [],
+    "test_order": "{'id': 'ee7b6d62-6c86-4e47-b94a-c1e5336eb7d9', 'table_id': '827c810f-6da7-4d0b-9cbb-833bf4490d34', '...",
+    "staff_calls": [],
+    "test_call": "{'id': 'e60bf70b-dfa0-4fa5-b691-d1127526ce6e', 'table_id': '827c810f-6da7-4d0b-9cbb-833bf4490d34', '...",
+    "employees": "[{'id': 'acae89b6-087a-420d-8355-75c915291983', 'name': 'Иван Петров', 'role': 'Официант', 'telegram...",
+    "test_employee": "{'id': '50014b35-fb4c-47f7-a53a-0df542a9f027', 'name': 'Тестовый Сотрудник', 'role': 'Тестер', 'tele...",
+    "settings": "{'id': 'main', 'online_menu_enabled': True, 'staff_call_enabled': True, 'online_orders_enabled': Tru...",
+    "stats": "{'views_today': 0, 'views_month': 0, 'calls_today': 1, 'calls_month': 1, 'orders_today': 1, 'orders_...",
+    "test_ticket": "{'id': '0dc899cb-899b-4f40-8466-f3bd56288d0c', 'subject': 'Техническая проблема', 'description': 'Те...",
+    "faqs": "[{'id': '562d8f42-b05c-4518-9f45-2b7de00f84df', 'question': 'Как добавить новую позицию в меню?', 'a...",
+    "public_menu": "{'table': {'id': '827c810f-6da7-4d0b-9cbb-833bf4490d34', 'number': 1, 'code': '697DCAA5', 'name': 'С..."
+  }
+}
