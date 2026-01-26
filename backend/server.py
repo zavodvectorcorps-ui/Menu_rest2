@@ -1052,32 +1052,35 @@ async def delete_employee(restaurant_id: str, employee_id: str, current_user: di
 
 # ============ SETTINGS ENDPOINTS ============
 
-@api_router.get("/settings")
-async def get_settings():
-    return await get_or_create_settings()
+@api_router.get("/restaurants/{restaurant_id}/settings")
+async def get_settings(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    return await get_or_create_settings(restaurant_id)
 
-@api_router.put("/settings")
-async def update_settings(data: SettingsUpdate):
+@api_router.put("/restaurants/{restaurant_id}/settings")
+async def update_settings(restaurant_id: str, data: SettingsUpdate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
     if update_data:
-        await db.settings.update_one({"id": "main"}, {"$set": update_data}, upsert=True)
-    return await get_or_create_settings()
+        await db.settings.update_one({"restaurant_id": restaurant_id}, {"$set": update_data}, upsert=True)
+    return await get_or_create_settings(restaurant_id)
 
 # ============ STATISTICS ENDPOINTS ============
 
-@api_router.get("/stats")
-async def get_stats():
+@api_router.get("/restaurants/{restaurant_id}/stats")
+async def get_stats(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
     
-    views_today = await db.menu_views.count_documents({"created_at": {"$gte": today_start}})
-    views_month = await db.menu_views.count_documents({"created_at": {"$gte": month_start}})
-    calls_today = await db.staff_calls.count_documents({"created_at": {"$gte": today_start}})
-    calls_month = await db.staff_calls.count_documents({"created_at": {"$gte": month_start}})
-    orders_today = await db.orders.count_documents({"created_at": {"$gte": today_start}})
-    orders_month = await db.orders.count_documents({"created_at": {"$gte": month_start}})
-    employees_count = await db.employees.count_documents({"is_active": True})
+    views_today = await db.menu_views.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": today_start}})
+    views_month = await db.menu_views.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": month_start}})
+    calls_today = await db.staff_calls.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": today_start}})
+    calls_month = await db.staff_calls.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": month_start}})
+    orders_today = await db.orders.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": today_start}})
+    orders_month = await db.orders.count_documents({"restaurant_id": restaurant_id, "created_at": {"$gte": month_start}})
+    employees_count = await db.employees.count_documents({"restaurant_id": restaurant_id, "is_active": True})
     
     return Stats(
         views_today=views_today,
