@@ -67,12 +67,13 @@ export default function SettingsPage() {
   }, [restaurant, settings]);
 
   const fetchData = async () => {
+    if (!currentRestaurantId) return;
     try {
       const [tablesRes, employeesRes, sectionsRes, callTypesRes] = await Promise.all([
-        axios.get(`${API}/tables`),
-        axios.get(`${API}/employees`),
-        axios.get(`${API}/menu-sections`),
-        axios.get(`${API}/call-types`)
+        axios.get(`${API}/restaurants/${currentRestaurantId}/tables`, authHeaders),
+        axios.get(`${API}/restaurants/${currentRestaurantId}/employees`, authHeaders),
+        axios.get(`${API}/restaurants/${currentRestaurantId}/menu-sections`, authHeaders),
+        axios.get(`${API}/restaurants/${currentRestaurantId}/call-types`, authHeaders)
       ]);
       setTables(tablesRes.data);
       setEmployees(employeesRes.data);
@@ -125,7 +126,7 @@ export default function SettingsPage() {
     try {
       const data = { ...tableForm, number: parseInt(tableForm.number) };
       if (editingTable) {
-        await axios.put(`${API}/tables/${editingTable.id}`, data);
+        await axios.put(`${API}/restaurants/${currentRestaurantId}/tables/${editingTable.id}`, data, authHeaders);
         toast.success('Стол обновлён');
       } else {
         await axios.post(`${API}/tables`, data);
