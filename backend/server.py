@@ -70,6 +70,39 @@ class StaffCallStatus(str, Enum):
 
 # ============ MODELS ============
 
+# User model for authentication
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    username: str
+    password_hash: str
+    role: UserRole = UserRole.MANAGER
+    restaurant_ids: List[str] = []  # Рестораны, к которым есть доступ
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: UserRole = UserRole.MANAGER
+    restaurant_ids: List[str] = []
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[UserRole] = None
+    restaurant_ids: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: dict
+
 class Restaurant(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -82,6 +115,13 @@ class Restaurant(BaseModel):
     working_hours: Optional[str] = ""
     slogan: Optional[str] = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class RestaurantCreate(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    address: Optional[str] = ""
+    phone: Optional[str] = ""
+    email: Optional[str] = ""
 
 class RestaurantUpdate(BaseModel):
     name: Optional[str] = None
@@ -97,6 +137,7 @@ class RestaurantUpdate(BaseModel):
 class MenuSection(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
     name: str
     sort_order: int = 0
     is_active: bool = True
@@ -109,6 +150,7 @@ class MenuSectionCreate(BaseModel):
 class Category(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
     name: str
     section_id: Optional[str] = None  # ID блока меню
     display_mode: str = "card"  # "card" (с картинкой) или "compact" (строка)
@@ -126,6 +168,7 @@ class CategoryCreate(BaseModel):
 class MenuItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
     category_id: str
     name: str
     description: Optional[str] = ""
