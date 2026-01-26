@@ -220,6 +220,7 @@ class MenuItemUpdate(BaseModel):
 class Table(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
     number: int
     code: str = Field(default_factory=lambda: str(uuid.uuid4())[:8].upper())
     name: Optional[str] = ""
@@ -240,6 +241,7 @@ class OrderItem(BaseModel):
 class Order(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
     table_id: str
     table_number: int
     items: List[OrderItem]
