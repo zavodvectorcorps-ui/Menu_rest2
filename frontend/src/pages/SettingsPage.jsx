@@ -129,7 +129,7 @@ export default function SettingsPage() {
         await axios.put(`${API}/restaurants/${currentRestaurantId}/tables/${editingTable.id}`, data, authHeaders);
         toast.success('Стол обновлён');
       } else {
-        await axios.post(`${API}/tables`, data);
+        await axios.post(`${API}/restaurants/${currentRestaurantId}/tables`, data, authHeaders);
         toast.success('Стол добавлен');
       }
       setTableDialogOpen(false);
@@ -141,7 +141,7 @@ export default function SettingsPage() {
 
   const deleteTable = async (tableId) => {
     try {
-      await axios.delete(`${API}/tables/${tableId}`);
+      await axios.delete(`${API}/restaurants/${currentRestaurantId}/tables/${tableId}`, authHeaders);
       toast.success('Стол удалён');
       fetchData();
     } catch (error) {
@@ -151,7 +151,7 @@ export default function SettingsPage() {
 
   const regenerateTableCode = async (tableId) => {
     try {
-      await axios.post(`${API}/tables/${tableId}/regenerate-code`);
+      await axios.post(`${API}/restaurants/${currentRestaurantId}/tables/${tableId}/regenerate-code`, {}, authHeaders);
       toast.success('Код обновлён');
       fetchData();
     } catch (error) {
@@ -171,7 +171,7 @@ export default function SettingsPage() {
     setQrDialogOpen(true);
     try {
       const baseUrl = window.location.origin;
-      const response = await axios.get(`${API}/tables/${table.id}/qr?base_url=${encodeURIComponent(baseUrl)}`);
+      const response = await axios.get(`${API}/restaurants/${currentRestaurantId}/tables/${table.id}/qr?base_url=${encodeURIComponent(baseUrl)}`, authHeaders);
       setQrData(response.data);
     } catch (error) {
       toast.error('Ошибка генерации QR-кода');
