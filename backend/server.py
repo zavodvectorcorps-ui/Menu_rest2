@@ -351,6 +351,7 @@ class SupportTicketCreate(BaseModel):
 class MenuView(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str  # Привязка к ресторану
     table_code: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -362,6 +363,69 @@ class Stats(BaseModel):
     orders_today: int = 0
     orders_month: int = 0
     employees_count: int = 0
+
+# ============ AUTH HELPER FUNCTIONS ============
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current user from JWT token"""
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Неверный токен")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if user is None:
+        raise HTTPException(status_code=401, detail="Пользователь не найден")
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=401, detail="Пользователь деактивирован")
+    
+    return user
+
+async def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current user if token provided, else return None"""
+    if credentials is None:
+        return None
+    try:
+        return await get_current_user(credentials)
+    except:
+        return None
+
+async def require_superadmin(current_user: dict = Depends(get_current_user)):
+    """Require superadmin role"""
+    if current_user.get("role") != UserRole.SUPERADMIN:
+        raise HTTPException(status_code=403, detail="Требуются права суперадмина")
+    return current_user
+
+async def check_restaurant_access(user: dict, restaurant_id: str):
+    """Check if user has access to restaurant"""
+    if user.get("role") == UserRole.SUPERADMIN:
+        return True
+    if restaurant_id in user.get("restaurant_ids", []):
+        return True
+    raise HTTPException(status_code=403, detail="Нет доступа к этому ресторану")
 
 # ============ HELPER FUNCTIONS ============
 
@@ -375,8 +439,31 @@ def serialize_doc(doc: dict) -> dict:
             doc[key] = value.isoformat()
     return doc
 
-async def get_or_create_restaurant():
-    """Get or create default restaurant"""
+async def create_superadmin():
+    """Create superadmin user if not exists"""
+    admin = await db.users.find_one({"username": "admin"}, {"_id": 0})
+    if not admin:
+        user = User(
+            username="admin",
+            password_hash=get_password_hash("220066"),
+            role=UserRole.SUPERADMIN,
+            restaurant_ids=[]
+        )
+        doc = user.model_dump()
+        doc['created_at'] = doc['created_at'].isoformat()
+        await db.users.insert_one(doc)
+        print("Superadmin created: admin/220066")
+        return doc
+    return admin
+
+async def get_or_create_restaurant(restaurant_id: Optional[str] = None):
+    """Get restaurant by ID or create default restaurant"""
+    if restaurant_id:
+        restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+        if restaurant:
+            return serialize_doc(restaurant)
+    
+    # Get first restaurant if no ID specified
     restaurant = await db.restaurants.find_one({}, {"_id": 0})
     if not restaurant:
         default = Restaurant(
@@ -394,9 +481,9 @@ async def get_or_create_restaurant():
         return serialize_doc(doc)
     return serialize_doc(restaurant)
 
-async def get_or_create_settings():
-    """Get or create default settings"""
-    settings = await db.settings.find_one({"id": "main"}, {"_id": 0})
+async def get_or_create_settings(restaurant_id: str):
+    """Get or create settings for restaurant"""
+    settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
     if not settings:
         default = Settings()
         doc = default.model_dump()
