@@ -967,9 +967,10 @@ async def update_order_status(restaurant_id: str, order_id: str, data: OrderStat
 
 # ============ STAFF CALLS ENDPOINTS ============
 
-@api_router.get("/staff-calls")
-async def get_staff_calls(status: Optional[StaffCallStatus] = None):
-    query = {}
+@api_router.get("/restaurants/{restaurant_id}/staff-calls")
+async def get_staff_calls(restaurant_id: str, status: Optional[StaffCallStatus] = None, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    query = {"restaurant_id": restaurant_id}
     if status:
         query["status"] = status.value
     calls = await db.staff_calls.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
@@ -981,18 +982,20 @@ async def create_staff_call(data: StaffCallCreate):
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
     
-    settings = await get_or_create_settings()
+    restaurant_id = table["restaurant_id"]
+    settings = await get_or_create_settings(restaurant_id)
     if not settings.get("staff_call_enabled", True):
         raise HTTPException(status_code=400, detail="Staff calls are disabled")
     
     # Get call type info
     call_type_name = "Вызов"
     if data.call_type_id:
-        call_type = await db.call_types.find_one({"id": data.call_type_id}, {"_id": 0})
+        call_type = await db.call_types.find_one({"id": data.call_type_id, "restaurant_id": restaurant_id}, {"_id": 0})
         if call_type:
             call_type_name = call_type.get("name", "Вызов")
     
     call = StaffCall(
+        restaurant_id=restaurant_id,
         table_id=table["id"],
         table_number=table["number"],
         call_type_id=data.call_type_id,
@@ -1003,12 +1006,13 @@ async def create_staff_call(data: StaffCallCreate):
     await db.staff_calls.insert_one(doc)
     return serialize_doc(doc)
 
-@api_router.put("/staff-calls/{call_id}/status")
-async def update_staff_call_status(call_id: str, status: StaffCallStatus):
-    result = await db.staff_calls.update_one({"id": call_id}, {"$set": {"status": status.value}})
+@api_router.put("/restaurants/{restaurant_id}/staff-calls/{call_id}/status")
+async def update_staff_call_status(restaurant_id: str, call_id: str, status: StaffCallStatus, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.staff_calls.update_one({"id": call_id, "restaurant_id": restaurant_id}, {"$set": {"status": status.value}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Staff call not found")
-    call = await db.staff_calls.find_one({"id": call_id}, {"_id": 0})
+    call = await db.staff_calls.find_one({"id": call_id, "restaurant_id": restaurant_id}, {"_id": 0})
     return serialize_doc(call)
 
 # ============ EMPLOYEES ENDPOINTS ============
