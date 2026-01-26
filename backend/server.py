@@ -1184,24 +1184,26 @@ async def get_faq():
 
 # ============ SEED DATA ENDPOINT ============
 
-@api_router.post("/seed")
-async def seed_data():
-    await get_or_create_restaurant()
-    await get_or_create_settings()
-    await get_or_create_menu_sections()
-    await get_or_create_call_types()
+@api_router.post("/restaurants/{restaurant_id}/seed")
+async def seed_data(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
     
-    # Create tables if none exist
-    existing_tables = await db.tables.count_documents({})
+    restaurant = await get_or_create_restaurant(restaurant_id)
+    await get_or_create_settings(restaurant_id)
+    await get_or_create_menu_sections(restaurant_id)
+    await get_or_create_call_types(restaurant_id)
+    
+    # Create tables if none exist for this restaurant
+    existing_tables = await db.tables.count_documents({"restaurant_id": restaurant_id})
     if existing_tables == 0:
         for i in range(1, 11):
-            table = Table(number=i, name=f"Стол {i}")
+            table = Table(restaurant_id=restaurant_id, number=i, name=f"Стол {i}")
             doc = table.model_dump()
             doc['created_at'] = doc['created_at'].isoformat()
             await db.tables.insert_one(doc)
     
-    # Create employees if none exist
-    existing_employees = await db.employees.count_documents({})
+    # Create employees if none exist for this restaurant
+    existing_employees = await db.employees.count_documents({"restaurant_id": restaurant_id})
     if existing_employees == 0:
         employees_data = [
             {"name": "Иван Петров", "role": "Официант"},
@@ -1209,7 +1211,7 @@ async def seed_data():
             {"name": "Алексей Козлов", "role": "Администратор"},
         ]
         for emp_data in employees_data:
-            emp = Employee(**emp_data)
+            emp = Employee(restaurant_id=restaurant_id, **emp_data)
             doc = emp.model_dump()
             doc['created_at'] = doc['created_at'].isoformat()
             await db.employees.insert_one(doc)
