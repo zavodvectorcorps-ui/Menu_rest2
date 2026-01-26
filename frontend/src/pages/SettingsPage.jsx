@@ -14,8 +14,9 @@ import { useApp, useTheme, API } from '@/App';
 import axios from 'axios';
 
 export default function SettingsPage() {
-  const { settings, updateSettings, restaurant, updateRestaurant } = useApp();
+  const { settings, updateSettings, restaurant, updateRestaurant, currentRestaurantId, token } = useApp();
   const { theme, setTheme } = useTheme();
+  const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
   
   const [tables, setTables] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -51,8 +52,10 @@ export default function SettingsPage() {
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (currentRestaurantId) {
+      fetchData();
+    }
+  }, [currentRestaurantId]);
 
   useEffect(() => {
     if (restaurant) {
