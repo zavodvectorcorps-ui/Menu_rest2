@@ -920,9 +920,10 @@ async def regenerate_table_code(restaurant_id: str, table_id: str, current_user:
 
 # ============ ORDERS ENDPOINTS ============
 
-@api_router.get("/orders")
-async def get_orders(status: Optional[OrderStatus] = None, date: Optional[str] = None):
-    query = {}
+@api_router.get("/restaurants/{restaurant_id}/orders")
+async def get_orders(restaurant_id: str, status: Optional[OrderStatus] = None, date: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    query = {"restaurant_id": restaurant_id}
     if status:
         query["status"] = status.value
     if date:
@@ -936,12 +937,14 @@ async def create_order(data: OrderCreate):
     if not table:
         raise HTTPException(status_code=404, detail="Table not found")
     
-    settings = await get_or_create_settings()
+    restaurant_id = table["restaurant_id"]
+    settings = await get_or_create_settings(restaurant_id)
     if not settings.get("online_orders_enabled", True):
         raise HTTPException(status_code=400, detail="Online orders are disabled")
     
     total = sum(item.price * item.quantity for item in data.items)
     order = Order(
+        restaurant_id=restaurant_id,
         table_id=table["id"],
         table_number=table["number"],
         items=[item.model_dump() for item in data.items],
@@ -953,12 +956,13 @@ async def create_order(data: OrderCreate):
     await db.orders.insert_one(doc)
     return serialize_doc(doc)
 
-@api_router.put("/orders/{order_id}/status")
-async def update_order_status(order_id: str, data: OrderStatusUpdate):
-    result = await db.orders.update_one({"id": order_id}, {"$set": {"status": data.status.value}})
+@api_router.put("/restaurants/{restaurant_id}/orders/{order_id}/status")
+async def update_order_status(restaurant_id: str, order_id: str, data: OrderStatusUpdate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.orders.update_one({"id": order_id, "restaurant_id": restaurant_id}, {"$set": {"status": data.status.value}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Order not found")
-    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    order = await db.orders.find_one({"id": order_id, "restaurant_id": restaurant_id}, {"_id": 0})
     return serialize_doc(order)
 
 # ============ STAFF CALLS ENDPOINTS ============
