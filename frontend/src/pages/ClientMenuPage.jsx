@@ -139,6 +139,8 @@ export default function ClientMenuPage() {
 
   const filteredItems = data?.items.filter(item => item.category_id === selectedCategory) || [];
   const currency = data?.settings?.currency || 'BYN';
+  const currentCategory = data?.categories.find(cat => cat.id === selectedCategory);
+  const displayMode = currentCategory?.display_mode || 'card';
 
   if (loading) {
     return (
