@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Clock, Filter, Search, ChevronDown, Check, X, RefreshCw, Eye } from 'lucide-react';
+import { Calendar, Clock, Filter, Search, ChevronDown, Check, X, RefreshCw, Eye, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { API } from '@/App';
+import { useApp, API } from '@/App';
 import axios from 'axios';
 
 const statusLabels = {
@@ -26,6 +26,9 @@ const callStatusLabels = {
 };
 
 export default function OrdersPage() {
+  const { currentRestaurantId, token } = useApp();
+  const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+  
   const [orders, setOrders] = useState([]);
   const [staffCalls, setStaffCalls] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,14 +39,17 @@ export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState('orders');
 
   useEffect(() => {
-    fetchData();
-  }, [statusFilter]);
+    if (currentRestaurantId) {
+      fetchData();
+    }
+  }, [statusFilter, currentRestaurantId]);
 
   const fetchData = async () => {
+    if (!currentRestaurantId) return;
     try {
       const [ordersRes, callsRes] = await Promise.all([
-        axios.get(`${API}/orders${statusFilter !== 'all' ? `?status=${statusFilter}` : ''}`),
-        axios.get(`${API}/staff-calls`)
+        axios.get(`${API}/restaurants/${currentRestaurantId}/orders${statusFilter !== 'all' ? `?status=${statusFilter}` : ''}`, authHeaders),
+        axios.get(`${API}/restaurants/${currentRestaurantId}/staff-calls`, authHeaders)
       ]);
       setOrders(ordersRes.data);
       setStaffCalls(callsRes.data);
