@@ -606,6 +606,59 @@ export default function MenuPage() {
     }
   };
 
+  // Import JSON handlers
+  const handleJsonFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target.result;
+        // Validate JSON
+        JSON.parse(content);
+        setImportJson(content);
+        setImportDialogOpen(true);
+      } catch (error) {
+        toast.error('Неверный формат JSON файла');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input
+  };
+
+  const handleImportMenu = async () => {
+    if (!importJson.trim()) {
+      toast.error('Введите JSON данные');
+      return;
+    }
+    
+    let jsonData;
+    try {
+      jsonData = JSON.parse(importJson);
+    } catch (error) {
+      toast.error('Неверный формат JSON');
+      return;
+    }
+    
+    setImporting(true);
+    try {
+      const response = await axios.post(
+        `${API}/restaurants/${currentRestaurantId}/import-menu`,
+        { data: jsonData },
+        authHeaders
+      );
+      toast.success(`Импортировано: ${response.data.imported_categories} категорий, ${response.data.imported_items} позиций`);
+      setImportDialogOpen(false);
+      setImportJson('');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Ошибка импорта');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const filteredItems = menuItems.filter(item => {
     const matchesCategory = !selectedCategory || item.category_id === selectedCategory;
     const matchesSearch = !searchQuery || 
