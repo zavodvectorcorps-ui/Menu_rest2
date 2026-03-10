@@ -116,7 +116,7 @@ export default function ClientMenuPage() {
 
     setSubmittingOrder(true);
     try {
-      await axios.post(`${API}/orders`, {
+      await axios.post(`${API}/public/orders`, {
         table_code: tableCode,
         items: cart.map(item => ({
           menu_item_id: item.id,
@@ -141,7 +141,7 @@ export default function ClientMenuPage() {
   const callStaff = async (callTypeId) => {
     setCallingStaff(true);
     try {
-      await axios.post(`${API}/staff-calls`, { 
+      await axios.post(`${API}/public/staff-calls`, { 
         table_code: tableCode,
         call_type_id: callTypeId 
       });
