@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   User, 
@@ -48,6 +48,7 @@ const navItems = [
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('ws_sound') !== 'off');
+  const [unreadCount, setUnreadCount] = useState(0);
   const { restaurant, restaurants, currentRestaurantId, switchRestaurant, user, handleLogout, token } = useApp();
   const { theme } = useTheme();
   const location = useLocation();
@@ -80,6 +81,7 @@ export default function AdminLayout() {
     if (msg.type === 'new_order') {
       const order = msg.data;
       playNotificationSound();
+      setUnreadCount(c => c + 1);
       if (order.is_preorder) {
         toast.info(`Новый предзаказ от ${order.customer_name || 'Гость'}`, {
           description: `${order.items?.length || 0} поз. — ${order.total?.toFixed(2)} BYN`,
@@ -97,6 +99,7 @@ export default function AdminLayout() {
     } else if (msg.type === 'new_staff_call') {
       const call = msg.data;
       playNotificationSound();
+      setUnreadCount(c => c + 1);
       toast.warning(`Вызов — Стол #${call.table_number}`, {
         description: call.call_type_name || 'Вызов персонала',
         action: { label: 'Открыть', onClick: () => navigate('/admin/orders') },
@@ -107,6 +110,11 @@ export default function AdminLayout() {
   }, [playNotificationSound, navigate]);
 
   const { connected } = useWebSocket(currentRestaurantId, token, handleWsMessage);
+
+  // Reset unread count when on orders page
+  useEffect(() => {
+    if (location.pathname === '/admin/orders') setUnreadCount(0);
+  }, [location.pathname]);
 
   const toggleSound = () => {
     const next = !soundEnabled;
@@ -219,6 +227,11 @@ export default function AdminLayout() {
               >
                 <Icon className="w-5 h-5" />
                 <span className="font-medium">{item.label}</span>
+                {item.path === '/admin/orders' && unreadCount > 0 && !isActive && (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white animate-pulse" data-testid="unread-badge">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
                 {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
               </NavLink>
             );
