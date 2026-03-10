@@ -1086,10 +1086,10 @@ async def create_public_order(data: OrderCreate):
     
     # Send Telegram notification
     table_num = table.get('number', '?')
-    items_text = "\n".join([f"  - {i.name} x{i.quantity}" for i in data.items])
-    msg = f"<b>Новый заказ</b>\nСтол #{table_num}\n\n{items_text}\n\n<b>Итого: {total} BYN</b>"
+    items_text = "\n".join([f"  • {i.name} x{i.quantity}" for i in data.items])
+    msg = f"🍽 <b>Новый заказ</b>\n📍 Стол #{table_num}\n\n{items_text}\n\n💰 <b>Итого: {total} BYN</b>"
     if data.notes:
-        msg += f"\nКомментарий: {data.notes}"
+        msg += f"\n📝 {data.notes}"
     await notify_restaurant_telegram(restaurant_id, msg)
     
     return doc
@@ -1121,7 +1121,16 @@ async def create_public_staff_call(data: StaffCallCreate):
     
     # Send Telegram notification
     table_num = table.get('number', '?')
-    msg = f"<b>{call_type_name or 'Вызов персонала'}</b>\nСтол #{table_num}"
+    # Use telegram_message template from call_type if available
+    if data.call_type_id:
+        call_type = await db.call_types.find_one({"id": data.call_type_id}, {"_id": 0})
+        tg_template = call_type.get('telegram_message', '') if call_type else ''
+        if tg_template:
+            msg = tg_template.replace('{table}', str(table_num))
+        else:
+            msg = f"🔔 <b>{call_type_name or 'Вызов персонала'}</b>\nСтол #{table_num}"
+    else:
+        msg = f"🔔 <b>Вызов персонала</b>\nСтол #{table_num}"
     await notify_restaurant_telegram(restaurant_id, msg)
     
     return doc
@@ -1794,11 +1803,11 @@ async def telegram_webhook(restaurant_id: str, request: dict):
             })
             await send_telegram_message(
                 bot_token, chat_id,
-                f"Вы подписаны на уведомления <b>{restaurant_name}</b>!\n\n"
+                f"✅ Вы подписаны на уведомления <b>{restaurant_name}</b>!\n\n"
                 f"Вы будете получать уведомления о:\n"
-                f"- Вызовах персонала\n"
-                f"- Запросах счёта\n"
-                f"- Новых заказах"
+                f"🔔 Вызовах персонала\n"
+                f"💳 Запросах счёта\n"
+                f"🍽 Новых заказах"
             )
         else:
             await send_telegram_message(
