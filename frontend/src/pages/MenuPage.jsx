@@ -606,25 +606,50 @@ export default function MenuPage() {
     }
   };
 
-  // Import JSON handlers
-  const handleJsonFileSelect = (e) => {
+  // Import menu file handlers (.data / .json)
+  const handleImportFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const content = event.target.result;
-        // Validate JSON
-        JSON.parse(content);
-        setImportJson(content);
-        setImportDialogOpen(true);
-      } catch (error) {
-        toast.error('Неверный формат JSON файла');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = ''; // Reset input
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'data') {
+      // Upload .data file directly
+      uploadImportFile(file);
+    } else {
+      // JSON - read and show in textarea for preview
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const content = event.target.result;
+          JSON.parse(content);
+          setImportJson(content);
+          setImportDialogOpen(true);
+        } catch (error) {
+          toast.error('Неверный формат JSON файла');
+        }
+      };
+      reader.readAsText(file);
+    }
+    e.target.value = '';
+  };
+
+  const uploadImportFile = async (file) => {
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await axios.post(
+        `${API}/restaurants/${currentRestaurantId}/import-file`,
+        formData,
+        { headers: { ...authHeaders.headers, 'Content-Type': 'multipart/form-data' } }
+      );
+      toast.success(`Импортировано: ${response.data.imported_categories} категорий, ${response.data.imported_items} позиций`);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Ошибка импорта файла');
+    } finally {
+      setImporting(false);
+    }
   };
 
   const handleImportMenu = async () => {
@@ -696,16 +721,16 @@ export default function MenuPage() {
             <Plus className="w-4 h-4" />
             Позиция
           </Button>
-          <Button variant="outline" className="gap-2 rounded-full" onClick={() => jsonFileRef.current?.click()} data-testid="import-json-btn">
-            <FileJson className="w-4 h-4" />
-            Импорт JSON
+          <Button variant="outline" className="gap-2 rounded-full" onClick={() => jsonFileRef.current?.click()} disabled={importing} data-testid="import-json-btn">
+            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileJson className="w-4 h-4" />}
+            {importing ? 'Импорт...' : 'Импорт меню'}
           </Button>
           <input
             ref={jsonFileRef}
             type="file"
-            accept=".json"
+            accept=".json,.data"
             className="hidden"
-            onChange={handleJsonFileSelect}
+            onChange={handleImportFileSelect}
           />
         </div>
       </div>

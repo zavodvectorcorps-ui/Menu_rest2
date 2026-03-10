@@ -1082,7 +1082,77 @@ async def upload_file(file: UploadFile = File(...)):
     
     return {"url": f"/uploads/{filename}", "filename": filename}
 
-# ============ IMPORT JSON MENU ============
+# ============ IMPORT MENU (JSON & .DATA) ============
+
+import re as _re
+
+def strip_html(text: str) -> str:
+    """Remove HTML tags from string"""
+    if not text:
+        return ""
+    return _re.sub(r'<[^>]+>', '', text).strip()
+
+def parse_lunchpad_data(raw_data: list) -> dict:
+    """Parse LunchPad .data format into our import format"""
+    categories = []
+    for entry in raw_data:
+        entry_type = entry.get("type")
+        if entry_type != 0:
+            continue
+        
+        cat_name = strip_html(entry.get("name", "")).strip()
+        if not cat_name:
+            continue
+        
+        items_raw = entry.get("items", [])
+        if not items_raw and not cat_name:
+            continue
+        
+        display = entry.get("display", "")
+        display_mode = "card" if display == "grid" else "compact"
+        
+        items = []
+        for item in items_raw:
+            if item.get("type") != 4:
+                continue
+            item_name = strip_html(item.get("name", "")).strip()
+            if not item_name:
+                continue
+            
+            description = strip_html(item.get("description", ""))
+            
+            prices = item.get("prices", [])
+            price = 0
+            weight = ""
+            if prices:
+                p = prices[0]
+                try:
+                    price = float(p.get("price", 0) or 0)
+                except (ValueError, TypeError):
+                    price = 0
+                weight = p.get("measure", "")
+            
+            foto = item.get("foto", {}) or {}
+            image_url = foto.get("image_url", "") or ""
+            
+            in_stop = item.get("in_stop_list", False)
+            
+            items.append({
+                "name": item_name,
+                "description": description,
+                "price": price,
+                "weight": weight,
+                "image_url": image_url,
+                "is_available": not in_stop,
+            })
+        
+        categories.append({
+            "name": cat_name,
+            "display_mode": display_mode,
+            "items": items,
+        })
+    
+    return {"categories": categories}
 
 class ImportMenuRequest(BaseModel):
     data: dict  # JSON data from old service
@@ -1239,6 +1309,38 @@ async def import_menu_json(restaurant_id: str, request: ImportMenuRequest, curre
     
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Ошибка импорта: {str(e)}")
+
+@api_router.post("/restaurants/{restaurant_id}/import-file")
+async def import_menu_file(restaurant_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    """Import menu from .data or .json file upload"""
+    await check_restaurant_access(current_user, restaurant_id)
+    
+    ext = Path(file.filename).suffix.lower()
+    if ext not in {'.data', '.json'}:
+        raise HTTPException(status_code=400, detail="Допустимые форматы: .data, .json")
+    
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Файл слишком большой. Максимум 10MB")
+    
+    try:
+        import json as _json
+        raw = _json.loads(content.decode('utf-8'))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Не удалось прочитать файл. Проверьте формат JSON.")
+    
+    # Detect format: LunchPad .data (array of objects with type field) vs our format (dict with categories)
+    if isinstance(raw, list):
+        # LunchPad format
+        parsed = parse_lunchpad_data(raw)
+    elif isinstance(raw, dict):
+        parsed = raw
+    else:
+        raise HTTPException(status_code=400, detail="Неизвестный формат данных")
+    
+    # Reuse existing import logic
+    request = ImportMenuRequest(data=parsed)
+    return await import_menu_json(restaurant_id, request, current_user)
 
 # ============ TELEGRAM BOT ============
 
