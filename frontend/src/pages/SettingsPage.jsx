@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Palette, Building2, Bot, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2 } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Building2, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -369,10 +369,6 @@ export default function SettingsPage() {
           <TabsTrigger value="employees" className="gap-2" data-testid="tab-employees">
             <Users className="w-4 h-4" />
             Сотрудники
-          </TabsTrigger>
-          <TabsTrigger value="integrations" className="gap-2" data-testid="tab-integrations">
-            <Bot className="w-4 h-4" />
-            Интеграции
           </TabsTrigger>
           <TabsTrigger value="appearance" className="gap-2" data-testid="tab-appearance">
             <Palette className="w-4 h-4" />
@@ -893,60 +889,6 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* Integrations Tab */}
-        <TabsContent value="integrations" className="mt-6">
-          <Card className="border-none shadow-md" data-testid="integrations-card">
-            <CardHeader>
-              <CardTitle className="font-heading">Интеграции</CardTitle>
-              <CardDescription>Подключение внешних сервисов</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="p-4 rounded-xl border border-border">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                    <Bot className="w-5 h-5 text-blue-500" />
-                  </div>
-                  <div>
-                    <h4 className="font-heading font-semibold">Telegram Bot</h4>
-                    <p className="text-sm text-muted-foreground">Уведомления о заказах и вызовах</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Bot Token</Label>
-                    <Input
-                      type="password"
-                      value={settingsForm.telegram_bot_token || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, telegram_bot_token: e.target.value })}
-                      placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-                      data-testid="telegram-token-input"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Chat ID</Label>
-                    <Input
-                      value={settingsForm.telegram_chat_id || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, telegram_chat_id: e.target.value })}
-                      placeholder="-1001234567890"
-                      data-testid="telegram-chat-input"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <Button 
-                className="w-full bg-mint-500 hover:bg-mint-600 rounded-full"
-                onClick={handleSaveSettings}
-                disabled={saving}
-                data-testid="save-integrations-btn"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {saving ? 'Сохранение...' : 'Сохранить интеграции'}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* Appearance Tab */}
         <TabsContent value="appearance" className="mt-6">
           <Card className="border-none shadow-md" data-testid="appearance-card">
