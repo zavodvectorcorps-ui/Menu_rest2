@@ -239,12 +239,14 @@ class Table(BaseModel):
     code: str = Field(default_factory=lambda: str(uuid.uuid4())[:8].upper())
     name: Optional[str] = ""
     is_active: bool = True
+    is_preorder: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class TableCreate(BaseModel):
     number: int
     name: Optional[str] = ""
     is_active: bool = True
+    is_preorder: bool = False
 
 class OrderItem(BaseModel):
     menu_item_id: str
@@ -262,12 +264,21 @@ class Order(BaseModel):
     total: float
     status: OrderStatus = OrderStatus.NEW
     notes: Optional[str] = ""
+    is_preorder: bool = False
+    customer_name: Optional[str] = ""
+    customer_phone: Optional[str] = ""
+    preorder_date: Optional[str] = ""
+    preorder_time: Optional[str] = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class OrderCreate(BaseModel):
     table_code: str
     items: List[OrderItem]
     notes: Optional[str] = ""
+    customer_name: Optional[str] = ""
+    customer_phone: Optional[str] = ""
+    preorder_date: Optional[str] = ""
+    preorder_time: Optional[str] = ""
 
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus
@@ -886,6 +897,15 @@ async def update_order_status(restaurant_id: str, order_id: str, data: OrderStat
     await db.orders.update_one({"id": order_id, "restaurant_id": restaurant_id}, {"$set": {"status": data.status}})
     return await db.orders.find_one({"id": order_id}, {"_id": 0})
 
+@api_router.post("/restaurants/{restaurant_id}/orders/complete-all")
+async def complete_all_orders(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.orders.update_many(
+        {"restaurant_id": restaurant_id, "status": {"$in": ["new", "in_progress"]}},
+        {"$set": {"status": "completed"}}
+    )
+    return {"message": f"Завершено заказов: {result.modified_count}", "count": result.modified_count}
+
 # ============ STAFF CALLS ============
 
 @api_router.get("/restaurants/{restaurant_id}/staff-calls")
@@ -902,6 +922,15 @@ async def update_staff_call_status(restaurant_id: str, call_id: str, status: Sta
     await check_restaurant_access(current_user, restaurant_id)
     await db.staff_calls.update_one({"id": call_id, "restaurant_id": restaurant_id}, {"$set": {"status": status}})
     return await db.staff_calls.find_one({"id": call_id}, {"_id": 0})
+
+@api_router.post("/restaurants/{restaurant_id}/staff-calls/complete-all")
+async def complete_all_staff_calls(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.staff_calls.update_many(
+        {"restaurant_id": restaurant_id, "status": {"$in": ["pending", "acknowledged"]}},
+        {"$set": {"status": "completed"}}
+    )
+    return {"message": f"Завершено вызовов: {result.modified_count}", "count": result.modified_count}
 
 # ============ EMPLOYEES ============
 
@@ -1071,13 +1100,20 @@ async def create_public_order(data: OrderCreate):
     restaurant_id = table.get('restaurant_id')
     total = sum(item.price * item.quantity for item in data.items)
     
+    is_preorder = table.get('is_preorder', False)
+    
     order = Order(
         restaurant_id=restaurant_id,
         table_id=table['id'],
         table_number=table['number'],
         items=[i.model_dump() for i in data.items],
         total=total,
-        notes=data.notes
+        notes=data.notes,
+        is_preorder=is_preorder,
+        customer_name=data.customer_name if is_preorder else "",
+        customer_phone=data.customer_phone if is_preorder else "",
+        preorder_date=data.preorder_date if is_preorder else "",
+        preorder_time=data.preorder_time if is_preorder else "",
     )
     doc = order.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
@@ -1087,7 +1123,10 @@ async def create_public_order(data: OrderCreate):
     # Send Telegram notification
     table_num = table.get('number', '?')
     items_text = "\n".join([f"  • {i.name} x{i.quantity}" for i in data.items])
-    msg = f"🍽 <b>Новый заказ</b>\n📍 Стол #{table_num}\n\n{items_text}\n\n💰 <b>Итого: {total} BYN</b>"
+    if is_preorder:
+        msg = f"📋 <b>Предзаказ</b>\n👤 {data.customer_name or '—'}\n📱 {data.customer_phone or '—'}\n📅 {data.preorder_date or '—'} {data.preorder_time or ''}\n\n{items_text}\n\n💰 <b>Итого: {total} BYN</b>"
+    else:
+        msg = f"🍽 <b>Новый заказ</b>\n📍 Стол #{table_num}\n\n{items_text}\n\n💰 <b>Итого: {total} BYN</b>"
     if data.notes:
         msg += f"\n📝 {data.notes}"
     await notify_restaurant_telegram(restaurant_id, msg)

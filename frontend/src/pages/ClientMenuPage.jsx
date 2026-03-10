@@ -110,9 +110,24 @@ export default function ClientMenuPage() {
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const isPreorder = data?.table?.is_preorder || false;
+
+  // Preorder form
+  const [preorderForm, setPreorderForm] = useState({ name: '', phone: '', date: '', time: '' });
 
   const submitOrder = async () => {
     if (cart.length === 0) return;
+
+    if (isPreorder) {
+      if (!preorderForm.name.trim() || !preorderForm.phone.trim()) {
+        toast.error('Укажите имя и телефон для предзаказа');
+        return;
+      }
+      if (!preorderForm.date) {
+        toast.error('Укажите дату предзаказа');
+        return;
+      }
+    }
 
     setSubmittingOrder(true);
     try {
@@ -124,11 +139,18 @@ export default function ClientMenuPage() {
           quantity: item.quantity,
           price: item.price
         })),
-        notes: orderNotes
+        notes: orderNotes,
+        ...(isPreorder && {
+          customer_name: preorderForm.name,
+          customer_phone: preorderForm.phone,
+          preorder_date: preorderForm.date,
+          preorder_time: preorderForm.time,
+        })
       });
       setOrderSuccess(true);
       setCart([]);
       setOrderNotes('');
+      setPreorderForm({ name: '', phone: '', date: '', time: '' });
       setTimeout(() => setOrderSuccess(false), 5000);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Ошибка оформления заказа');
@@ -592,7 +614,44 @@ export default function ClientMenuPage() {
               </div>
             ))}
 
-            <div className="pt-3">
+            <div className="pt-3 space-y-3">
+              {isPreorder && (
+                <div className="space-y-3 p-3 rounded-xl bg-purple-500/5 border border-purple-500/20">
+                  <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Данные для предзаказа</p>
+                  <input
+                    type="text"
+                    placeholder="Ваше имя *"
+                    value={preorderForm.name}
+                    onChange={(e) => setPreorderForm({...preorderForm, name: e.target.value})}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-sm"
+                    data-testid="preorder-name"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Телефон *"
+                    value={preorderForm.phone}
+                    onChange={(e) => setPreorderForm({...preorderForm, phone: e.target.value})}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-sm"
+                    data-testid="preorder-phone"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="date"
+                      value={preorderForm.date}
+                      onChange={(e) => setPreorderForm({...preorderForm, date: e.target.value})}
+                      className="p-2.5 rounded-lg border border-border bg-background text-sm"
+                      data-testid="preorder-date"
+                    />
+                    <input
+                      type="time"
+                      value={preorderForm.time}
+                      onChange={(e) => setPreorderForm({...preorderForm, time: e.target.value})}
+                      className="p-2.5 rounded-lg border border-border bg-background text-sm"
+                      data-testid="preorder-time"
+                    />
+                  </div>
+                </div>
+              )}
               <Textarea
                 placeholder="Комментарий к заказу (аллергии, пожелания...)"
                 value={orderNotes}

@@ -1,388 +1,246 @@
-import { useState, useEffect } from 'react';
-import { Calendar, Clock, Filter, Search, ChevronDown, Check, X, RefreshCw, Eye, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useMemo } from 'react';
+import { ShoppingBag, Phone, Clock, CheckCircle, XCircle, Loader2, CheckCheck, CalendarClock, User, PhoneCall } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { useApp, API } from '@/App';
+import { API, useApp } from '@/App';
 import axios from 'axios';
 
-const statusLabels = {
-  new: { label: 'Новый', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
-  in_progress: { label: 'В работе', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300' },
-  completed: { label: 'Выполнен', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' },
-  cancelled: { label: 'Отменён', color: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' }
-};
-
-const callStatusLabels = {
-  pending: { label: 'Ожидает', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300' },
-  acknowledged: { label: 'Принят', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' },
-  completed: { label: 'Выполнен', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' }
+const STATUS_MAP = {
+  new: { label: 'Новый', color: 'bg-blue-500', icon: Clock },
+  in_progress: { label: 'В работе', color: 'bg-yellow-500', icon: Loader2 },
+  completed: { label: 'Завершён', color: 'bg-green-500', icon: CheckCircle },
+  cancelled: { label: 'Отменён', color: 'bg-red-500', icon: XCircle },
+  pending: { label: 'Ожидает', color: 'bg-blue-500', icon: Clock },
+  acknowledged: { label: 'Принят', color: 'bg-yellow-500', icon: CheckCircle },
 };
 
 export default function OrdersPage() {
-  const { currentRestaurantId, token } = useApp();
+  const { token, currentRestaurantId } = useApp();
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
-  
+
   const [orders, setOrders] = useState([]);
   const [staffCalls, setStaffCalls] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('orders');
-
-  useEffect(() => {
-    if (currentRestaurantId) {
-      fetchData();
-    }
-  }, [statusFilter, currentRestaurantId]);
+  const [tab, setTab] = useState('orders');
+  const [completeAllOpen, setCompleteAllOpen] = useState(false);
+  const [completeAllType, setCompleteAllType] = useState('');
 
   const fetchData = async () => {
     if (!currentRestaurantId) return;
     try {
       const [ordersRes, callsRes] = await Promise.all([
-        axios.get(`${API}/restaurants/${currentRestaurantId}/orders${statusFilter !== 'all' ? `?status=${statusFilter}` : ''}`, authHeaders),
+        axios.get(`${API}/restaurants/${currentRestaurantId}/orders`, authHeaders),
         axios.get(`${API}/restaurants/${currentRestaurantId}/staff-calls`, authHeaders)
       ]);
       setOrders(ordersRes.data);
       setStaffCalls(callsRes.data);
-    } catch (error) {
-      toast.error('Ошибка загрузки заказов');
+    } catch (err) {
+      toast.error('Ошибка загрузки');
     } finally {
       setLoading(false);
     }
   };
 
-  const updateOrderStatus = async (orderId, newStatus) => {
+  useEffect(() => { fetchData(); }, [currentRestaurantId]);
+
+  const updateOrderStatus = async (orderId, status) => {
     try {
-      await axios.put(`${API}/restaurants/${currentRestaurantId}/orders/${orderId}/status`, { status: newStatus }, authHeaders);
-      toast.success('Статус обновлён');
+      await axios.put(`${API}/restaurants/${currentRestaurantId}/orders/${orderId}/status`, { status }, authHeaders);
       fetchData();
-    } catch (error) {
-      toast.error('Ошибка обновления статуса');
-    }
+    } catch { toast.error('Ошибка'); }
   };
 
-  const updateCallStatus = async (callId, newStatus) => {
+  const updateCallStatus = async (callId, status) => {
     try {
-      await axios.put(`${API}/restaurants/${currentRestaurantId}/staff-calls/${callId}/status?status=${newStatus}`, {}, authHeaders);
-      toast.success('Статус обновлён');
+      await axios.put(`${API}/restaurants/${currentRestaurantId}/staff-calls/${callId}/status`, { status }, authHeaders);
       fetchData();
-    } catch (error) {
-      toast.error('Ошибка обновления статуса');
-    }
+    } catch { toast.error('Ошибка'); }
   };
 
-  const openOrderDetails = (order) => {
-    setSelectedOrder(order);
-    setDetailsDialogOpen(true);
+  const handleCompleteAll = async () => {
+    try {
+      if (completeAllType === 'orders') {
+        const resp = await axios.post(`${API}/restaurants/${currentRestaurantId}/orders/complete-all`, {}, authHeaders);
+        toast.success(resp.data.message);
+      } else {
+        const resp = await axios.post(`${API}/restaurants/${currentRestaurantId}/staff-calls/complete-all`, {}, authHeaders);
+        toast.success(resp.data.message);
+      }
+      setCompleteAllOpen(false);
+      fetchData();
+    } catch { toast.error('Ошибка'); }
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ru-RU', { 
-      day: '2-digit', 
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const filteredOrders = orders.filter(order => {
-    if (!searchQuery) return true;
-    return order.table_number.toString().includes(searchQuery) ||
-           order.id.toLowerCase().includes(searchQuery.toLowerCase());
-  });
-
-  const pendingCalls = staffCalls.filter(c => c.status === 'pending').length;
+  const regularOrders = useMemo(() => orders.filter(o => !o.is_preorder), [orders]);
+  const preOrders = useMemo(() => orders.filter(o => o.is_preorder), [orders]);
+  const activeOrders = regularOrders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
+  const activeCalls = staffCalls.filter(c => c.status !== 'completed');
+  const activePreorders = preOrders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="spinner" />
-      </div>
-    );
+    return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>;
   }
 
-  return (
-    <div className="space-y-6 animate-fadeIn" data-testid="orders-page">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Заказы и вызовы</h1>
-          <p className="text-muted-foreground">Управление заказами гостей</p>
+  const renderOrder = (order) => {
+    const st = STATUS_MAP[order.status] || STATUS_MAP.new;
+    const StIcon = st.icon;
+    return (
+      <div key={order.id} className="p-4 rounded-xl border border-border space-y-3" data-testid={`order-${order.id}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {order.is_preorder ? (
+              <Badge className="bg-purple-500 text-white gap-1"><CalendarClock className="w-3 h-3" />Предзаказ</Badge>
+            ) : (
+              <Badge variant="outline">Стол #{order.table_number}</Badge>
+            )}
+            <Badge className={`${st.color} text-white gap-1`}><StIcon className="w-3 h-3" />{st.label}</Badge>
+          </div>
+          <span className="text-xs text-muted-foreground">{new Date(order.created_at).toLocaleString('ru')}</span>
         </div>
-        <Button
-          variant="outline"
-          className="gap-2 rounded-full"
-          onClick={fetchData}
-          data-testid="refresh-orders-btn"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Обновить
-        </Button>
+
+        {order.is_preorder && (
+          <div className="grid grid-cols-2 gap-2 text-sm bg-purple-500/5 rounded-lg p-3">
+            <div className="flex items-center gap-1.5"><User className="w-3.5 h-3.5 text-purple-500" /><span>{order.customer_name || '—'}</span></div>
+            <div className="flex items-center gap-1.5"><PhoneCall className="w-3.5 h-3.5 text-purple-500" /><span>{order.customer_phone || '—'}</span></div>
+            <div className="flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5 text-purple-500" /><span>{order.preorder_date || '—'} {order.preorder_time || ''}</span></div>
+            {order.notes && <div className="col-span-2 text-muted-foreground">{order.notes}</div>}
+          </div>
+        )}
+
+        <div className="space-y-1">
+          {order.items?.map((item, i) => (
+            <div key={i} className="flex justify-between text-sm">
+              <span>{item.name} <span className="text-muted-foreground">x{item.quantity}</span></span>
+              <span className="font-medium">{(item.price * item.quantity).toFixed(2)}</span>
+            </div>
+          ))}
+          <div className="flex justify-between font-bold border-t border-border pt-1 mt-2">
+            <span>Итого</span><span>{order.total?.toFixed(2)} BYN</span>
+          </div>
+        </div>
+
+        {order.status !== 'completed' && order.status !== 'cancelled' && (
+          <div className="flex gap-2">
+            {order.status === 'new' && (
+              <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-white" onClick={() => updateOrderStatus(order.id, 'in_progress')}>В работу</Button>
+            )}
+            <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white" onClick={() => updateOrderStatus(order.id, 'completed')}>Завершить</Button>
+            <Button size="sm" variant="outline" className="text-destructive" onClick={() => updateOrderStatus(order.id, 'cancelled')}>Отменить</Button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderCall = (call) => {
+    const st = STATUS_MAP[call.status] || STATUS_MAP.pending;
+    const StIcon = st.icon;
+    return (
+      <div key={call.id} className="p-4 rounded-xl border border-border" data-testid={`call-${call.id}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">Стол #{call.table_number}</Badge>
+            <Badge className={`${st.color} text-white gap-1`}><StIcon className="w-3 h-3" />{st.label}</Badge>
+            <span className="text-sm font-medium">{call.call_type_name || 'Вызов'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{new Date(call.created_at).toLocaleString('ru')}</span>
+            {call.status !== 'completed' && (
+              <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white h-7" onClick={() => updateCallStatus(call.id, 'completed')}>Готово</Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6" data-testid="orders-page">
+      <div>
+        <h1 className="text-2xl font-heading font-bold">Заказы и вызовы</h1>
+        <p className="text-muted-foreground">Управление заказами, предзаказами и вызовами персонала</p>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="orders" className="gap-2" data-testid="tab-orders">
-            Заказы
-            <Badge variant="secondary" className="ml-1">{orders.length}</Badge>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="grid grid-cols-3 w-full max-w-md">
+          <TabsTrigger value="orders" className="gap-1.5" data-testid="tab-orders">
+            <ShoppingBag className="w-4 h-4" />Заказы
+            {activeOrders.length > 0 && <Badge className="bg-blue-500 text-white text-[10px] h-4 min-w-4 px-1">{activeOrders.length}</Badge>}
           </TabsTrigger>
-          <TabsTrigger value="calls" className="gap-2" data-testid="tab-calls">
-            Вызовы персонала
-            {pendingCalls > 0 && (
-              <Badge className="ml-1 bg-red-500 text-white animate-pulse">{pendingCalls}</Badge>
-            )}
+          <TabsTrigger value="preorders" className="gap-1.5" data-testid="tab-preorders">
+            <CalendarClock className="w-4 h-4" />Предзаказы
+            {activePreorders.length > 0 && <Badge className="bg-purple-500 text-white text-[10px] h-4 min-w-4 px-1">{activePreorders.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="calls" className="gap-1.5" data-testid="tab-calls">
+            <Phone className="w-4 h-4" />Вызовы
+            {activeCalls.length > 0 && <Badge className="bg-orange-500 text-white text-[10px] h-4 min-w-4 px-1">{activeCalls.length}</Badge>}
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="orders" className="mt-6">
-          {/* Filters */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                placeholder="Поиск по номеру стола..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 rounded-full"
-                data-testid="orders-search-input"
-              />
+        <TabsContent value="orders" className="mt-6 space-y-4">
+          {activeOrders.length > 0 && (
+            <div className="flex justify-end">
+              <Button variant="outline" className="gap-2" onClick={() => { setCompleteAllType('orders'); setCompleteAllOpen(true); }} data-testid="complete-all-orders-btn">
+                <CheckCheck className="w-4 h-4" />Завершить все ({activeOrders.length})
+              </Button>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px] rounded-full" data-testid="status-filter">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Все статусы" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Все статусы</SelectItem>
-                <SelectItem value="new">Новые</SelectItem>
-                <SelectItem value="in_progress">В работе</SelectItem>
-                <SelectItem value="completed">Выполненные</SelectItem>
-                <SelectItem value="cancelled">Отменённые</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Orders Table */}
-          {filteredOrders.length === 0 ? (
-            <Card className="border-none shadow-md">
-              <CardContent className="py-12 text-center">
-                <Clock className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground">Заказов пока нет</p>
-              </CardContent>
-            </Card>
+          )}
+          {regularOrders.length === 0 ? (
+            <Card className="border-none shadow-md"><CardContent className="py-12 text-center text-muted-foreground"><ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-30" /><p>Заказов пока нет</p></CardContent></Card>
           ) : (
-            <Card className="border-none shadow-md overflow-hidden" data-testid="orders-table">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="font-heading">Стол</TableHead>
-                    <TableHead className="font-heading">Время</TableHead>
-                    <TableHead className="font-heading">Позиции</TableHead>
-                    <TableHead className="font-heading">Сумма</TableHead>
-                    <TableHead className="font-heading">Статус</TableHead>
-                    <TableHead className="font-heading text-right">Действия</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.map((order) => (
-                    <TableRow key={order.id} className="table-row-hover" data-testid={`order-row-${order.id}`}>
-                      <TableCell>
-                        <span className="font-semibold">№{order.table_number}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <span className="text-foreground">{formatDate(order.created_at)}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-muted-foreground">
-                          {order.items?.length || 0} поз.
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-semibold text-mint-500">{order.total} ₽</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={statusLabels[order.status]?.color}>
-                          {statusLabels[order.status]?.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openOrderDetails(order)}
-                            data-testid={`view-order-${order.id}`}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {order.status === 'new' && (
-                            <Button
-                              size="sm"
-                              className="h-8 bg-mint-500 hover:bg-mint-600 rounded-full"
-                              onClick={() => updateOrderStatus(order.id, 'in_progress')}
-                              data-testid={`accept-order-${order.id}`}
-                            >
-                              Принять
-                            </Button>
-                          )}
-                          {order.status === 'in_progress' && (
-                            <Button
-                              size="sm"
-                              className="h-8 bg-emerald-500 hover:bg-emerald-600 rounded-full"
-                              onClick={() => updateOrderStatus(order.id, 'completed')}
-                              data-testid={`complete-order-${order.id}`}
-                            >
-                              <Check className="w-4 h-4 mr-1" />
-                              Готово
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
+            regularOrders.map(renderOrder)
           )}
         </TabsContent>
 
-        <TabsContent value="calls" className="mt-6">
-          {staffCalls.length === 0 ? (
-            <Card className="border-none shadow-md">
-              <CardContent className="py-12 text-center">
-                <Clock className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-                <p className="text-muted-foreground">Вызовов пока нет</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4" data-testid="calls-list">
-              {staffCalls.map((call) => (
-                <Card 
-                  key={call.id} 
-                  className={`border-none shadow-md ${call.status === 'pending' ? 'ring-2 ring-amber-500/50' : ''}`}
-                  data-testid={`call-${call.id}`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                          <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
-                            {call.table_number}
-                          </span>
-                        </div>
-                        <div>
-                          <h4 className="font-heading font-semibold text-foreground">
-                            Стол №{call.table_number}
-                          </h4>
-                          <p className="text-sm text-muted-foreground">{formatDate(call.created_at)}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Badge className={callStatusLabels[call.status]?.color}>
-                          {callStatusLabels[call.status]?.label}
-                        </Badge>
-                        {call.status === 'pending' && (
-                          <Button
-                            size="sm"
-                            className="bg-mint-500 hover:bg-mint-600 rounded-full"
-                            onClick={() => updateCallStatus(call.id, 'acknowledged')}
-                            data-testid={`acknowledge-call-${call.id}`}
-                          >
-                            Принять
-                          </Button>
-                        )}
-                        {call.status === 'acknowledged' && (
-                          <Button
-                            size="sm"
-                            className="bg-emerald-500 hover:bg-emerald-600 rounded-full"
-                            onClick={() => updateCallStatus(call.id, 'completed')}
-                            data-testid={`complete-call-${call.id}`}
-                          >
-                            <Check className="w-4 h-4 mr-1" />
-                            Выполнен
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+        <TabsContent value="preorders" className="mt-6 space-y-4">
+          {activePreorders.length > 0 && (
+            <div className="flex justify-end">
+              <Button variant="outline" className="gap-2" onClick={() => { setCompleteAllType('orders'); setCompleteAllOpen(true); }} data-testid="complete-all-preorders-btn">
+                <CheckCheck className="w-4 h-4" />Завершить все ({activePreorders.length})
+              </Button>
             </div>
+          )}
+          {preOrders.length === 0 ? (
+            <Card className="border-none shadow-md"><CardContent className="py-12 text-center text-muted-foreground"><CalendarClock className="w-12 h-12 mx-auto mb-3 opacity-30" /><p>Предзаказов пока нет</p></CardContent></Card>
+          ) : (
+            preOrders.map(renderOrder)
+          )}
+        </TabsContent>
+
+        <TabsContent value="calls" className="mt-6 space-y-4">
+          {activeCalls.length > 0 && (
+            <div className="flex justify-end">
+              <Button variant="outline" className="gap-2" onClick={() => { setCompleteAllType('calls'); setCompleteAllOpen(true); }} data-testid="complete-all-calls-btn">
+                <CheckCheck className="w-4 h-4" />Завершить все ({activeCalls.length})
+              </Button>
+            </div>
+          )}
+          {staffCalls.length === 0 ? (
+            <Card className="border-none shadow-md"><CardContent className="py-12 text-center text-muted-foreground"><Phone className="w-12 h-12 mx-auto mb-3 opacity-30" /><p>Вызовов пока нет</p></CardContent></Card>
+          ) : (
+            staffCalls.map(renderCall)
           )}
         </TabsContent>
       </Tabs>
 
-      {/* Order Details Dialog */}
-      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
-        <DialogContent className="max-w-lg" data-testid="order-details-dialog">
+      <Dialog open={completeAllOpen} onOpenChange={setCompleteAllOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="font-heading">
-              Заказ №{selectedOrder?.id?.slice(0, 8)}
-            </DialogTitle>
+            <DialogTitle className="font-heading">Завершить все?</DialogTitle>
+            <DialogDescription>
+              {completeAllType === 'orders'
+                ? `Все активные заказы (${activeOrders.length + activePreorders.length}) будут отмечены как завершённые.`
+                : `Все активные вызовы (${activeCalls.length}) будут отмечены как завершённые.`}
+            </DialogDescription>
           </DialogHeader>
-          {selectedOrder && (
-            <div className="space-y-4 py-4">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Стол</span>
-                <span className="font-semibold">№{selectedOrder.table_number}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Время</span>
-                <span>{formatDate(selectedOrder.created_at)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Статус</span>
-                <Badge className={statusLabels[selectedOrder.status]?.color}>
-                  {statusLabels[selectedOrder.status]?.label}
-                </Badge>
-              </div>
-              
-              <div className="border-t border-border pt-4">
-                <h4 className="font-heading font-semibold mb-3">Позиции:</h4>
-                <div className="space-y-2">
-                  {selectedOrder.items?.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
-                      <div>
-                        <span className="font-medium">{item.name}</span>
-                        <span className="text-muted-foreground ml-2">×{item.quantity}</span>
-                      </div>
-                      <span className="font-medium">{item.price * item.quantity} ₽</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {selectedOrder.notes && (
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <span className="text-sm text-muted-foreground">Комментарий: </span>
-                  <span className="text-sm">{selectedOrder.notes}</span>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center pt-4 border-t border-border">
-                <span className="text-lg font-heading font-semibold">Итого:</span>
-                <span className="text-xl font-bold text-mint-500">{selectedOrder.total} ₽</span>
-              </div>
-            </div>
-          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailsDialogOpen(false)}>
-              Закрыть
+            <Button variant="outline" onClick={() => setCompleteAllOpen(false)}>Отмена</Button>
+            <Button className="bg-green-500 hover:bg-green-600 text-white gap-2" onClick={handleCompleteAll} data-testid="confirm-complete-all">
+              <CheckCheck className="w-4 h-4" />Завершить все
             </Button>
           </DialogFooter>
         </DialogContent>

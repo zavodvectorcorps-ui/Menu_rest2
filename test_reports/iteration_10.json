@@ -1,0 +1,91 @@
+{
+  "summary": "Completed comprehensive testing of preorder and complete-all features. All 15 backend tests passed (100%). All frontend flows working correctly - login, orders page with 3 tabs (Заказы, Предзаказы, Вызовы), complete-all dialog, and client menu preorder form.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "Backend: POST /api/auth/login - returns valid JWT token",
+    "Backend: POST /api/auth/login with invalid credentials - returns 401",
+    "Backend: POST /api/restaurants/{id}/orders/complete-all - completes all active orders",
+    "Backend: POST /api/restaurants/{id}/orders/complete-all without auth - returns 401",
+    "Backend: POST /api/restaurants/{id}/staff-calls/complete-all - completes all active calls",
+    "Backend: POST /api/restaurants/{id}/staff-calls/complete-all without auth - returns 401",
+    "Backend: Preorder table exists with is_preorder=true (code 6E32830E)",
+    "Backend: Regular table exists (code 697DCAA5)",
+    "Backend: GET /api/public/menu/{preorder_table_code} - returns is_preorder=true in table",
+    "Backend: GET /api/public/menu/{regular_table_code} - returns is_preorder=false/null",
+    "Backend: POST /api/public/orders with preorder table - saves customer info",
+    "Backend: POST /api/public/orders with regular table - does NOT save customer info",
+    "Backend: GET /api/restaurants/{id}/orders - returns orders with is_preorder flag",
+    "Backend: Preorder from 'Иван Петров' exists with customer details",
+    "Backend: Cleanup test orders completed",
+    "Frontend: Login with admin/220066 - dashboard loads",
+    "Frontend: Navigate to Заказы page - shows 3 tabs (Заказы, Предзаказы, Вызовы)",
+    "Frontend: Orders tab shows 'Завершить все' button when active orders exist",
+    "Frontend: Preorders tab shows preorders with customer details (name, phone, date/time)",
+    "Frontend: Preorder from 'Иван Петров' visible with details",
+    "Frontend: Calls (Вызовы) tab shows staff calls with types",
+    "Frontend: Complete-all confirmation dialog works with 'Отмена' and 'Завершить все' buttons",
+    "Frontend: Client menu /menu/6E32830E (preorder table) shows preorder form",
+    "Frontend: Preorder form has name, phone, date, time fields",
+    "Frontend: Client menu /menu/697DCAA5 (regular table) does NOT show preorder form"
+  ],
+
+  "test_report_links": [
+    "/app/backend/tests/test_preorders_complete_all.py",
+    "/app/test_reports/pytest/pytest_preorders_complete_all.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [],
+
+  "updated_files": [
+    "/app/backend/tests/test_preorders_complete_all.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "100%"
+  },
+
+  "seed_data_creation": "Test preorders with TEST_ prefix were created and cleaned up during testing.",
+
+  "retest_needed": false,
+
+  "should_main_agent_self_test": true,
+
+  "context_for_next_testing_agent": "All preorder and complete-all features verified working. Restaurant 'Мята Спортивная' (id: aa25189d-d668-4838-915a-c5d936547f3f) has: 1) Regular table code '697DCAA5' (is_preorder=false), 2) Preorder table code '6E32830E' (is_preorder=true). Existing preorder from 'Иван Петров' was present. Orders page has 3 tabs with complete-all buttons that work via API calls. Client menu at /menu/{code} correctly shows preorder form only for preorder tables.",
+
+  "test_credentials": {
+    "superadmin": {
+      "username": "admin",
+      "password": "220066"
+    },
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "preorder_table_code": "6E32830E",
+    "regular_table_code": "697DCAA5"
+  },
+
+  "features_verified": {
+    "login_flow": "✓ Login with admin/220066 works, dashboard loads",
+    "orders_page_tabs": "✓ 3 tabs (Заказы, Предзаказы, Вызовы) render correctly",
+    "preorders_tab": "✓ Shows preorder from 'Иван Петров' with customer details",
+    "complete_all_orders_button": "✓ Works with confirmation dialog",
+    "complete_all_calls_button": "✓ Works with confirmation dialog",
+    "complete_all_orders_api": "✓ POST /api/restaurants/{id}/orders/complete-all returns 200",
+    "complete_all_staff_calls_api": "✓ POST /api/restaurants/{id}/staff-calls/complete-all returns 200",
+    "create_preorder_api": "✓ POST /api/public/orders with preorder table saves customer info",
+    "client_menu_preorder_form": "✓ /menu/{preorder_table_code} shows preorder form",
+    "orders_list_shows_preorder_details": "✓ Customer name, phone, date visible in preorders tab"
+  }
+}
