@@ -1320,10 +1320,14 @@ def parse_lunchpad_data(raw_data: list) -> dict:
             weight = ""
             if prices:
                 p = prices[0]
-                try:
-                    price = float(p.get("price", 0) or 0)
-                except (ValueError, TypeError):
-                    price = 0
+                raw_price = p.get("price", 0)
+                if isinstance(raw_price, (int, float)):
+                    price = float(raw_price)
+                elif isinstance(raw_price, str):
+                    # Extract number from strings like "75 р", "8.5 р", "12,50 р"
+                    cleaned = raw_price.replace(',', '.').strip()
+                    match = _re.search(r'[\d]+[.]?[\d]*', cleaned)
+                    price = float(match.group()) if match else 0
                 weight = p.get("measure", "")
             
             foto = item.get("foto", {}) or {}
