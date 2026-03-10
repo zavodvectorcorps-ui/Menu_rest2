@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit2, Trash2, GripVertical, ImageIcon, Flame, Star, Sparkles, Tag, Search, Image, Layers, Upload, X, Loader2, FileJson, RefreshCw, Download } from 'lucide-react';
+import { Plus, Edit2, Trash2, GripVertical, ImageIcon, Flame, Star, Sparkles, Tag, Search, Image, Layers, Upload, X, Loader2, FileJson, RefreshCw, Download, LayoutGrid, List, Eye, EyeOff } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -143,7 +143,7 @@ function ImageUpload({ value, onChange }) {
 }
 
 // Sortable Category Item
-function SortableCategoryItem({ category, isSelected, itemCount, sectionName, onSelect, onEdit, onDelete }) {
+function SortableCategoryItem({ category, isSelected, itemCount, sectionName, onSelect, onEdit, onDelete, onToggleActive, onToggleDisplay }) {
   const {
     attributes,
     listeners,
@@ -156,22 +156,22 @@ function SortableCategoryItem({ category, isSelected, itemCount, sectionName, on
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.5 : (category.is_active !== false ? 1 : 0.5),
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${
+      className={`flex flex-col gap-1 p-2.5 rounded-xl cursor-pointer transition-all ${
         isSelected 
-          ? 'bg-mint-500 text-white' 
+          ? 'bg-mint-500 text-white shadow-md' 
           : 'hover:bg-accent'
       } ${isDragging ? 'shadow-lg' : ''}`}
       onClick={() => onSelect(category.id)}
       data-testid={`category-${category.id}`}
     >
-      <div className="flex items-center gap-2 flex-1 min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
         <button
           className={`cursor-grab active:cursor-grabbing p-1 rounded hover:bg-black/10 flex-shrink-0 ${isSelected ? 'hover:bg-white/20' : ''}`}
           {...attributes}
@@ -186,27 +186,54 @@ function SortableCategoryItem({ category, isSelected, itemCount, sectionName, on
             <span className={`text-xs ${isSelected ? 'text-white/70' : 'text-muted-foreground'}`}>{sectionName}</span>
           )}
         </div>
+        <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+          <span className={`text-xs w-5 text-center ${isSelected ? 'text-white/80' : 'text-muted-foreground'}`}>
+            {itemCount}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-6 w-6 ${isSelected ? 'hover:bg-white/20' : ''}`}
+            onClick={(e) => { e.stopPropagation(); onEdit(category); }}
+          >
+            <Edit2 className="w-3 h-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-6 w-6 ${isSelected ? 'hover:bg-white/20' : 'hover:text-destructive'}`}
+            onClick={(e) => { e.stopPropagation(); onDelete(category); }}
+          >
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
       </div>
-      <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
-        <span className={`text-xs w-5 text-center ${isSelected ? 'text-white/80' : 'text-muted-foreground'}`}>
-          {itemCount}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={`h-6 w-6 ${isSelected ? 'hover:bg-white/20' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onEdit(category); }}
+      {/* Quick controls row */}
+      <div className="flex items-center gap-1.5 pl-8" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => onToggleActive(category)}
+          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+            category.is_active !== false
+              ? (isSelected ? 'bg-white/20 text-white' : 'bg-green-500/10 text-green-600')
+              : (isSelected ? 'bg-white/10 text-white/50' : 'bg-red-500/10 text-red-500')
+          }`}
+          title={category.is_active !== false ? 'Категория видна в меню' : 'Категория скрыта'}
+          data-testid={`category-active-toggle-${category.id}`}
         >
-          <Edit2 className="w-3 h-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className={`h-6 w-6 ${isSelected ? 'hover:bg-white/20' : 'hover:text-destructive'}`}
-          onClick={(e) => { e.stopPropagation(); onDelete(category); }}
+          {category.is_active !== false ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+          {category.is_active !== false ? 'Видна' : 'Скрыта'}
+        </button>
+        <button
+          onClick={() => onToggleDisplay(category)}
+          className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+            isSelected ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground hover:bg-accent'
+          }`}
+          title={category.display_mode === 'card' ? 'Режим: Карточки' : 'Режим: Список'}
+          data-testid={`category-display-toggle-${category.id}`}
         >
-          <Trash2 className="w-3 h-3" />
-        </Button>
+          {category.display_mode === 'card' ? <LayoutGrid className="w-3 h-3" /> : <List className="w-3 h-3" />}
+          {category.display_mode === 'card' ? 'Карточки' : 'Список'}
+        </button>
       </div>
     </div>
   );
@@ -518,6 +545,25 @@ export default function MenuPage() {
   };
 
   // Item handlers
+  
+  // Quick category toggles (without opening dialog)
+  const quickToggleCategoryActive = async (category) => {
+    try {
+      await axios.put(`${API}/restaurants/${currentRestaurantId}/categories/${category.id}`, 
+        { is_active: !category.is_active }, authHeaders);
+      fetchData();
+    } catch { toast.error('Ошибка'); }
+  };
+
+  const quickToggleCategoryDisplay = async (category) => {
+    const newMode = category.display_mode === 'card' ? 'compact' : 'card';
+    try {
+      await axios.put(`${API}/restaurants/${currentRestaurantId}/categories/${category.id}`, 
+        { display_mode: newMode }, authHeaders);
+      fetchData();
+    } catch { toast.error('Ошибка'); }
+  };
+
   const openItemDialog = (item = null, isBanner = false) => {
     if (item) {
       setEditingItem(item);
@@ -906,6 +952,8 @@ export default function MenuPage() {
                       onSelect={setSelectedCategory}
                       onEdit={openCategoryDialog}
                       onDelete={(cat) => openDeleteDialog(cat, 'category')}
+                      onToggleActive={quickToggleCategoryActive}
+                      onToggleDisplay={quickToggleCategoryDisplay}
                     />
                   ))}
                 </SortableContext>
