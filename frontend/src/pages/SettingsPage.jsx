@@ -751,13 +751,14 @@ export default function SettingsPage() {
                           <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
+                              size="sm"
+                              className="h-8 gap-1 px-2 text-xs font-medium"
                               onClick={() => showQrCode(table)}
                               title="QR-код"
                               data-testid={`qr-code-${table.id}`}
                             >
-                              <QrCode className="w-4 h-4" />
+                              <QrCode className="w-3.5 h-3.5" />
+                              QR
                             </Button>
                             <Button
                               variant="ghost"

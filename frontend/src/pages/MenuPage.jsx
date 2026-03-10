@@ -696,6 +696,17 @@ export default function MenuPage() {
             <Plus className="w-4 h-4" />
             Позиция
           </Button>
+          <Button variant="outline" className="gap-2 rounded-full" onClick={() => jsonFileRef.current?.click()} data-testid="import-json-btn">
+            <FileJson className="w-4 h-4" />
+            Импорт JSON
+          </Button>
+          <input
+            ref={jsonFileRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={handleJsonFileSelect}
+          />
         </div>
       </div>
 
@@ -976,6 +987,39 @@ export default function MenuPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Отмена</Button>
             <Button variant="destructive" onClick={confirmDelete}>Удалить</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import JSON Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-heading">Импорт меню из JSON</DialogTitle>
+            <DialogDescription>
+              Вставьте или отредактируйте JSON-данные меню. Формат: {"{"}"categories": [{"{"}"name": "...", "items": [...]{"}"}{"]"}{"}"} 
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <Textarea
+              value={importJson}
+              onChange={(e) => setImportJson(e.target.value)}
+              placeholder='{"categories": [{"name": "Закуски", "items": [{"name": "Цезарь", "price": 15.0}]}]}'
+              className="font-mono text-sm min-h-[250px]"
+              data-testid="import-json-textarea"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportJson(''); }}>Отмена</Button>
+            <Button
+              onClick={handleImportMenu}
+              className="bg-mint-500 hover:bg-mint-600 gap-2"
+              disabled={importing || !importJson.trim()}
+              data-testid="import-json-submit"
+            >
+              {importing && <Loader2 className="w-4 h-4 animate-spin" />}
+              {importing ? 'Импорт...' : 'Импортировать'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
