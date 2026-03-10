@@ -6,62 +6,72 @@
 ## Оригинальное ТЗ
 Веб-приложение "Личный кабинет ресторана" по типу LunchPad. Админка + клиентское меню по QR-коду.
 
-## Архитектура (после рефакторинга 2026-03-10)
+## Архитектура
 
 ### Бэкенд (FastAPI + MongoDB)
 ```
 /app/backend/
-├── server.py          # Точка входа (59 строк)
-├── database.py        # MongoDB подключение (6)
-├── models.py          # Все Pydantic модели (357)
-├── auth.py            # JWT, пароли, проверка доступа (57)
-├── helpers.py         # serialize_doc, seed, get_or_create_* (72)
+├── server.py          # Точка входа (62 строки)
+├── database.py        # MongoDB подключение
+├── models.py          # Все Pydantic модели
+├── auth.py            # JWT, пароли, проверка доступа
+├── helpers.py         # serialize_doc, seed, get_or_create_*
 ├── services/
-│   ├── telegram.py    # Отправка в Telegram (32)
-│   └── images.py      # Скачивание изображений (72)
+│   ├── telegram.py    # Отправка в Telegram
+│   ├── images.py      # Скачивание изображений
+│   └── websocket.py   # ConnectionManager для WS
 ├── routes/
-│   ├── auth.py        # login, me, users CRUD (127)
-│   ├── restaurants.py # рестораны CRUD (66)
-│   ├── menu.py        # секции, категории, позиции, ярлыки, импорт (527)
-│   ├── tables.py      # столы, QR-коды (85)
-│   ├── orders.py      # заказы, вызовы, complete-all (99)
-│   ├── settings.py    # настройки, сотрудники, аналитика (133)
-│   ├── public.py      # публичное меню, заказы, вызовы (126)
-│   ├── telegram.py    # управление Telegram-ботом (181)
-│   └── seed.py        # health, seed (63)
+│   ├── auth.py        # login, me, users CRUD
+│   ├── restaurants.py # рестораны CRUD
+│   ├── menu.py        # секции, категории, позиции, ярлыки, импорт
+│   ├── tables.py      # столы, QR-коды
+│   ├── orders.py      # заказы, вызовы, complete-all
+│   ├── settings.py    # настройки, сотрудники, аналитика
+│   ├── public.py      # публичное меню, заказы, вызовы + WS broadcast
+│   ├── telegram.py    # управление Telegram-ботом
+│   ├── ws.py          # WebSocket endpoint
+│   └── seed.py        # health, seed
 ```
 
 ### Фронтенд (React + Tailwind)
 ```
 /app/frontend/src/
+├── hooks/
+│   └── useWebSocket.js         # WS hook с reconnect/ping
 ├── components/menu/
-│   ├── ImageUpload.jsx         # Загрузка изображений (112)
-│   ├── SortableCategoryItem.jsx # Категория с DnD (100)
-│   ├── SortableMenuItem.jsx    # Позиция с DnD (141)
-│   └── MenuDialogs.jsx         # Все диалоги (393)
+│   ├── ImageUpload.jsx
+│   ├── SortableCategoryItem.jsx
+│   ├── SortableMenuItem.jsx
+│   └── MenuDialogs.jsx
 ├── pages/
-│   ├── MenuPage.jsx            # Управление меню (477, было 1402)
-│   ├── OrdersPage.jsx          # Заказы/предзаказы/вызовы
-│   ├── ClientMenuPage.jsx      # Клиентское меню
+│   ├── AdminLayout.jsx         # Глобальные WS уведомления + индикатор
+│   ├── MenuPage.jsx
+│   ├── OrdersPage.jsx          # Авто-обновление по WS
+│   ├── ClientMenuPage.jsx
 │   └── ...
 ```
 
 ## Реализовано
 
 ### Мультитенантность и авторизация
-- JWT (фиксированный SECRET), роли суперадмин/менеджер
+- JWT, роли суперадмин/менеджер
 
-### Telegram-бот
-- Webhook, уведомления о вызовах и заказах
+### Telegram-бот, импорт меню (.data/.json), ярлыки, предзаказы
 
-### Импорт меню
-- .data (LunchPad) и .json форматы, баннеры, режим замена/дополнение
+### Массовое завершение заказов/вызовов
 
-### Ярлыки, предзаказы, массовое завершение заказов/вызовов
+### WebSocket уведомления в реальном времени (2026-03-10)
+- WS endpoint: /api/ws/{restaurant_id}?token={jwt}
+- Broadcast new_order и new_staff_call при создании через публичный API
+- Глобальные toast-уведомления на всех страницах админки
+- Звуковое уведомление (AudioContext, включение/выключение в localStorage)
+- Индикатор подключения в сайдбаре (зелёная/красная точка)
+- Auto-refresh списка заказов на OrdersPage
+- Auto-reconnect через 3 сек, ping каждые 30 сек
 
-### Рефакторинг (2026-03-10, протестировано 100%)
-- server.py: 1936 → 59 строк (разбит на 15 модулей)
-- MenuPage.jsx: 1402 → 477 строк (4 компонента извлечены)
+### Рефакторинг (2026-03-10)
+- server.py: 1936 → 62 строки (16 модулей)
+- MenuPage.jsx: 1402 → 477 строк (4 компонента)
 
 ## Учётные данные
 - Суперадмин: admin / 220066
