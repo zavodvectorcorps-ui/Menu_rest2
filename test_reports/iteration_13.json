@@ -1,0 +1,131 @@
+{
+  "summary": "Comprehensive testing of Telegram bot expansion features (Iteration 13). All 29 backend tests passed (100%). Frontend order tracker with polling verified working correctly - status updates reflected after Telegram callback.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Cart/Call Modal",
+        "issues": ["Console warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent} - accessibility improvement needed"]
+      }
+    ]
+  },
+
+  "passed_tests": [
+    "Backend: POST /api/public/orders returns order with id field",
+    "Backend: POST /api/public/orders for preorder returns id and is_preorder=true",
+    "Backend: GET /api/public/orders/{order_id}/status returns order status",
+    "Backend: GET /api/public/orders/{invalid_id}/status returns 404",
+    "Backend: Order status is public (no auth required)",
+    "Backend: Status flow via admin API (new -> in_progress -> completed)",
+    "Backend: Status cancelled via admin API",
+    "Backend: Telegram webhook callback_query o_accept updates status to in_progress",
+    "Backend: Telegram webhook callback_query o_done updates status to completed",
+    "Backend: Telegram webhook callback_query o_cancel updates status to cancelled",
+    "Backend: Telegram webhook callback_query c_done marks staff call as completed",
+    "Backend: Telegram webhook handles invalid order ID gracefully",
+    "Backend: Telegram webhook handles /orders command",
+    "Backend: Telegram webhook handles /calls command",
+    "Backend: Telegram webhook handles /stats command",
+    "Backend: Telegram webhook handles /start command and subscribes user",
+    "Backend: POST /api/public/staff-calls returns call with id",
+    "Backend: POST /api/public/staff-calls with call_type_id works",
+    "Backend regression: Login works (admin/220066)",
+    "Backend regression: GET /api/restaurants works",
+    "Backend regression: GET /api/restaurants/{id}/categories works",
+    "Backend regression: GET /api/restaurants/{id}/menu-items works",
+    "Backend regression: GET /api/restaurants/{id}/labels works",
+    "Backend regression: GET /api/restaurants/{id}/tables works",
+    "Backend regression: GET /api/restaurants/{id}/settings works",
+    "Backend regression: GET /api/restaurants/{id}/analytics works",
+    "Backend regression: GET /api/restaurants/{id}/orders works",
+    "Backend regression: GET /api/restaurants/{id}/staff-calls works",
+    "Backend regression: GET /api/public/menu/{table_code} works",
+    "Frontend: Client menu page /menu/{tableCode} loads correctly",
+    "Frontend: Restaurant name, sections, categories displayed",
+    "Frontend: Menu items displayed with images and prices",
+    "Frontend: Add to cart button works",
+    "Frontend: Cart dialog opens with items",
+    "Frontend: Submit order creates order and returns id",
+    "Frontend: Order tracker appears after ordering with data-testid='order-tracker'",
+    "Frontend: Order tracker displays 3 steps (Принят/Готовится/Готов)",
+    "Frontend: Order tracker polls /api/public/orders/{id}/status every 5 seconds",
+    "Frontend: Order tracker reflects status change after polling",
+    "Frontend: Admin login with Russian placeholders works (Введите логин, Введите пароль)",
+    "Frontend: Admin dashboard loads with stats",
+    "Frontend: Admin orders page shows 3 tabs (Заказы, Предзаказы, Вызовы)",
+    "Frontend: WebSocket 'Онлайн' indicator visible"
+  ],
+
+  "test_report_links": [
+    "/app/backend/tests/test_telegram_expansion.py",
+    "/app/test_reports/pytest/pytest_telegram_expansion.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "Minor: DialogContent accessibility warning in console - consider adding Description or aria-describedby to cart/call modals"
+  ],
+
+  "updated_files": [
+    "/app/backend/tests/test_telegram_expansion.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (29/29 tests passed)",
+    "frontend": "100%"
+  },
+
+  "seed_data_creation": "Test orders created during testing via POST /api/public/orders endpoint",
+
+  "retest_needed": false,
+
+  "should_main_agent_self_test": true,
+
+  "context_for_next_testing_agent": "Telegram bot expansion fully implemented and tested. Key features verified: 1) POST /api/public/orders returns order with id, 2) GET /api/public/orders/{order_id}/status provides order status for client-side tracking, 3) Status flow works (new -> in_progress -> completed/cancelled), 4) Telegram webhook handles callback_query for inline button actions (o_accept, o_done, o_cancel, c_done), 5) Telegram commands /orders, /calls, /stats work, 6) Frontend order tracker at /menu/{tableCode} polls status every 5 seconds and reflects changes. WebSocket broadcast on order status update from admin panel verified in previous iteration. All backend APIs continue to work (regression passed).",
+
+  "test_credentials": {
+    "superadmin": {
+      "username": "admin",
+      "password": "220066"
+    },
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "regular_table_code": "697DCAA5",
+    "preorder_table_code": "6E32830E"
+  },
+
+  "telegram_features_verified": {
+    "inline_buttons": [
+      "o_accept_{order_id} - Accept order, sets status to in_progress",
+      "o_done_{order_id} - Complete order, sets status to completed",
+      "o_cancel_{order_id} - Cancel order, sets status to cancelled",
+      "c_done_{call_id} - Complete staff call, sets status to completed"
+    ],
+    "bot_commands": [
+      "/start - Subscribe to notifications",
+      "/orders - List active orders with inline buttons",
+      "/calls - List active staff calls with inline buttons",
+      "/stats - Show today's statistics"
+    ],
+    "keyboard_builders": [
+      "build_order_keyboard(order_id, status) - Returns inline keyboard for orders",
+      "build_call_keyboard(call_id) - Returns inline keyboard for staff calls"
+    ]
+  },
+
+  "order_tracker_features_verified": {
+    "frontend_location": "/menu/{tableCode} after order submission",
+    "storage": "localStorage key: order_{tableCode}",
+    "polling_interval": "5 seconds via useEffect",
+    "status_steps": ["new (Принят)", "in_progress (Готовится)", "completed (Готов)"],
+    "special_states": ["cancelled - Shows 'Заказ отменён' banner", "completed - Shows 'Ваш заказ готов!' banner"],
+    "auto_cleanup": "Removed from localStorage after completed/cancelled, tracker hidden after 10s"
+  }
+}

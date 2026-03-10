@@ -5,7 +5,7 @@ from models import (
     OrderCreate, Order, StaffCall, StaffCallCreate, MenuView
 )
 from helpers import serialize_doc, get_or_create_settings, get_or_create_menu_sections, get_or_create_call_types
-from services.telegram import notify_restaurant_telegram
+from services.telegram import notify_restaurant_telegram, build_order_keyboard, build_call_keyboard
 from services.websocket import manager
 
 router = APIRouter()
@@ -74,6 +74,7 @@ async def create_public_order(data: OrderCreate):
     await db.orders.insert_one(doc)
     doc.pop('_id', None)
 
+    # Telegram notification with inline buttons
     table_num = table.get('number', '?')
     items_text = "\n".join([f"  • {i.name} x{i.quantity}" for i in data.items])
     if is_preorder:
@@ -82,7 +83,9 @@ async def create_public_order(data: OrderCreate):
         msg = f"🍽 <b>Новый заказ</b>\n📍 Стол #{table_num}\n\n{items_text}\n\n💰 <b>Итого: {total} BYN</b>"
     if data.notes:
         msg += f"\n📝 {data.notes}"
-    await notify_restaurant_telegram(restaurant_id, msg)
+
+    keyboard = build_order_keyboard(doc['id'])
+    await notify_restaurant_telegram(restaurant_id, msg, keyboard)
 
     await manager.broadcast(restaurant_id, "new_order", doc)
 
@@ -124,8 +127,18 @@ async def create_public_staff_call(data: StaffCallCreate):
             msg = f"🔔 <b>{call_type_name or 'Вызов персонала'}</b>\nСтол #{table_num}"
     else:
         msg = f"🔔 <b>Вызов персонала</b>\nСтол #{table_num}"
-    await notify_restaurant_telegram(restaurant_id, msg)
+
+    keyboard = build_call_keyboard(doc['id'])
+    await notify_restaurant_telegram(restaurant_id, msg, keyboard)
 
     await manager.broadcast(restaurant_id, "new_staff_call", doc)
 
     return doc
+
+
+@router.get("/public/orders/{order_id}/status")
+async def get_order_status(order_id: str):
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0, "id": 1, "status": 1, "created_at": 1, "is_preorder": 1})
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    return order

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ImageIcon, Clock, MapPin, Phone, ChevronDown } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ImageIcon, Clock, MapPin, Phone, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -26,6 +26,18 @@ export default function ClientMenuPage() {
   const [callModalOpen, setCallModalOpen] = useState(false);
   const [callingStaff, setCallingStaff] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [activeOrderId, setActiveOrderId] = useState(() => {
+    const saved = localStorage.getItem(`order_${tableCode}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.status === 'completed' || parsed.status === 'cancelled') return null;
+        return parsed;
+      } catch { return null; }
+    }
+    return null;
+  });
+  const [orderStatus, setOrderStatus] = useState(activeOrderId?.status || null);
 
   useEffect(() => {
     const fetchMenu = async () => {
@@ -53,6 +65,27 @@ export default function ClientMenuPage() {
 
     fetchMenu();
   }, [tableCode]);
+
+  // Poll order status
+  useEffect(() => {
+    if (!activeOrderId?.id) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const resp = await axios.get(`${API}/public/orders/${activeOrderId.id}/status`);
+        if (!active) return;
+        const newStatus = resp.data.status;
+        setOrderStatus(newStatus);
+        if (newStatus === 'completed' || newStatus === 'cancelled') {
+          localStorage.removeItem(`order_${tableCode}`);
+          setTimeout(() => { if (active) { setActiveOrderId(null); setOrderStatus(null); } }, 10000);
+        }
+      } catch { /* ignore */ }
+    };
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => { active = false; clearInterval(interval); };
+  }, [activeOrderId?.id, tableCode]);
 
   // Apply theme from settings
   useEffect(() => {
@@ -131,7 +164,7 @@ export default function ClientMenuPage() {
 
     setSubmittingOrder(true);
     try {
-      await axios.post(`${API}/public/orders`, {
+      const resp = await axios.post(`${API}/public/orders`, {
         table_code: tableCode,
         items: cart.map(item => ({
           menu_item_id: item.id,
@@ -147,6 +180,10 @@ export default function ClientMenuPage() {
           preorder_time: preorderForm.time,
         })
       });
+      const orderData = { id: resp.data.id, status: 'new' };
+      setActiveOrderId(orderData);
+      setOrderStatus('new');
+      localStorage.setItem(`order_${tableCode}`, JSON.stringify(orderData));
       setOrderSuccess(true);
       setCart([]);
       setOrderNotes('');
@@ -295,7 +332,59 @@ export default function ClientMenuPage() {
 
       {/* Menu items */}
       <main className="px-4 py-6 pb-32">
-        {orderSuccess && (
+        {/* Order status tracker */}
+        {activeOrderId && orderStatus && (
+          <div className="mb-6 p-4 rounded-xl bg-card border border-border shadow-sm" data-testid="order-tracker">
+            <h3 className="font-heading font-semibold text-foreground mb-3">Статус заказа</h3>
+            <div className="flex items-center gap-2">
+              {['new', 'in_progress', 'completed'].map((step, idx) => {
+                const isCancelled = orderStatus === 'cancelled';
+                const isActive = step === orderStatus;
+                const isPast = !isCancelled && (
+                  (step === 'new' && ['in_progress', 'completed'].includes(orderStatus)) ||
+                  (step === 'in_progress' && orderStatus === 'completed')
+                );
+                const labels = { new: 'Принят', in_progress: 'Готовится', completed: 'Готов' };
+                const icons = { new: '📝', in_progress: '👨‍🍳', completed: '✅' };
+                return (
+                  <div key={step} className="flex items-center gap-2 flex-1">
+                    <div className={`flex flex-col items-center gap-1 flex-1 ${isCancelled ? 'opacity-30' : ''}`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all ${
+                        isPast ? 'bg-green-500 text-white' :
+                        isActive ? 'bg-mint-500 text-white animate-pulse' :
+                        'bg-muted text-muted-foreground'
+                      }`}>
+                        {icons[step]}
+                      </div>
+                      <span className={`text-xs font-medium ${isActive ? 'text-mint-500' : isPast ? 'text-green-600' : 'text-muted-foreground'}`}>
+                        {labels[step]}
+                      </span>
+                    </div>
+                    {idx < 2 && <div className={`h-0.5 flex-1 rounded ${isPast ? 'bg-green-500' : 'bg-muted'}`} />}
+                  </div>
+                );
+              })}
+            </div>
+            {orderStatus === 'cancelled' && (
+              <div className="mt-3 p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm text-center font-medium">
+                Заказ отменён
+              </div>
+            )}
+            {orderStatus === 'completed' && (
+              <div className="mt-3 p-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm text-center font-medium">
+                Ваш заказ готов!
+              </div>
+            )}
+            {(orderStatus === 'new' || orderStatus === 'in_progress') && (
+              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Обновляется автоматически
+              </div>
+            )}
+          </div>
+        )}
+
+        {orderSuccess && !activeOrderId && (
           <div className="mb-6 p-4 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800" data-testid="order-success-message">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">

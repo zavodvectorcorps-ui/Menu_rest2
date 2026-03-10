@@ -5,6 +5,7 @@ from database import db
 from models import OrderStatusUpdate, StaffCallStatus, CallType, CallTypeCreate
 from auth import get_current_user, check_restaurant_access
 from helpers import serialize_doc, get_or_create_call_types
+from services.websocket import manager
 
 router = APIRouter()
 
@@ -25,7 +26,10 @@ async def get_orders(restaurant_id: str, status: Optional[str] = None, current_u
 async def update_order_status(restaurant_id: str, order_id: str, data: OrderStatusUpdate, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
     await db.orders.update_one({"id": order_id, "restaurant_id": restaurant_id}, {"$set": {"status": data.status}})
-    return await db.orders.find_one({"id": order_id}, {"_id": 0})
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if order:
+        await manager.broadcast(restaurant_id, "order_status_changed", serialize_doc(order))
+    return order
 
 
 @router.post("/restaurants/{restaurant_id}/orders/complete-all")
