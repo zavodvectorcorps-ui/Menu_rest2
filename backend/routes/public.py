@@ -6,6 +6,7 @@ from models import (
 )
 from helpers import serialize_doc, get_or_create_settings, get_or_create_menu_sections, get_or_create_call_types
 from services.telegram import notify_restaurant_telegram
+from services.websocket import manager
 
 router = APIRouter()
 
@@ -83,6 +84,8 @@ async def create_public_order(data: OrderCreate):
         msg += f"\n📝 {data.notes}"
     await notify_restaurant_telegram(restaurant_id, msg)
 
+    await manager.broadcast(restaurant_id, "new_order", doc)
+
     return doc
 
 
@@ -122,5 +125,7 @@ async def create_public_staff_call(data: StaffCallCreate):
     else:
         msg = f"🔔 <b>Вызов персонала</b>\nСтол #{table_num}"
     await notify_restaurant_telegram(restaurant_id, msg)
+
+    await manager.broadcast(restaurant_id, "new_staff_call", doc)
 
     return doc

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ShoppingBag, Phone, Clock, CheckCircle, XCircle, Loader2, CheckCheck, CalendarClock, User, PhoneCall } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,18 @@ export default function OrdersPage() {
   };
 
   useEffect(() => { fetchData(); }, [currentRestaurantId]);
+
+  // Listen for WebSocket events
+  useEffect(() => {
+    const handleNewOrder = () => fetchData();
+    const handleNewCall = () => fetchData();
+    window.addEventListener('ws:new_order', handleNewOrder);
+    window.addEventListener('ws:new_staff_call', handleNewCall);
+    return () => {
+      window.removeEventListener('ws:new_order', handleNewOrder);
+      window.removeEventListener('ws:new_staff_call', handleNewCall);
+    };
+  }, [currentRestaurantId]);
 
   const updateOrderStatus = async (orderId, status) => {
     try {

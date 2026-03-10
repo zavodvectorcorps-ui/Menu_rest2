@@ -1,0 +1,111 @@
+{
+  "summary": "Comprehensive WebSocket feature testing completed. All 25 backend tests passed (100%). Frontend WebSocket integration verified: connection indicator shows green with 'Онлайн' text, sound toggle button present, toast notifications for new orders/staff calls, and Orders page auto-refreshes via WS events.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "Backend: GET /api/health - returns healthy status",
+    "Backend: POST /api/auth/login with admin/220066 - returns access_token",
+    "Backend: POST /api/auth/login with invalid credentials - returns 401",
+    "Backend: GET /api/auth/me with Bearer token - returns user data",
+    "Backend: GET /api/restaurants - returns list of restaurants",
+    "Backend: GET /api/restaurants/{id} - returns restaurant details",
+    "Backend: GET /api/restaurants/{id}/categories - works",
+    "Backend: GET /api/restaurants/{id}/menu-items - works",
+    "Backend: GET /api/restaurants/{id}/orders - works",
+    "Backend: GET /api/restaurants/{id}/staff-calls - works",
+    "Backend: GET /api/restaurants/{id}/tables - works",
+    "Backend: GET /api/restaurants/{id}/labels - works",
+    "Backend: GET /api/restaurants/{id}/settings - works",
+    "Backend: GET /api/restaurants/{id}/analytics - works",
+    "Backend: GET /api/public/menu/{regular_table} - works",
+    "Backend: GET /api/public/menu/{preorder_table} - is_preorder=true",
+    "Backend: GET /api/public/menu/INVALID - returns 404",
+    "Backend: WS /api/ws/{restaurant_id} without token - returns close code 4001",
+    "Backend: WS /api/ws/{restaurant_id} with invalid token - returns close code 4001",
+    "Backend: WS /api/ws/{restaurant_id} with valid token - connects and ping/pong works",
+    "Backend: WS broadcast on new order - new_order event sent to connected clients",
+    "Backend: WS broadcast on staff call - new_staff_call event sent to connected clients",
+    "Backend: POST /api/public/orders - creates order with menu_item_id",
+    "Backend: POST /api/public/orders (preorder) - creates preorder correctly",
+    "Backend: POST /api/public/staff-calls - creates staff call",
+    "Frontend: Login page with Russian placeholders (Введите логин, Введите пароль)",
+    "Frontend: Login with admin/220066 - works, redirects to admin",
+    "Frontend: WS status indicator shows green dot (bg-green-500) when connected",
+    "Frontend: 'Онлайн' text displayed next to WS indicator",
+    "Frontend: Sound toggle button present in sidebar (data-testid='toggle-sound-sidebar')",
+    "Frontend: Orders page loads with 3 tabs (Заказы, Предзаказы, Вызовы)",
+    "Frontend: Orders page auto-refreshes when WS new_order event received (count increased)",
+    "Frontend: Toast notification appears for new order (Новый заказ — Стол #1)",
+    "Frontend: Toast notification appears for staff call (Вызов — Стол #1)"
+  ],
+
+  "test_report_links": [
+    "/app/backend/tests/test_websocket_feature.py",
+    "/app/test_reports/pytest/pytest_websocket.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [],
+
+  "updated_files": [
+    "/app/backend/tests/test_websocket_feature.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (25/25 tests passed)",
+    "frontend": "100%"
+  },
+
+  "seed_data_creation": "Test orders and staff calls created during WebSocket broadcast testing via public API endpoints.",
+
+  "retest_needed": false,
+
+  "should_main_agent_self_test": true,
+
+  "context_for_next_testing_agent": "WebSocket feature fully implemented and tested. Backend WS endpoint at /api/ws/{restaurant_id}?token={jwt} accepts JWT via query param, responds to 'ping' with {'type':'pong'}, broadcasts 'new_order' and 'new_staff_call' events when orders/calls created via public API. Frontend has global WS connection in AdminLayout with toast notifications, sound alerts, and connection indicator in sidebar. OrdersPage listens for CustomEvents and auto-refreshes. All API endpoints continue to work (regression passed).",
+
+  "test_credentials": {
+    "superadmin": {
+      "username": "admin",
+      "password": "220066"
+    },
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "preorder_table_code": "6E32830E",
+    "regular_table_code": "697DCAA5",
+    "menu_item_id": "45a34f6a-a780-4087-9d95-63a5eaaa6ebe"
+  },
+
+  "websocket_verification": {
+    "backend_features_verified": [
+      "ConnectionManager class manages WS connections per restaurant",
+      "WS endpoint /api/ws/{restaurant_id} with JWT auth via query param",
+      "Connection without token closes with code 4001",
+      "Connection with invalid token closes with code 4001",
+      "Valid connection accepts and responds to ping with pong",
+      "Broadcast method sends events to all connected clients for restaurant",
+      "POST /api/public/orders triggers new_order broadcast",
+      "POST /api/public/staff-calls triggers new_staff_call broadcast"
+    ],
+    "frontend_features_verified": [
+      "useWebSocket hook connects with restaurantId and token",
+      "Auto-reconnect after 3s on disconnect",
+      "Ping every 30s to keep connection alive",
+      "AdminLayout handles WS messages, plays sound, shows toast",
+      "Connection indicator in sidebar (green = connected, red = disconnected)",
+      "Sound toggle button persists preference in localStorage",
+      "OrdersPage listens for ws:new_order and ws:new_staff_call CustomEvents",
+      "Auto-refresh of order/call list on WS event"
+    ]
+  }
+}

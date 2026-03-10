@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { useState, useCallback, useRef } from 'react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   User, 
   UtensilsCrossed, 
@@ -15,7 +15,11 @@ import {
   LogOut,
   ChevronDown,
   Building2,
-  Bot
+  Bot,
+  Wifi,
+  WifiOff,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { useApp, useTheme } from '@/App';
 import { Button } from '@/components/ui/button';
@@ -27,6 +31,8 @@ import {
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 const navItems = [
   { path: '/admin/profile', label: 'Профиль', icon: User },
@@ -41,9 +47,73 @@ const navItems = [
 
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { restaurant, restaurants, currentRestaurantId, switchRestaurant, user, handleLogout } = useApp();
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('ws_sound') !== 'off');
+  const { restaurant, restaurants, currentRestaurantId, switchRestaurant, user, handleLogout, token } = useApp();
   const { theme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
+  const audioRef = useRef(null);
+
+  const playNotificationSound = useCallback(() => {
+    if (!soundEnabled) return;
+    try {
+      if (!audioRef.current) {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        audioRef.current = ctx;
+      }
+      const ctx = audioRef.current;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+    } catch { /* audio not available */ }
+  }, [soundEnabled]);
+
+  const handleWsMessage = useCallback((msg) => {
+    if (msg.type === 'new_order') {
+      const order = msg.data;
+      playNotificationSound();
+      if (order.is_preorder) {
+        toast.info(`Новый предзаказ от ${order.customer_name || 'Гость'}`, {
+          description: `${order.items?.length || 0} поз. — ${order.total?.toFixed(2)} BYN`,
+          action: { label: 'Открыть', onClick: () => navigate('/admin/orders') },
+          duration: 8000,
+        });
+      } else {
+        toast.info(`Новый заказ — Стол #${order.table_number}`, {
+          description: `${order.items?.length || 0} поз. — ${order.total?.toFixed(2)} BYN`,
+          action: { label: 'Открыть', onClick: () => navigate('/admin/orders') },
+          duration: 8000,
+        });
+      }
+      window.dispatchEvent(new CustomEvent('ws:new_order', { detail: order }));
+    } else if (msg.type === 'new_staff_call') {
+      const call = msg.data;
+      playNotificationSound();
+      toast.warning(`Вызов — Стол #${call.table_number}`, {
+        description: call.call_type_name || 'Вызов персонала',
+        action: { label: 'Открыть', onClick: () => navigate('/admin/orders') },
+        duration: 8000,
+      });
+      window.dispatchEvent(new CustomEvent('ws:new_staff_call', { detail: call }));
+    }
+  }, [playNotificationSound, navigate]);
+
+  const { connected } = useWebSocket(currentRestaurantId, token, handleWsMessage);
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    localStorage.setItem('ws_sound', next ? 'on' : 'off');
+    toast.success(next ? 'Звук уведомлений включён' : 'Звук уведомлений выключен');
+  };
 
   const currentRestaurant = restaurants.find(r => r.id === currentRestaurantId) || restaurant;
 
@@ -176,6 +246,16 @@ export default function AdminLayout() {
 
         {/* User info & Logout */}
         <div className="p-4 border-t border-border">
+          {/* Connection status */}
+          <div className="flex items-center justify-between mb-3 px-1">
+            <div className="flex items-center gap-2">
+              <div className={cn("w-2 h-2 rounded-full", connected ? "bg-green-500" : "bg-red-500")} data-testid="ws-status-sidebar" />
+              <span className="text-xs text-muted-foreground">{connected ? 'Онлайн' : 'Нет связи'}</span>
+            </div>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleSound} data-testid="toggle-sound-sidebar">
+              {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 text-muted-foreground" />}
+            </Button>
+          </div>
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-mint-100 dark:bg-mint-900/30 flex items-center justify-center">
               <User className="w-5 h-5 text-mint-600" />
@@ -212,7 +292,12 @@ export default function AdminLayout() {
             <Menu className="w-5 h-5" />
           </Button>
           <h1 className="font-heading font-bold truncate">{currentRestaurant?.name}</h1>
-          <div className="w-10" /> {/* Spacer for centering */}
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={toggleSound} data-testid="toggle-sound-mobile">
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
+            </Button>
+            <div className={cn("w-2 h-2 rounded-full", connected ? "bg-green-500" : "bg-red-500")} data-testid="ws-status-mobile" title={connected ? 'Онлайн' : 'Нет связи'} />
+          </div>
         </header>
 
         {/* Page content */}
