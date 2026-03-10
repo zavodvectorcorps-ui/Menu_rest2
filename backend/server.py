@@ -1276,6 +1276,7 @@ def parse_lunchpad_data(raw_data: list) -> dict:
         display_mode = "card" if display == "grid" else "compact"
         
         items = []
+        sub_categories = []  # nested type=0 with their own items
         
         # Add pending banners to this category
         for banner in pending_banners:
@@ -1302,8 +1303,48 @@ def parse_lunchpad_data(raw_data: list) -> dict:
                     })
                 continue
             
-            # type=0 inside category = sub-category header (skip for now, not a menu item)
+            # type=0 inside category = sub-category with nested items
             if item_type == 0:
+                sub_name = strip_html(item.get("name", "")).strip()
+                sub_items_raw = item.get("items", [])
+                if sub_name and sub_items_raw:
+                    sub_items = []
+                    for sub_item in sub_items_raw:
+                        if sub_item.get("type") != 4:
+                            continue
+                        si_name = strip_html(sub_item.get("name", "")).strip()
+                        if not si_name:
+                            continue
+                        si_desc = strip_html(sub_item.get("description", ""))
+                        si_prices = sub_item.get("prices", [])
+                        si_price = 0
+                        si_weight = ""
+                        if si_prices:
+                            sp = si_prices[0]
+                            raw_p = sp.get("price", 0)
+                            if isinstance(raw_p, (int, float)):
+                                si_price = float(raw_p)
+                            elif isinstance(raw_p, str):
+                                cleaned = raw_p.replace(',', '.').strip()
+                                match = _re.search(r'[\d]+[.]?[\d]*', cleaned)
+                                si_price = float(match.group()) if match else 0
+                            si_weight = sp.get("measure", "")
+                        si_foto = sub_item.get("foto", {}) or {}
+                        si_img = si_foto.get("image_url", "") or ""
+                        sub_items.append({
+                            "name": si_name,
+                            "description": si_desc,
+                            "price": si_price,
+                            "weight": si_weight,
+                            "image_url": si_img,
+                            "is_available": not sub_item.get("in_stop_list", False),
+                        })
+                    if sub_items:
+                        sub_categories.append({
+                            "name": f"{cat_name} — {sub_name}",
+                            "display_mode": display_mode,
+                            "items": sub_items,
+                        })
                 continue
             
             if item_type != 4:
@@ -1349,6 +1390,9 @@ def parse_lunchpad_data(raw_data: list) -> dict:
             "display_mode": display_mode,
             "items": items,
         })
+        
+        # Add sub-categories after the main category
+        categories.extend(sub_categories)
     
     return {"categories": categories}
 
