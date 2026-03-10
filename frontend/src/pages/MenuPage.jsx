@@ -360,11 +360,14 @@ export default function MenuPage() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   
   // Form states
   const [editingCategory, setEditingCategory] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importJson, setImportJson] = useState('');
+  const [importing, setImporting] = useState(false);
   
   const [categoryForm, setCategoryForm] = useState({ name: '', section_id: '', display_mode: 'card', sort_order: 0, is_active: true });
   const [itemForm, setItemForm] = useState({
@@ -383,6 +386,9 @@ export default function MenuPage() {
     is_banner: false,
     sort_order: 0
   });
+
+  // File input ref for JSON import
+  const jsonFileRef = useRef(null);
 
   // Get context
   const { currentRestaurantId, token } = useApp();
