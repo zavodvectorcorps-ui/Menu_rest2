@@ -1,0 +1,131 @@
+{
+  "summary": "Completed comprehensive testing of new features: Labels CRUD, Import mode selection (replace/append), Login page icon, and Labels display in client menu. All 13 backend tests passed (100%). All frontend features verified working.",
+  
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "Backend: GET /api/restaurants/{id}/labels - returns list of labels",
+    "Backend: POST /api/restaurants/{id}/labels - creates new label with name and color",
+    "Backend: PUT /api/restaurants/{id}/labels/{lid} - updates label name and color",
+    "Backend: DELETE /api/restaurants/{id}/labels/{lid} - deletes label",
+    "Backend: DELETE label also removes label_id from all menu_items (tested via $pull operation)",
+    "Backend: POST /api/restaurants/{id}/menu-items with label_ids - saves label assignments",
+    "Backend: PUT /api/restaurants/{id}/menu-items/{iid} with label_ids - updates label assignments",
+    "Backend: POST /api/restaurants/{id}/import-menu with mode=append - adds to existing menu",
+    "Backend: POST /api/restaurants/{id}/import-menu with mode=replace - deletes all existing and imports new",
+    "Backend: POST /api/restaurants/{id}/import-file?mode=replace - file upload with replace mode",
+    "Backend: POST /api/restaurants/{id}/import-file?mode=append - file upload with append mode",
+    "Backend: GET /api/public/menu/{code} - returns labels array in response",
+    "Frontend: Login page shows UtensilsCrossed icon (fork & knife, not Leaf)",
+    "Frontend: Labels button (Ярлыки) visible in Menu page header",
+    "Frontend: Label dialog shows existing labels with colors, edit/delete buttons",
+    "Frontend: Label dialog has name input, color picker with presets, preview badge",
+    "Frontend: Import file triggers mode selection dialog",
+    "Frontend: Import mode dialog shows 'Полное обновление' (replace) and 'Дополнить меню' (append) options",
+    "Frontend: Item edit dialog shows custom labels section with toggle buttons",
+    "Frontend: Selected labels shown with solid color background, unselected with dashed border",
+    "Frontend: Client menu displays custom labels as colored badges on items"
+  ],
+
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/pytest_new_features.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [],
+
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (13/13 tests passed)",
+    "frontend": "100%"
+  },
+
+  "seed_data_creation": "Test data with TEST_ prefix was created and cleaned up during testing. Existing labels (Хит, Сезонное, Выбор гостей) remain in restaurant aa25189d-d668-4838-915a-c5d936547f3f.",
+
+  "retest_needed": false,
+
+  "should_main_agent_self_test": true,
+
+  "context_for_next_testing_agent": "All 3 new features are fully implemented and working: 1) Import mode selection (replace/append) via query param mode or body field, 2) Login page uses UtensilsCrossed icon from lucide-react, 3) Labels CRUD with full UI for creation, editing, deletion, color picker, and assignment to menu items. Labels display in client menu as colored badges. The 3 default labels exist: Хит (#ef4444), Сезонное (#f97316), Выбор гостей (#8b5cf6).",
+
+  "features_verified": {
+    "import_mode_selection": {
+      "endpoints": [
+        "POST /api/restaurants/{id}/import-menu with mode in body",
+        "POST /api/restaurants/{id}/import-file?mode=replace|append"
+      ],
+      "frontend_dialog": "Shows 'Полное обновление' (replace) and 'Дополнить меню' (append)",
+      "status": "✓ Working"
+    },
+    "login_page_icon": {
+      "icon": "UtensilsCrossed from lucide-react",
+      "location": "LoginPage.jsx line 6",
+      "visual": "Fork and knife crossed in teal/mint circle",
+      "status": "✓ Working"
+    },
+    "labels_crud": {
+      "endpoints": [
+        "GET /api/restaurants/{id}/labels",
+        "POST /api/restaurants/{id}/labels",
+        "PUT /api/restaurants/{id}/labels/{lid}",
+        "DELETE /api/restaurants/{id}/labels/{lid}"
+      ],
+      "frontend_features": [
+        "Ярлыки button in menu header",
+        "Dialog with existing labels list",
+        "Name input and color picker",
+        "Preview badge",
+        "Edit/Delete buttons per label"
+      ],
+      "status": "✓ Working"
+    },
+    "labels_on_menu_items": {
+      "backend": "label_ids array in MenuItem model, stored and returned",
+      "frontend_admin": "Label selector in item edit dialog with toggle buttons",
+      "frontend_client": "Labels displayed as colored Badge components",
+      "status": "✓ Working"
+    },
+    "public_menu_labels": {
+      "endpoint": "GET /api/public/menu/{code}",
+      "response_field": "labels (array of label objects)",
+      "status": "✓ Working"
+    }
+  },
+
+  "test_credentials": {
+    "superadmin": {
+      "username": "admin",
+      "password": "220066"
+    },
+    "test_restaurants": [
+      {
+        "id": "aa25189d-d668-4838-915a-c5d936547f3f",
+        "name": "Мята Спортивная",
+        "table_code": "697DCAA5"
+      },
+      {
+        "id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+        "name": "Мята Центральная"
+      }
+    ],
+    "existing_labels": [
+      {"name": "Хит", "color": "#ef4444"},
+      {"name": "Сезонное", "color": "#f97316"},
+      {"name": "Выбор гостей", "color": "#8b5cf6"}
+    ]
+  }
+}

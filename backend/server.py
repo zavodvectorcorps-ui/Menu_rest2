@@ -171,6 +171,7 @@ class MenuItem(BaseModel):
     is_spicy: bool = False
     is_banner: bool = False
     sort_order: int = 0
+    label_ids: list = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class MenuItemCreate(BaseModel):
@@ -188,6 +189,7 @@ class MenuItemCreate(BaseModel):
     is_spicy: bool = False
     is_banner: bool = False
     sort_order: int = 0
+    label_ids: list = []
 
 class MenuItemUpdate(BaseModel):
     category_id: Optional[str] = None
@@ -204,6 +206,23 @@ class MenuItemUpdate(BaseModel):
     is_spicy: Optional[bool] = None
     is_banner: Optional[bool] = None
     sort_order: Optional[int] = None
+    label_ids: Optional[list] = None
+
+class Label(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    restaurant_id: str
+    name: str
+    color: str = "#ef4444"
+    sort_order: int = 0
+
+class LabelCreate(BaseModel):
+    name: str
+    color: str = "#ef4444"
+
+class LabelUpdate(BaseModel):
+    name: Optional[str] = None
+    color: Optional[str] = None
 
 class Table(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -710,6 +729,42 @@ async def reorder_items(restaurant_id: str, order: List[str], current_user: dict
         await db.menu_items.update_one({"id": item_id, "restaurant_id": restaurant_id}, {"$set": {"sort_order": idx}})
     return {"message": "Reordered"}
 
+# ============ LABELS ============
+
+@api_router.get("/restaurants/{restaurant_id}/labels")
+async def get_labels(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    labels = await db.labels.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("sort_order", 1).to_list(500)
+    return labels
+
+@api_router.post("/restaurants/{restaurant_id}/labels")
+async def create_label(restaurant_id: str, data: LabelCreate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    label = Label(restaurant_id=restaurant_id, name=data.name, color=data.color)
+    doc = label.model_dump()
+    await db.labels.insert_one(doc)
+    doc.pop('_id', None)
+    return doc
+
+@api_router.put("/restaurants/{restaurant_id}/labels/{label_id}")
+async def update_label(restaurant_id: str, label_id: str, data: LabelUpdate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if update_data:
+        await db.labels.update_one({"id": label_id, "restaurant_id": restaurant_id}, {"$set": update_data})
+    return await db.labels.find_one({"id": label_id}, {"_id": 0})
+
+@api_router.delete("/restaurants/{restaurant_id}/labels/{label_id}")
+async def delete_label(restaurant_id: str, label_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    await db.labels.delete_one({"id": label_id, "restaurant_id": restaurant_id})
+    # Remove label from all items
+    await db.menu_items.update_many(
+        {"restaurant_id": restaurant_id, "label_ids": label_id},
+        {"$pull": {"label_ids": label_id}}
+    )
+    return {"message": "Label deleted"}
+
 # ============ TABLES ============
 
 @api_router.get("/restaurants/{restaurant_id}/tables")
@@ -979,6 +1034,7 @@ async def get_public_menu(table_code: str):
     call_types = await get_or_create_call_types(restaurant_id)
     categories = await db.categories.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(1000)
     items = await db.menu_items.find({"restaurant_id": restaurant_id, "is_available": True}, {"_id": 0}).sort("sort_order", 1).to_list(5000)
+    labels = await db.labels.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("sort_order", 1).to_list(500)
     
     # Record view
     view = MenuView(restaurant_id=restaurant_id, table_code=table_code)
@@ -993,7 +1049,8 @@ async def get_public_menu(table_code: str):
         "sections": sections,
         "call_types": call_types,
         "categories": [serialize_doc(c) for c in categories],
-        "items": [serialize_doc(i) for i in items]
+        "items": [serialize_doc(i) for i in items],
+        "labels": labels
     }
 
 @api_router.post("/public/orders")
@@ -1155,7 +1212,8 @@ def parse_lunchpad_data(raw_data: list) -> dict:
     return {"categories": categories}
 
 class ImportMenuRequest(BaseModel):
-    data: dict  # JSON data from old service
+    data: dict
+    mode: str = "append"  # "append" or "replace"
 
 @api_router.post("/restaurants/{restaurant_id}/import-menu")
 async def import_menu_json(restaurant_id: str, request: ImportMenuRequest, current_user: dict = Depends(get_current_user)):
@@ -1167,6 +1225,10 @@ async def import_menu_json(restaurant_id: str, request: ImportMenuRequest, curre
     imported_items = 0
     
     try:
+        # If replace mode, delete all existing categories and items
+        if request.mode == "replace":
+            await db.menu_items.delete_many({"restaurant_id": restaurant_id})
+            await db.categories.delete_many({"restaurant_id": restaurant_id})
         # Get existing menu sections
         sections = await get_or_create_menu_sections(restaurant_id)
         section_map = {s['name'].lower(): s['id'] for s in sections}
@@ -1311,7 +1373,7 @@ async def import_menu_json(restaurant_id: str, request: ImportMenuRequest, curre
         raise HTTPException(status_code=400, detail=f"Ошибка импорта: {str(e)}")
 
 @api_router.post("/restaurants/{restaurant_id}/import-file")
-async def import_menu_file(restaurant_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+async def import_menu_file(restaurant_id: str, file: UploadFile = File(...), mode: str = Query("append"), current_user: dict = Depends(get_current_user)):
     """Import menu from .data or .json file upload"""
     await check_restaurant_access(current_user, restaurant_id)
     
@@ -1339,7 +1401,7 @@ async def import_menu_file(restaurant_id: str, file: UploadFile = File(...), cur
         raise HTTPException(status_code=400, detail="Неизвестный формат данных")
     
     # Reuse existing import logic
-    request = ImportMenuRequest(data=parsed)
+    request = ImportMenuRequest(data=parsed, mode=mode)
     return await import_menu_json(restaurant_id, request, current_user)
 
 # ============ TELEGRAM BOT ============

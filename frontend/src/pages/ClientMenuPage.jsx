@@ -72,6 +72,8 @@ export default function ClientMenuPage() {
 
   // Get categories for selected section
   const sectionCategories = data?.categories.filter(cat => cat.section_id === selectedSection) || [];
+  const labelsMap = {};
+  (data?.labels || []).forEach(l => { labelsMap[l.id] = l; });
   
   // Set first category when section changes
   useEffect(() => {
@@ -326,6 +328,14 @@ export default function ClientMenuPage() {
                             <span className="font-medium text-foreground truncate">{item.name}</span>
                             {item.is_hit && <Star className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
                             {item.is_new && <Sparkles className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
+                            {(item.label_ids || []).map(lid => {
+                              const lbl = labelsMap[lid];
+                              return lbl ? (
+                                <span key={lid} className="text-[10px] font-medium px-1.5 py-0 rounded-full text-white flex-shrink-0" style={{ backgroundColor: lbl.color }}>
+                                  {lbl.name}
+                                </span>
+                              ) : null;
+                            })}
                           </div>
                           {item.weight && (
                             <span className="text-xs text-muted-foreground">{item.weight}</span>
@@ -423,6 +433,14 @@ export default function ClientMenuPage() {
                                 <Flame className="w-3 h-3 mr-0.5" />Острое
                               </Badge>
                             )}
+                            {(item.label_ids || []).map(lid => {
+                              const lbl = labelsMap[lid];
+                              return lbl ? (
+                                <Badge key={lid} className="text-white text-[10px] px-1.5 py-0" style={{ backgroundColor: lbl.color }}>
+                                  {lbl.name}
+                                </Badge>
+                              ) : null;
+                            })}
                           </div>
                           
                           {item.description && (

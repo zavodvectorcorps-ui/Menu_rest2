@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit2, Trash2, GripVertical, ImageIcon, Flame, Star, Sparkles, Tag, Search, Image, Layers, Upload, X, Loader2, FileJson } from 'lucide-react';
+import { Plus, Edit2, Trash2, GripVertical, ImageIcon, Flame, Star, Sparkles, Tag, Search, Image, Layers, Upload, X, Loader2, FileJson, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -351,6 +351,7 @@ export default function MenuPage() {
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [menuSections, setMenuSections] = useState([]);
+  const [labels, setLabels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -361,6 +362,8 @@ export default function MenuPage() {
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importModeDialogOpen, setImportModeDialogOpen] = useState(false);
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   
   // Form states
   const [editingCategory, setEditingCategory] = useState(null);
@@ -368,6 +371,9 @@ export default function MenuPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [importJson, setImportJson] = useState('');
   const [importing, setImporting] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState(null);
+  const [editingLabel, setEditingLabel] = useState(null);
+  const [labelForm, setLabelForm] = useState({ name: '', color: '#ef4444' });
   
   const [categoryForm, setCategoryForm] = useState({ name: '', section_id: '', display_mode: 'card', sort_order: 0, is_active: true });
   const [itemForm, setItemForm] = useState({
@@ -384,7 +390,8 @@ export default function MenuPage() {
     is_new: false,
     is_spicy: false,
     is_banner: false,
-    sort_order: 0
+    sort_order: 0,
+    label_ids: []
   });
 
   // File input ref for JSON import
@@ -409,15 +416,17 @@ export default function MenuPage() {
   const fetchData = async () => {
     if (!currentRestaurantId) return;
     try {
-      const [categoriesRes, itemsRes, sectionsRes, settingsRes] = await Promise.all([
+      const [categoriesRes, itemsRes, sectionsRes, settingsRes, labelsRes] = await Promise.all([
         axios.get(`${API}/restaurants/${currentRestaurantId}/categories`, authHeaders),
         axios.get(`${API}/restaurants/${currentRestaurantId}/menu-items`, authHeaders),
         axios.get(`${API}/restaurants/${currentRestaurantId}/menu-sections`, authHeaders),
-        axios.get(`${API}/restaurants/${currentRestaurantId}/settings`, authHeaders)
+        axios.get(`${API}/restaurants/${currentRestaurantId}/settings`, authHeaders),
+        axios.get(`${API}/restaurants/${currentRestaurantId}/labels`, authHeaders)
       ]);
       setCategories(categoriesRes.data);
       setMenuItems(itemsRes.data);
       setMenuSections(sectionsRes.data);
+      setLabels(labelsRes.data);
       setCurrency(settingsRes.data?.currency || 'BYN');
       if (categoriesRes.data.length > 0 && !selectedCategory) {
         setSelectedCategory(categoriesRes.data[0].id);
@@ -525,7 +534,8 @@ export default function MenuPage() {
         is_new: item.is_new,
         is_spicy: item.is_spicy,
         is_banner: item.is_banner,
-        sort_order: item.sort_order
+        sort_order: item.sort_order,
+        label_ids: item.label_ids || []
       });
     } else {
       setEditingItem(null);
@@ -543,7 +553,8 @@ export default function MenuPage() {
         is_new: false,
         is_spicy: false,
         is_banner: isBanner,
-        sort_order: menuItems.filter(i => i.category_id === selectedCategory).length
+        sort_order: menuItems.filter(i => i.category_id === selectedCategory).length,
+        label_ids: []
       });
     }
     setItemDialogOpen(true);
@@ -610,45 +621,84 @@ export default function MenuPage() {
   const handleImportFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPendingImportFile(file);
     
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (ext === 'data') {
-      // Upload .data file directly
-      uploadImportFile(file);
-    } else {
-      // JSON - read and show in textarea for preview
+    if (ext === 'json') {
+      // JSON - read content for preview
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
-          const content = event.target.result;
-          JSON.parse(content);
-          setImportJson(content);
-          setImportDialogOpen(true);
-        } catch (error) {
+          JSON.parse(event.target.result);
+          setImportJson(event.target.result);
+        } catch {
           toast.error('Неверный формат JSON файла');
+          setPendingImportFile(null);
+          return;
         }
+        setImportModeDialogOpen(true);
       };
       reader.readAsText(file);
+    } else {
+      // .data file - show mode selection
+      setImportModeDialogOpen(true);
     }
     e.target.value = '';
   };
 
-  const uploadImportFile = async (file) => {
-    setImporting(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await axios.post(
-        `${API}/restaurants/${currentRestaurantId}/import-file`,
-        formData,
-        { headers: { ...authHeaders.headers, 'Content-Type': 'multipart/form-data' } }
-      );
-      toast.success(`Импортировано: ${response.data.imported_categories} категорий, ${response.data.imported_items} позиций`);
-      fetchData();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Ошибка импорта файла');
-    } finally {
-      setImporting(false);
+  const executeImport = async (mode) => {
+    setImportModeDialogOpen(false);
+    const file = pendingImportFile;
+    if (!file) return;
+    
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    
+    if (ext === 'json' && importJson) {
+      // JSON import via body
+      let jsonData;
+      try {
+        jsonData = JSON.parse(importJson);
+      } catch {
+        toast.error('Неверный формат JSON');
+        return;
+      }
+      setImporting(true);
+      try {
+        const response = await axios.post(
+          `${API}/restaurants/${currentRestaurantId}/import-menu`,
+          { data: jsonData, mode },
+          authHeaders
+        );
+        toast.success(`Импортировано: ${response.data.imported_categories} категорий, ${response.data.imported_items} позиций`);
+        setImportJson('');
+        setSelectedCategory(null);
+        fetchData();
+      } catch (error) {
+        toast.error(error.response?.data?.detail || 'Ошибка импорта');
+      } finally {
+        setImporting(false);
+        setPendingImportFile(null);
+      }
+    } else {
+      // File upload (.data or .json)
+      setImporting(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await axios.post(
+          `${API}/restaurants/${currentRestaurantId}/import-file?mode=${mode}`,
+          formData,
+          { headers: { ...authHeaders.headers, 'Content-Type': 'multipart/form-data' } }
+        );
+        toast.success(`Импортировано: ${response.data.imported_categories} категорий, ${response.data.imported_items} позиций`);
+        setSelectedCategory(null);
+        fetchData();
+      } catch (error) {
+        toast.error(error.response?.data?.detail || 'Ошибка импорта файла');
+      } finally {
+        setImporting(false);
+        setPendingImportFile(null);
+      }
     }
   };
 
@@ -670,7 +720,7 @@ export default function MenuPage() {
     try {
       const response = await axios.post(
         `${API}/restaurants/${currentRestaurantId}/import-menu`,
-        { data: jsonData },
+        { data: jsonData, mode: 'append' },
         authHeaders
       );
       toast.success(`Импортировано: ${response.data.imported_categories} категорий, ${response.data.imported_items} позиций`);
@@ -682,6 +732,49 @@ export default function MenuPage() {
     } finally {
       setImporting(false);
     }
+  };
+
+  // Label handlers
+  const openLabelDialog = (label = null) => {
+    setEditingLabel(label);
+    setLabelForm(label ? { name: label.name, color: label.color } : { name: '', color: '#ef4444' });
+    setLabelDialogOpen(true);
+  };
+
+  const saveLabelHandler = async () => {
+    if (!labelForm.name.trim()) return;
+    try {
+      if (editingLabel) {
+        await axios.put(`${API}/restaurants/${currentRestaurantId}/labels/${editingLabel.id}`, labelForm, authHeaders);
+        toast.success('Ярлык обновлён');
+      } else {
+        await axios.post(`${API}/restaurants/${currentRestaurantId}/labels`, labelForm, authHeaders);
+        toast.success('Ярлык создан');
+      }
+      setLabelDialogOpen(false);
+      fetchData();
+    } catch (error) {
+      toast.error('Ошибка сохранения ярлыка');
+    }
+  };
+
+  const deleteLabelHandler = async (labelId) => {
+    try {
+      await axios.delete(`${API}/restaurants/${currentRestaurantId}/labels/${labelId}`, authHeaders);
+      toast.success('Ярлык удалён');
+      fetchData();
+    } catch (error) {
+      toast.error('Ошибка удаления');
+    }
+  };
+
+  const toggleItemLabel = (labelId) => {
+    setItemForm(prev => ({
+      ...prev,
+      label_ids: prev.label_ids.includes(labelId)
+        ? prev.label_ids.filter(id => id !== labelId)
+        : [...prev.label_ids, labelId]
+    }));
   };
 
   const filteredItems = menuItems.filter(item => {
@@ -724,6 +817,10 @@ export default function MenuPage() {
           <Button variant="outline" className="gap-2 rounded-full" onClick={() => jsonFileRef.current?.click()} disabled={importing} data-testid="import-json-btn">
             {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileJson className="w-4 h-4" />}
             {importing ? 'Импорт...' : 'Импорт меню'}
+          </Button>
+          <Button variant="outline" className="gap-2 rounded-full" onClick={() => openLabelDialog()} data-testid="manage-labels-btn">
+            <Tag className="w-4 h-4" />
+            Ярлыки
           </Button>
           <input
             ref={jsonFileRef}
@@ -976,6 +1073,35 @@ export default function MenuPage() {
               </div>
             )}
 
+            {/* Custom Labels */}
+            {!itemForm.is_banner && labels.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <Label>Ярлыки</Label>
+                <div className="flex flex-wrap gap-2" data-testid="item-labels-selector">
+                  {labels.map((label) => (
+                    <button
+                      key={label.id}
+                      type="button"
+                      onClick={() => toggleItemLabel(label.id)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-all border-2 ${
+                        itemForm.label_ids.includes(label.id)
+                          ? 'border-transparent text-white'
+                          : 'border-dashed opacity-50 hover:opacity-80'
+                      }`}
+                      style={{
+                        backgroundColor: itemForm.label_ids.includes(label.id) ? label.color : 'transparent',
+                        borderColor: itemForm.label_ids.includes(label.id) ? label.color : label.color,
+                        color: itemForm.label_ids.includes(label.id) ? 'white' : label.color
+                      }}
+                      data-testid={`label-toggle-${label.id}`}
+                    >
+                      {label.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {itemForm.is_banner && (
               <div className="flex items-center gap-2">
                 <Switch checked={itemForm.is_available} onCheckedChange={(checked) => setItemForm({ ...itemForm, is_available: checked })} />
@@ -1044,6 +1170,142 @@ export default function MenuPage() {
             >
               {importing && <Loader2 className="w-4 h-4 animate-spin" />}
               {importing ? 'Импорт...' : 'Импортировать'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Mode Dialog */}
+      <Dialog open={importModeDialogOpen} onOpenChange={(open) => { if (!open) { setImportModeDialogOpen(false); setPendingImportFile(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-heading">Режим импорта</DialogTitle>
+            <DialogDescription>
+              {pendingImportFile?.name && <span className="block mb-2 text-sm font-medium">{pendingImportFile.name}</span>}
+              Как обработать импортируемое меню?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-4">
+            <button
+              onClick={() => executeImport('replace')}
+              className="flex items-start gap-4 p-4 rounded-xl border-2 border-border hover:border-destructive/50 hover:bg-destructive/5 transition-all text-left group"
+              disabled={importing}
+              data-testid="import-mode-replace"
+            >
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-red-500/20">
+                <RefreshCw className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <h4 className="font-medium text-sm">Полное обновление</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">Удалить всё текущее меню и загрузить новое из файла</p>
+              </div>
+            </button>
+            <button
+              onClick={() => executeImport('append')}
+              className="flex items-start gap-4 p-4 rounded-xl border-2 border-border hover:border-mint-500/50 hover:bg-mint-500/5 transition-all text-left group"
+              disabled={importing}
+              data-testid="import-mode-append"
+            >
+              <div className="w-10 h-10 rounded-xl bg-mint-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-mint-500/20">
+                <Plus className="w-5 h-5 text-mint-500" />
+              </div>
+              <div>
+                <h4 className="font-medium text-sm">Дополнить меню</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">Сохранить текущее меню и добавить новые позиции</p>
+              </div>
+            </button>
+          </div>
+          {importing && (
+            <div className="flex items-center justify-center gap-2 py-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm text-muted-foreground">Импорт...</span>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Label Management Dialog */}
+      <Dialog open={labelDialogOpen} onOpenChange={setLabelDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-heading">{editingLabel ? 'Редактировать ярлык' : 'Ярлыки'}</DialogTitle>
+            <DialogDescription>Ярлыки отображаются на карточках блюд в клиентском меню</DialogDescription>
+          </DialogHeader>
+
+          {/* Existing labels list (shown when not editing) */}
+          {!editingLabel && labels.length > 0 && (
+            <div className="space-y-2 py-2">
+              {labels.map((label) => (
+                <div key={label.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50" data-testid={`label-item-${label.id}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 h-4 rounded-full" style={{ backgroundColor: label.color }} />
+                    <span className="text-sm font-medium">{label.name}</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingLabel(label); setLabelForm({ name: label.name, color: label.color }); }}>
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => deleteLabelHandler(label.id)}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Label form */}
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label>Название</Label>
+              <Input
+                value={labelForm.name}
+                onChange={(e) => setLabelForm({ ...labelForm, name: e.target.value })}
+                placeholder="Хит, Сезонное, Выбор гостей..."
+                data-testid="label-name-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Цвет</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={labelForm.color}
+                  onChange={(e) => setLabelForm({ ...labelForm, color: e.target.value })}
+                  className="w-10 h-10 rounded-lg cursor-pointer border border-border"
+                  data-testid="label-color-input"
+                />
+                <div className="flex gap-2 flex-wrap">
+                  {['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setLabelForm({ ...labelForm, color: c })}
+                      className={`w-7 h-7 rounded-full transition-transform ${labelForm.color === c ? 'ring-2 ring-offset-2 ring-offset-background scale-110' : ''}`}
+                      style={{ backgroundColor: c, ringColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-sm text-muted-foreground">Предпросмотр:</span>
+              <span
+                className="px-3 py-1 rounded-full text-xs font-medium text-white"
+                style={{ backgroundColor: labelForm.color }}
+              >
+                {labelForm.name || 'Ярлык'}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            {editingLabel && (
+              <Button variant="outline" onClick={() => { setEditingLabel(null); setLabelForm({ name: '', color: '#ef4444' }); }}>
+                Назад
+              </Button>
+            )}
+            <Button onClick={saveLabelHandler} className="bg-mint-500 hover:bg-mint-600" disabled={!labelForm.name.trim()} data-testid="save-label-btn">
+              {editingLabel ? 'Сохранить' : 'Создать ярлык'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Leaf, Loader2, Eye, EyeOff } from 'lucide-react';
+import { UtensilsCrossed, Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 
@@ -52,7 +52,7 @@ export default function LoginPage({ onLogin }) {
         <CardHeader className="text-center pb-2">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 bg-mint-500 rounded-2xl flex items-center justify-center shadow-lg">
-              <Leaf className="w-10 h-10 text-white" />
+              <UtensilsCrossed className="w-10 h-10 text-white" />
             </div>
           </div>
           <CardTitle className="text-2xl font-heading">Личный кабинет</CardTitle>
