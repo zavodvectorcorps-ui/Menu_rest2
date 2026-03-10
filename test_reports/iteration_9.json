@@ -1,0 +1,121 @@
+{
+  "summary": "Completed testing of Iteration 9 bugfixes: Banner import, image download, /api/uploads path, JWT_SECRET stability, import replace mode, and public menu labels. All 12 backend tests passed (100%). Frontend verified working correctly.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "Backend: POST /api/auth/login - returns valid JWT token",
+    "Backend: GET /api/auth/me - works with token (no 401 error, JWT_SECRET is now fixed)",
+    "Backend: PUT /api/restaurants/{id}/menu-items/{iid} - no 401 error (confirms JWT_SECRET stability)",
+    "Backend: HEAD /api/uploads/{filename} - images served correctly (200 response)",
+    "Backend: Local image URLs use /api/uploads/ prefix format",
+    "Backend: .data file parsing detects type=2 banners with images",
+    "Backend: POST /api/restaurants/{id}/import-file?mode=replace - imports banners as is_banner=true",
+    "Backend: POST /api/restaurants/{id}/import-menu with mode=replace - deletes old data before import",
+    "Backend: POST /api/restaurants/{id}/download-images - returns immediately (background task)",
+    "Backend: Download images endpoint reports count of external images",
+    "Backend: GET /api/public/menu/{code} - returns labels array in response",
+    "Backend: Labels array contains id, name, color for each label",
+    "Frontend: Menu page loads with images displaying correctly",
+    "Frontend: Images load from /api/uploads/ path (verified natural width > 0)",
+    "Frontend: Import menu button visible",
+    "Frontend: Labels button (Ярлыки) visible and opens dialog",
+    "Frontend: Labels dialog shows existing labels (3 found: Хит, Сезонное, Выбор гостей)",
+    "Frontend: Label name input and color picker working",
+    "Frontend: Download images button correctly NOT visible when all images are local",
+    "Frontend: Client menu displays correctly with categories, items, and images"
+  ],
+
+  "test_report_links": [
+    "/app/backend/tests/test_bugfixes_iteration9.py",
+    "/app/test_reports/pytest/pytest_bugfixes_i9.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [],
+
+  "updated_files": [
+    "/app/backend/tests/test_bugfixes_iteration9.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (12/12 tests passed)",
+    "frontend": "100%"
+  },
+
+  "seed_data_creation": "Test restaurants with TEST_ prefix were created and cleaned up during testing.",
+
+  "retest_needed": false,
+
+  "should_main_agent_self_test": true,
+
+  "context_for_next_testing_agent": "All bugfixes verified working: 1) Banner import from .data files (type=2 items become is_banner=true), 2) Download images endpoint works as background task and was already used to download all external images for Ресторан Catch (formerly Мята Центральная), 3) /api/uploads/ path correctly serves images, 4) JWT_SECRET is fixed in .env (ecf63243...) so no more 401 errors, 5) Import mode=replace correctly deletes old menu before import, 6) Public menu /api/public/menu/{code} returns labels array. Restaurant names: 'Мята Спортивная' (local images), 'Ресторан Catch' (formerly Мята Центральная, images now local after download).",
+
+  "verified_bugfixes": {
+    "banner_import": {
+      "issue": "Banners (type=2) not imported from .data files",
+      "fix": "parse_lunchpad_data now creates pending_banners list for type=2 entries with images, attaches to next category",
+      "status": "✓ Fixed and verified"
+    },
+    "image_download": {
+      "issue": "Need to download external images to local server",
+      "fix": "POST /api/restaurants/{id}/download-images endpoint starts background task",
+      "status": "✓ Fixed and verified (all images for Ресторан Catch now local)"
+    },
+    "uploads_path": {
+      "issue": "/uploads/ path not working in Kubernetes",
+      "fix": "Changed to /api/uploads/ mount and URL prefix",
+      "status": "✓ Fixed and verified (images serve with 200)"
+    },
+    "jwt_401_error": {
+      "issue": "Random 401 errors due to regenerating JWT_SECRET",
+      "fix": "JWT_SECRET now fixed in backend/.env",
+      "status": "✓ Fixed and verified (PUT menu-items works)"
+    },
+    "import_replace_mode": {
+      "issue": "Import replace mode needed to delete existing data",
+      "fix": "mode=replace deletes all categories and menu_items before import",
+      "status": "✓ Fixed and verified"
+    },
+    "public_menu_labels": {
+      "issue": "Labels not returned in public menu endpoint",
+      "fix": "GET /api/public/menu/{code} now returns labels array",
+      "status": "✓ Fixed and verified"
+    }
+  },
+
+  "test_credentials": {
+    "superadmin": {
+      "username": "admin",
+      "password": "220066"
+    },
+    "test_restaurants": [
+      {
+        "id": "aa25189d-d668-4838-915a-c5d936547f3f",
+        "name": "Мята Спортивная",
+        "table_code": "697DCAA5",
+        "images": "all local (/api/uploads/)"
+      },
+      {
+        "id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+        "name": "Ресторан Catch",
+        "images": "all local (downloaded from external URLs)"
+      }
+    ],
+    "existing_labels": [
+      {"name": "Хит", "color": "#ef4444"},
+      {"name": "Сезонное", "color": "#f97316"},
+      {"name": "Выбор гостей", "color": "#8b5cf6"}
+    ]
+  }
+}

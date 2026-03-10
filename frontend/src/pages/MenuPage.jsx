@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit2, Trash2, GripVertical, ImageIcon, Flame, Star, Sparkles, Tag, Search, Image, Layers, Upload, X, Loader2, FileJson, RefreshCw } from 'lucide-react';
+import { Plus, Edit2, Trash2, GripVertical, ImageIcon, Flame, Star, Sparkles, Tag, Search, Image, Layers, Upload, X, Loader2, FileJson, RefreshCw, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -374,6 +374,7 @@ export default function MenuPage() {
   const [pendingImportFile, setPendingImportFile] = useState(null);
   const [editingLabel, setEditingLabel] = useState(null);
   const [labelForm, setLabelForm] = useState({ name: '', color: '#ef4444' });
+  const [downloadingImages, setDownloadingImages] = useState(false);
   
   const [categoryForm, setCategoryForm] = useState({ name: '', section_id: '', display_mode: 'card', sort_order: 0, is_active: true });
   const [itemForm, setItemForm] = useState({
@@ -777,6 +778,37 @@ export default function MenuPage() {
     }));
   };
 
+  const downloadAllImages = async () => {
+    setDownloadingImages(true);
+    try {
+      const resp = await axios.post(`${API}/restaurants/${currentRestaurantId}/download-images`, {}, authHeaders);
+      toast.success(resp.data.message);
+      // Poll for completion - check every 10 seconds
+      if (resp.data.total > 0) {
+        const interval = setInterval(async () => {
+          const items = await axios.get(`${API}/restaurants/${currentRestaurantId}/menu-items`, authHeaders);
+          const ext = items.data.filter(i => i.image_url && i.image_url.startsWith('http'));
+          if (ext.length === 0) {
+            clearInterval(interval);
+            setDownloadingImages(false);
+            toast.success('Все фотографии перенесены на сервер!');
+            fetchData();
+          }
+        }, 10000);
+        // Safety timeout after 5 min
+        setTimeout(() => { clearInterval(interval); setDownloadingImages(false); fetchData(); }, 300000);
+      } else {
+        setDownloadingImages(false);
+      }
+    } catch (error) {
+      toast.error('Ошибка скачивания изображений');
+      setDownloadingImages(false);
+    }
+  };
+
+  // Check if there are external images
+  const hasExternalImages = menuItems.some(i => i.image_url && i.image_url.startsWith('http'));
+
   const filteredItems = menuItems.filter(item => {
     const matchesCategory = !selectedCategory || item.category_id === selectedCategory;
     const matchesSearch = !searchQuery || 
@@ -822,6 +854,12 @@ export default function MenuPage() {
             <Tag className="w-4 h-4" />
             Ярлыки
           </Button>
+          {hasExternalImages && (
+            <Button variant="outline" className="gap-2 rounded-full" onClick={downloadAllImages} disabled={downloadingImages} data-testid="download-images-btn">
+              {downloadingImages ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {downloadingImages ? 'Скачивание...' : 'Скачать фото'}
+            </Button>
+          )}
           <input
             ref={jsonFileRef}
             type="file"

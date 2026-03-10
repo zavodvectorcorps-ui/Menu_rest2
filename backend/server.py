@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Query, UploadFile, File, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -44,7 +44,7 @@ security = HTTPBearer(auto_error=False)
 
 # Create the main app
 app = FastAPI(title="Restaurant Dashboard API")
-app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 api_router = APIRouter(prefix="/api")
 
 # ============ ENUMS ============
@@ -1137,7 +1137,95 @@ async def upload_file(file: UploadFile = File(...)):
     with open(filepath, "wb") as f:
         f.write(content)
     
-    return {"url": f"/uploads/{filename}", "filename": filename}
+    return {"url": f"/api/uploads/{filename}", "filename": filename}
+
+async def download_and_save_image(image_url: str) -> str:
+    """Download image from external URL and save locally. Returns local URL."""
+    if not image_url or not image_url.startswith("http"):
+        return image_url
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            resp = await client.get(image_url)
+            if resp.status_code != 200:
+                return image_url
+            
+            content_type = resp.headers.get("content-type", "")
+            if "jpeg" in content_type or "jpg" in content_type:
+                ext = ".jpg"
+            elif "png" in content_type:
+                ext = ".png"
+            elif "webp" in content_type:
+                ext = ".webp"
+            elif "gif" in content_type:
+                ext = ".gif"
+            else:
+                ext = ".jpg"
+            
+            filename = f"{uuid.uuid4()}{ext}"
+            filepath = UPLOADS_DIR / filename
+            with open(filepath, "wb") as f:
+                f.write(resp.content)
+            
+            return f"/api/uploads/{filename}"
+    except Exception as e:
+        logging.error(f"Image download failed for {image_url}: {e}")
+        return image_url
+
+@api_router.post("/restaurants/{restaurant_id}/download-images")
+async def download_menu_images(restaurant_id: str, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
+    """Start background download of all external images in menu items"""
+    await check_restaurant_access(current_user, restaurant_id)
+    
+    items = await db.menu_items.find(
+        {"restaurant_id": restaurant_id, "image_url": {"$regex": "^https?://"}},
+        {"_id": 0, "id": 1, "image_url": 1}
+    ).to_list(5000)
+    
+    if not items:
+        return {"message": "Нет внешних изображений", "total": 0}
+    
+    # Start background task
+    background_tasks.add_task(download_images_task, restaurant_id, items)
+    
+    return {"message": f"Запущено скачивание {len(items)} изображений. Это может занять несколько минут.", "total": len(items)}
+
+async def download_images_task(restaurant_id: str, items: list):
+    """Background task to download images in batches"""
+    import asyncio
+    downloaded = 0
+    failed = 0
+    
+    # Process in batches of 10
+    batch_size = 10
+    for i in range(0, len(items), batch_size):
+        batch = items[i:i+batch_size]
+        tasks = []
+        for item in batch:
+            tasks.append(download_and_update_item(restaurant_id, item))
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for r in results:
+            if r is True:
+                downloaded += 1
+            else:
+                failed += 1
+    
+    logging.info(f"Image download complete for {restaurant_id}: {downloaded} ok, {failed} failed")
+
+async def download_and_update_item(restaurant_id: str, item: dict) -> bool:
+    """Download single image and update item"""
+    try:
+        old_url = item["image_url"]
+        new_url = await download_and_save_image(old_url)
+        if new_url != old_url:
+            await db.menu_items.update_one(
+                {"id": item["id"], "restaurant_id": restaurant_id},
+                {"$set": {"image_url": new_url}}
+            )
+            return True
+        return False
+    except Exception:
+        return False
 
 # ============ IMPORT MENU (JSON & .DATA) ============
 
