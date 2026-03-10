@@ -1066,6 +1066,164 @@ async def upload_file(file: UploadFile = File(...)):
     
     return {"url": f"/uploads/{filename}", "filename": filename}
 
+# ============ IMPORT JSON MENU ============
+
+class ImportMenuRequest(BaseModel):
+    data: dict  # JSON data from old service
+
+@api_router.post("/restaurants/{restaurant_id}/import-menu")
+async def import_menu_json(restaurant_id: str, request: ImportMenuRequest, current_user: dict = Depends(get_current_user)):
+    """Import menu from JSON (old service format)"""
+    await check_restaurant_access(current_user, restaurant_id)
+    
+    data = request.data
+    imported_categories = 0
+    imported_items = 0
+    
+    try:
+        # Get existing menu sections
+        sections = await get_or_create_menu_sections(restaurant_id)
+        section_map = {s['name'].lower(): s['id'] for s in sections}
+        default_section_id = sections[0]['id'] if sections else None
+        
+        # Process categories
+        categories_data = data.get('categories', [])
+        for cat_data in categories_data:
+            cat_name = cat_data.get('name', '').strip()
+            if not cat_name:
+                continue
+            
+            # Determine section based on category name or use default
+            section_id = default_section_id
+            cat_lower = cat_name.lower()
+            if any(kw in cat_lower for kw in ['напиток', 'коктейль', 'вино', 'пиво', 'виски', 'кофе', 'чай', 'сок', 'лимонад', 'бар']):
+                section_id = section_map.get('напитки', default_section_id)
+            elif any(kw in cat_lower for kw in ['кальян', 'табак', 'hookah']):
+                section_id = section_map.get('кальяны', default_section_id)
+            else:
+                section_id = section_map.get('еда', default_section_id)
+            
+            # Check if category exists
+            existing_cat = await db.categories.find_one({
+                "restaurant_id": restaurant_id,
+                "name": cat_name
+            })
+            
+            if existing_cat:
+                cat_id = existing_cat['id']
+            else:
+                # Create new category
+                category = Category(
+                    restaurant_id=restaurant_id,
+                    name=cat_name,
+                    section_id=section_id,
+                    display_mode=cat_data.get('display_mode', 'card'),
+                    sort_order=cat_data.get('sort_order', imported_categories),
+                    is_active=cat_data.get('is_active', True)
+                )
+                doc = category.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.categories.insert_one(doc)
+                cat_id = doc['id']
+                imported_categories += 1
+            
+            # Process items in this category
+            items_data = cat_data.get('items', [])
+            for idx, item_data in enumerate(items_data):
+                item_name = item_data.get('name', '').strip()
+                if not item_name:
+                    continue
+                
+                # Check if item exists
+                existing_item = await db.menu_items.find_one({
+                    "restaurant_id": restaurant_id,
+                    "category_id": cat_id,
+                    "name": item_name
+                })
+                
+                if not existing_item:
+                    item = MenuItem(
+                        restaurant_id=restaurant_id,
+                        category_id=cat_id,
+                        name=item_name,
+                        description=item_data.get('description', ''),
+                        price=float(item_data.get('price', 0)),
+                        weight=item_data.get('weight', item_data.get('portion', '')),
+                        image_url=item_data.get('image_url', item_data.get('image', '')),
+                        is_available=item_data.get('is_available', True),
+                        is_hit=item_data.get('is_hit', False),
+                        is_new=item_data.get('is_new', False),
+                        is_spicy=item_data.get('is_spicy', False),
+                        is_banner=item_data.get('is_banner', False),
+                        sort_order=item_data.get('sort_order', idx)
+                    )
+                    doc = item.model_dump()
+                    doc['created_at'] = doc['created_at'].isoformat()
+                    await db.menu_items.insert_one(doc)
+                    imported_items += 1
+        
+        # Also handle flat items list if present
+        if 'items' in data and not categories_data:
+            for idx, item_data in enumerate(data.get('items', [])):
+                item_name = item_data.get('name', '').strip()
+                cat_name = item_data.get('category', item_data.get('category_name', 'Без категории'))
+                
+                if not item_name:
+                    continue
+                
+                # Find or create category
+                existing_cat = await db.categories.find_one({
+                    "restaurant_id": restaurant_id,
+                    "name": cat_name
+                })
+                
+                if existing_cat:
+                    cat_id = existing_cat['id']
+                else:
+                    category = Category(
+                        restaurant_id=restaurant_id,
+                        name=cat_name,
+                        section_id=default_section_id,
+                        sort_order=imported_categories
+                    )
+                    doc = category.model_dump()
+                    doc['created_at'] = doc['created_at'].isoformat()
+                    await db.categories.insert_one(doc)
+                    cat_id = doc['id']
+                    imported_categories += 1
+                
+                # Create item
+                existing_item = await db.menu_items.find_one({
+                    "restaurant_id": restaurant_id,
+                    "name": item_name
+                })
+                
+                if not existing_item:
+                    item = MenuItem(
+                        restaurant_id=restaurant_id,
+                        category_id=cat_id,
+                        name=item_name,
+                        description=item_data.get('description', ''),
+                        price=float(item_data.get('price', 0)),
+                        weight=item_data.get('weight', item_data.get('portion', '')),
+                        image_url=item_data.get('image_url', item_data.get('image', '')),
+                        is_available=item_data.get('is_available', True),
+                        sort_order=idx
+                    )
+                    doc = item.model_dump()
+                    doc['created_at'] = doc['created_at'].isoformat()
+                    await db.menu_items.insert_one(doc)
+                    imported_items += 1
+        
+        return {
+            "message": "Импорт завершён",
+            "imported_categories": imported_categories,
+            "imported_items": imported_items
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Ошибка импорта: {str(e)}")
+
 # ============ SEED & HEALTH ============
 
 @api_router.get("/health")
