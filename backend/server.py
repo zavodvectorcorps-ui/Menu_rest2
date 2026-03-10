@@ -1152,8 +1152,29 @@ def strip_html(text: str) -> str:
 def parse_lunchpad_data(raw_data: list) -> dict:
     """Parse LunchPad .data format into our import format"""
     categories = []
+    pending_banners = []  # type=2 banners to attach to next category
+    
     for entry in raw_data:
         entry_type = entry.get("type")
+        
+        # type=2: banner/separator - collect banners with images
+        if entry_type == 2:
+            foto = entry.get("foto", {}) or {}
+            image_url = foto.get("image_url", "") or ""
+            if image_url:
+                banner_name = strip_html(entry.get("name", "")).strip()
+                banner_desc = strip_html(entry.get("description", "")).strip()
+                if banner_name == "--":
+                    banner_name = ""
+                pending_banners.append({
+                    "name": banner_name,
+                    "description": banner_desc,
+                    "image_url": image_url,
+                    "is_banner": True,
+                    "price": 0,
+                })
+            continue
+        
         if entry_type != 0:
             continue
         
@@ -1162,13 +1183,17 @@ def parse_lunchpad_data(raw_data: list) -> dict:
             continue
         
         items_raw = entry.get("items", [])
-        if not items_raw and not cat_name:
-            continue
         
         display = entry.get("display", "")
         display_mode = "card" if display == "grid" else "compact"
         
         items = []
+        
+        # Add pending banners to this category
+        for banner in pending_banners:
+            items.append(banner)
+        pending_banners = []
+        
         for item in items_raw:
             if item.get("type") != 4:
                 continue
@@ -1279,15 +1304,21 @@ async def import_menu_json(restaurant_id: str, request: ImportMenuRequest, curre
             items_data = cat_data.get('items', [])
             for idx, item_data in enumerate(items_data):
                 item_name = item_data.get('name', '').strip()
-                if not item_name:
+                is_banner = item_data.get('is_banner', False)
+                
+                # Skip non-banner items without names
+                if not item_name and not is_banner:
                     continue
                 
-                # Check if item exists
-                existing_item = await db.menu_items.find_one({
-                    "restaurant_id": restaurant_id,
-                    "category_id": cat_id,
-                    "name": item_name
-                })
+                # For banners, check by image_url; for items check by name
+                if not is_banner:
+                    existing_item = await db.menu_items.find_one({
+                        "restaurant_id": restaurant_id,
+                        "category_id": cat_id,
+                        "name": item_name
+                    })
+                else:
+                    existing_item = None
                 
                 if not existing_item:
                     item = MenuItem(
@@ -1295,14 +1326,14 @@ async def import_menu_json(restaurant_id: str, request: ImportMenuRequest, curre
                         category_id=cat_id,
                         name=item_name,
                         description=item_data.get('description', ''),
-                        price=float(item_data.get('price', 0)),
+                        price=float(item_data.get('price', 0) or 0),
                         weight=item_data.get('weight', item_data.get('portion', '')),
                         image_url=item_data.get('image_url', item_data.get('image', '')),
                         is_available=item_data.get('is_available', True),
                         is_hit=item_data.get('is_hit', False),
                         is_new=item_data.get('is_new', False),
                         is_spicy=item_data.get('is_spicy', False),
-                        is_banner=item_data.get('is_banner', False),
+                        is_banner=is_banner,
                         sort_order=item_data.get('sort_order', idx)
                     )
                     doc = item.model_dump()
