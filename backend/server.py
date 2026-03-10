@@ -153,6 +153,13 @@ class CategoryCreate(BaseModel):
     sort_order: int = 0
     is_active: bool = True
 
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    section_id: Optional[str] = None
+    display_mode: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_active: Optional[bool] = None
+
 class MenuItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -662,11 +669,13 @@ async def create_category(restaurant_id: str, data: CategoryCreate, current_user
     return doc
 
 @api_router.put("/restaurants/{restaurant_id}/categories/{category_id}")
-async def update_category(restaurant_id: str, category_id: str, data: CategoryCreate, current_user: dict = Depends(get_current_user)):
+async def update_category(restaurant_id: str, category_id: str, data: CategoryUpdate, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
-    result = await db.categories.update_one({"id": category_id, "restaurant_id": restaurant_id}, {"$set": data.model_dump()})
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Category not found")
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if update_data:
+        result = await db.categories.update_one({"id": category_id, "restaurant_id": restaurant_id}, {"$set": update_data})
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Category not found")
     return await db.categories.find_one({"id": category_id}, {"_id": 0})
 
 @api_router.delete("/restaurants/{restaurant_id}/categories/{category_id}")
