@@ -1283,8 +1283,32 @@ def parse_lunchpad_data(raw_data: list) -> dict:
         pending_banners = []
         
         for item in items_raw:
-            if item.get("type") != 4:
+            item_type = item.get("type")
+            
+            # type=2 inside category = banner/separator
+            if item_type == 2:
+                item_foto = item.get("foto", {}) or {}
+                item_img = item_foto.get("image_url", "") or ""
+                if item_img:
+                    banner_name = strip_html(item.get("name", "")).strip()
+                    if banner_name == "--":
+                        banner_name = ""
+                    items.append({
+                        "name": banner_name,
+                        "description": strip_html(item.get("description", "")),
+                        "image_url": item_img,
+                        "is_banner": True,
+                        "price": 0,
+                    })
                 continue
+            
+            # type=0 inside category = sub-category header (skip for now, not a menu item)
+            if item_type == 0:
+                continue
+            
+            if item_type != 4:
+                continue
+            
             item_name = strip_html(item.get("name", "")).strip()
             if not item_name:
                 continue
