@@ -615,6 +615,12 @@ export default function ClientMenuPage() {
       </Dialog>
 
       <Toaster position="top-center" richColors />
+
+      {/* Footer */}
+      <footer className="mt-8 pb-4 flex items-center justify-center gap-2 text-xs text-muted-foreground" data-testid="client-footer">
+        <span className="w-5 h-5 rounded bg-foreground/10 flex items-center justify-center font-bold text-[10px] text-foreground/60">MK</span>
+        <span>Made by Knyazev</span>
+      </footer>
     </div>
   );
 }

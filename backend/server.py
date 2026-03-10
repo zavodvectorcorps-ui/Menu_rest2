@@ -19,6 +19,7 @@ import base64
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 import secrets
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1016,6 +1017,15 @@ async def create_public_order(data: OrderCreate):
     doc['created_at'] = doc['created_at'].isoformat()
     await db.orders.insert_one(doc)
     doc.pop('_id', None)
+    
+    # Send Telegram notification
+    table_num = table.get('number', '?')
+    items_text = "\n".join([f"  - {i.name} x{i.quantity}" for i in data.items])
+    msg = f"<b>Новый заказ</b>\nСтол #{table_num}\n\n{items_text}\n\n<b>Итого: {total} BYN</b>"
+    if data.notes:
+        msg += f"\nКомментарий: {data.notes}"
+    await notify_restaurant_telegram(restaurant_id, msg)
+    
     return doc
 
 @api_router.post("/public/staff-calls")
@@ -1042,6 +1052,12 @@ async def create_public_staff_call(data: StaffCallCreate):
     doc['created_at'] = doc['created_at'].isoformat()
     await db.staff_calls.insert_one(doc)
     doc.pop('_id', None)
+    
+    # Send Telegram notification
+    table_num = table.get('number', '?')
+    msg = f"<b>{call_type_name or 'Вызов персонала'}</b>\nСтол #{table_num}"
+    await notify_restaurant_telegram(restaurant_id, msg)
+    
     return doc
 
 # ============ FILE UPLOAD ============
@@ -1223,6 +1239,210 @@ async def import_menu_json(restaurant_id: str, request: ImportMenuRequest, curre
     
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Ошибка импорта: {str(e)}")
+
+# ============ TELEGRAM BOT ============
+
+TELEGRAM_API = "https://api.telegram.org/bot"
+
+async def send_telegram_message(bot_token: str, chat_id: str, text: str):
+    """Send message via Telegram Bot API"""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{TELEGRAM_API}{bot_token}/sendMessage",
+                json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+            )
+            return resp.status_code == 200
+    except Exception as e:
+        logging.error(f"Telegram send error: {e}")
+        return False
+
+async def notify_restaurant_telegram(restaurant_id: str, message: str):
+    """Send notification to all Telegram subscribers of a restaurant"""
+    settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
+    if not settings or not settings.get("telegram_bot_token"):
+        return
+    
+    bot_token = settings["telegram_bot_token"]
+    subscribers = await db.telegram_subscribers.find(
+        {"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}
+    ).to_list(500)
+    
+    for sub in subscribers:
+        await send_telegram_message(bot_token, sub["chat_id"], message)
+
+class TelegramBotUpdate(BaseModel):
+    telegram_bot_token: str
+
+@api_router.get("/restaurants/{restaurant_id}/telegram-bot")
+async def get_telegram_bot(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
+    bot_token = settings.get("telegram_bot_token", "") if settings else ""
+    
+    subscribers = await db.telegram_subscribers.find(
+        {"restaurant_id": restaurant_id}, {"_id": 0}
+    ).to_list(500)
+    
+    bot_info = None
+    webhook_set = False
+    if bot_token:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(f"{TELEGRAM_API}{bot_token}/getMe")
+                if resp.status_code == 200:
+                    bot_info = resp.json().get("result")
+                wh_resp = await client.get(f"{TELEGRAM_API}{bot_token}/getWebhookInfo")
+                if wh_resp.status_code == 200:
+                    wh_url = wh_resp.json().get("result", {}).get("url", "")
+                    webhook_set = bool(wh_url)
+        except Exception:
+            pass
+    
+    return {
+        "bot_token": bot_token,
+        "bot_info": bot_info,
+        "webhook_set": webhook_set,
+        "subscribers": [{"chat_id": s["chat_id"], "username": s.get("username", ""), "first_name": s.get("first_name", ""), "subscribed_at": s.get("subscribed_at", "")} for s in subscribers]
+    }
+
+@api_router.put("/restaurants/{restaurant_id}/telegram-bot")
+async def update_telegram_bot(restaurant_id: str, data: TelegramBotUpdate, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    bot_token = data.telegram_bot_token.strip()
+    
+    # Validate token with Telegram
+    if bot_token:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(f"{TELEGRAM_API}{bot_token}/getMe")
+                if resp.status_code != 200:
+                    raise HTTPException(status_code=400, detail="Невалидный токен бота. Проверьте токен от @BotFather")
+        except httpx.RequestError:
+            raise HTTPException(status_code=400, detail="Не удалось подключиться к Telegram API")
+        
+        # Set webhook
+        webhook_url = f"{os.environ.get('REACT_APP_BACKEND_URL', '')}/api/telegram/webhook/{restaurant_id}"
+        # Try to get the external URL from frontend env 
+        frontend_env_path = ROOT_DIR.parent / "frontend" / ".env"
+        if frontend_env_path.exists():
+            with open(frontend_env_path) as f:
+                for line in f:
+                    if line.startswith("REACT_APP_BACKEND_URL="):
+                        external_url = line.split("=", 1)[1].strip()
+                        webhook_url = f"{external_url}/api/telegram/webhook/{restaurant_id}"
+                        break
+        
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                # Set webhook
+                wh_resp = await client.post(
+                    f"{TELEGRAM_API}{bot_token}/setWebhook",
+                    json={"url": webhook_url}
+                )
+                # Set bot commands
+                await client.post(
+                    f"{TELEGRAM_API}{bot_token}/setMyCommands",
+                    json={"commands": [{"command": "start", "description": "Подписаться на уведомления"}]}
+                )
+        except Exception as e:
+            logging.error(f"Webhook setup error: {e}")
+    else:
+        # Remove webhook if token is cleared
+        old_settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
+        old_token = old_settings.get("telegram_bot_token") if old_settings else None
+        if old_token:
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    await client.post(f"{TELEGRAM_API}{old_token}/deleteWebhook")
+            except Exception:
+                pass
+    
+    await db.settings.update_one(
+        {"restaurant_id": restaurant_id},
+        {"$set": {"telegram_bot_token": bot_token}}
+    )
+    
+    return {"message": "Настройки бота обновлены", "webhook_url": webhook_url if bot_token else ""}
+
+@api_router.delete("/restaurants/{restaurant_id}/telegram-bot")
+async def disconnect_telegram_bot(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    
+    settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
+    old_token = settings.get("telegram_bot_token") if settings else None
+    if old_token:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.post(f"{TELEGRAM_API}{old_token}/deleteWebhook")
+        except Exception:
+            pass
+    
+    await db.settings.update_one(
+        {"restaurant_id": restaurant_id},
+        {"$set": {"telegram_bot_token": ""}}
+    )
+    await db.telegram_subscribers.delete_many({"restaurant_id": restaurant_id})
+    
+    return {"message": "Бот отключён"}
+
+@api_router.delete("/restaurants/{restaurant_id}/telegram-bot/subscribers/{chat_id}")
+async def remove_telegram_subscriber(restaurant_id: str, chat_id: str, current_user: dict = Depends(get_current_user)):
+    await check_restaurant_access(current_user, restaurant_id)
+    await db.telegram_subscribers.delete_one({"restaurant_id": restaurant_id, "chat_id": chat_id})
+    return {"message": "Подписчик удалён"}
+
+@api_router.post("/telegram/webhook/{restaurant_id}")
+async def telegram_webhook(restaurant_id: str, request: dict):
+    """Handle incoming Telegram updates (public endpoint)"""
+    message = request.get("message", {})
+    if not message:
+        return {"ok": True}
+    
+    chat = message.get("chat", {})
+    chat_id = str(chat.get("id", ""))
+    text = message.get("text", "")
+    
+    if not chat_id:
+        return {"ok": True}
+    
+    settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
+    if not settings or not settings.get("telegram_bot_token"):
+        return {"ok": True}
+    
+    bot_token = settings["telegram_bot_token"]
+    restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+    restaurant_name = restaurant.get("name", "Ресторан") if restaurant else "Ресторан"
+    
+    if text.startswith("/start"):
+        # Subscribe user
+        existing = await db.telegram_subscribers.find_one(
+            {"restaurant_id": restaurant_id, "chat_id": chat_id}
+        )
+        if not existing:
+            await db.telegram_subscribers.insert_one({
+                "restaurant_id": restaurant_id,
+                "chat_id": chat_id,
+                "username": chat.get("username", ""),
+                "first_name": chat.get("first_name", ""),
+                "is_active": True,
+                "subscribed_at": datetime.now(timezone.utc).isoformat()
+            })
+            await send_telegram_message(
+                bot_token, chat_id,
+                f"Вы подписаны на уведомления <b>{restaurant_name}</b>!\n\n"
+                f"Вы будете получать уведомления о:\n"
+                f"- Вызовах персонала\n"
+                f"- Запросах счёта\n"
+                f"- Новых заказах"
+            )
+        else:
+            await send_telegram_message(
+                bot_token, chat_id,
+                f"Вы уже подписаны на уведомления <b>{restaurant_name}</b>."
+            )
+    
+    return {"ok": True}
 
 # ============ SEED & HEALTH ============
 

@@ -14,7 +14,8 @@ import {
   Users,
   LogOut,
   ChevronDown,
-  Building2
+  Building2,
+  Bot
 } from 'lucide-react';
 import { useApp, useTheme } from '@/App';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ const navItems = [
   { path: '/admin/orders', label: 'Заказы', icon: ShoppingBag },
   { path: '/admin/analytics', label: 'Аналитика', icon: BarChart3 },
   { path: '/admin/settings', label: 'Настройки', icon: Settings },
+  { path: '/admin/telegram-bot', label: 'Telegram-бот', icon: Bot },
   { path: '/admin/help', label: 'Справочный центр', icon: HelpCircle },
   { path: '/admin/support', label: 'Поддержка', icon: MessageSquare },
 ];
@@ -217,6 +219,12 @@ export default function AdminLayout() {
         <div className="flex-1 p-4 md:p-8 overflow-auto">
           <Outlet />
         </div>
+
+        {/* Footer */}
+        <footer className="px-4 md:px-8 py-3 border-t border-border flex items-center justify-center gap-2 text-xs text-muted-foreground" data-testid="admin-footer">
+          <span className="w-5 h-5 rounded bg-foreground/10 flex items-center justify-center font-bold text-[10px] text-foreground/60">MK</span>
+          <span>Made by Knyazev</span>
+        </footer>
       </main>
     </div>
   );
