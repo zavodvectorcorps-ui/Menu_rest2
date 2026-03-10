@@ -171,41 +171,41 @@ function SortableCategoryItem({ category, isSelected, itemCount, sectionName, on
       onClick={() => onSelect(category.id)}
       data-testid={`category-${category.id}`}
     >
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 flex-1 min-w-0">
         <button
-          className={`cursor-grab active:cursor-grabbing p-1 rounded hover:bg-black/10 ${isSelected ? 'hover:bg-white/20' : ''}`}
+          className={`cursor-grab active:cursor-grabbing p-1 rounded hover:bg-black/10 flex-shrink-0 ${isSelected ? 'hover:bg-white/20' : ''}`}
           {...attributes}
           {...listeners}
           onClick={(e) => e.stopPropagation()}
         >
           <GripVertical className="w-4 h-4" />
         </button>
-        <div className="min-w-0">
-          <span className="font-medium block truncate">{category.name}</span>
+        <div className="flex-1 min-w-0">
+          <span className="font-medium block text-sm leading-tight" title={category.name}>{category.name}</span>
           {sectionName && (
             <span className={`text-xs ${isSelected ? 'text-white/70' : 'text-muted-foreground'}`}>{sectionName}</span>
           )}
         </div>
       </div>
-      <div className="flex items-center gap-1 flex-shrink-0">
-        <span className={`text-sm ${isSelected ? 'text-white/80' : 'text-muted-foreground'}`}>
+      <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+        <span className={`text-xs w-5 text-center ${isSelected ? 'text-white/80' : 'text-muted-foreground'}`}>
           {itemCount}
         </span>
         <Button
           variant="ghost"
           size="icon"
-          className={`h-7 w-7 ${isSelected ? 'hover:bg-white/20' : ''}`}
+          className={`h-6 w-6 ${isSelected ? 'hover:bg-white/20' : ''}`}
           onClick={(e) => { e.stopPropagation(); onEdit(category); }}
         >
-          <Edit2 className="w-3.5 h-3.5" />
+          <Edit2 className="w-3 h-3" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className={`h-7 w-7 ${isSelected ? 'hover:bg-white/20' : 'hover:text-destructive'}`}
+          className={`h-6 w-6 ${isSelected ? 'hover:bg-white/20' : 'hover:text-destructive'}`}
           onClick={(e) => { e.stopPropagation(); onDelete(category); }}
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          <Trash2 className="w-3 h-3" />
         </Button>
       </div>
     </div>
