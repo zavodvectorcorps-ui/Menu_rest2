@@ -1273,7 +1273,7 @@ def parse_lunchpad_data(raw_data: list) -> dict:
         items_raw = entry.get("items", [])
         
         display = entry.get("display", "")
-        display_mode = "card" if display == "grid" else "compact"
+        display_mode = "compact" if display == "list" else "card"
         
         items = []
         sub_categories = []  # nested type=0 with their own items
