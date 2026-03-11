@@ -6,6 +6,10 @@ from models import OrderStatusUpdate, StaffCallStatus, CallType, CallTypeCreate
 from auth import get_current_user, check_restaurant_access
 from helpers import serialize_doc, get_or_create_call_types
 from services.websocket import manager
+from pydantic import BaseModel
+
+class StaffCallStatusUpdate(BaseModel):
+    status: StaffCallStatus
 
 router = APIRouter()
 
@@ -55,10 +59,13 @@ async def get_staff_calls(restaurant_id: str, status: Optional[str] = None, curr
 
 
 @router.put("/restaurants/{restaurant_id}/staff-calls/{call_id}/status")
-async def update_staff_call_status(restaurant_id: str, call_id: str, status: StaffCallStatus, current_user: dict = Depends(get_current_user)):
+async def update_staff_call_status(restaurant_id: str, call_id: str, data: StaffCallStatusUpdate, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
-    await db.staff_calls.update_one({"id": call_id, "restaurant_id": restaurant_id}, {"$set": {"status": status}})
-    return await db.staff_calls.find_one({"id": call_id}, {"_id": 0})
+    await db.staff_calls.update_one({"id": call_id, "restaurant_id": restaurant_id}, {"$set": {"status": data.status}})
+    call = await db.staff_calls.find_one({"id": call_id}, {"_id": 0})
+    if call:
+        await manager.broadcast(restaurant_id, "staff_call_completed", serialize_doc(call))
+    return call
 
 
 @router.post("/restaurants/{restaurant_id}/staff-calls/complete-all")
