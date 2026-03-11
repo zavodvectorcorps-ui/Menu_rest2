@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ImageIcon, Clock, MapPin, Phone, ChevronDown, Loader2 } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ChevronLeft, ImageIcon, Clock, MapPin, Phone, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -13,7 +13,10 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 export default function ClientMenuPage() {
-  const { tableCode } = useParams();
+  const { tableCode, slug, tableNumber } = useParams();
+  const isSlugMode = !!slug && !!tableNumber;
+  const storageKey = isSlugMode ? `order_${slug}_${tableNumber}` : `order_${tableCode}`;
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,7 +30,7 @@ export default function ClientMenuPage() {
   const [callingStaff, setCallingStaff] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [activeOrderId, setActiveOrderId] = useState(() => {
-    const saved = localStorage.getItem(`order_${tableCode}`);
+    const saved = localStorage.getItem(storageKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -39,13 +42,48 @@ export default function ClientMenuPage() {
   });
   const [orderStatus, setOrderStatus] = useState(activeOrderId?.status || null);
 
+  // Category scroll state
+  const categoryScrollRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkCategoryScroll = useCallback(() => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    checkCategoryScroll();
+    el.addEventListener('scroll', checkCategoryScroll, { passive: true });
+    const ro = new ResizeObserver(checkCategoryScroll);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', checkCategoryScroll);
+      ro.disconnect();
+    };
+  }, [checkCategoryScroll, selectedSection, data]);
+
+  const scrollCategories = (direction) => {
+    const el = categoryScrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * 150, behavior: 'smooth' });
+  };
+
   useEffect(() => {
     const fetchMenu = async () => {
       try {
-        const response = await axios.get(`${API}/public/menu/${tableCode}`);
+        let response;
+        if (isSlugMode) {
+          response = await axios.get(`${API}/public/menu-by-slug/${slug}/${tableNumber}`);
+        } else {
+          response = await axios.get(`${API}/public/menu/${tableCode}`);
+        }
         setData(response.data);
         
-        // Select first section with categories
         const sections = response.data.sections || [];
         if (sections.length > 0) {
           setSelectedSection(sections[0].id);
@@ -64,7 +102,7 @@ export default function ClientMenuPage() {
     };
 
     fetchMenu();
-  }, [tableCode]);
+  }, [tableCode, slug, tableNumber, isSlugMode]);
 
   // Poll order status
   useEffect(() => {
@@ -77,7 +115,7 @@ export default function ClientMenuPage() {
         const newStatus = resp.data.status;
         setOrderStatus(newStatus);
         if (newStatus === 'completed' || newStatus === 'cancelled') {
-          localStorage.removeItem(`order_${tableCode}`);
+          localStorage.removeItem(storageKey);
           setTimeout(() => { if (active) { setActiveOrderId(null); setOrderStatus(null); } }, 10000);
         }
       } catch { /* ignore */ }
@@ -85,7 +123,7 @@ export default function ClientMenuPage() {
     poll();
     const interval = setInterval(poll, 5000);
     return () => { active = false; clearInterval(interval); };
-  }, [activeOrderId?.id, tableCode]);
+  }, [activeOrderId?.id, storageKey]);
 
   // Apply theme from settings
   useEffect(() => {
@@ -164,8 +202,9 @@ export default function ClientMenuPage() {
 
     setSubmittingOrder(true);
     try {
+      const orderTableCode = data?.table?.code || tableCode;
       const resp = await axios.post(`${API}/public/orders`, {
-        table_code: tableCode,
+        table_code: orderTableCode,
         items: cart.map(item => ({
           menu_item_id: item.id,
           name: item.name,
@@ -183,7 +222,7 @@ export default function ClientMenuPage() {
       const orderData = { id: resp.data.id, status: 'new' };
       setActiveOrderId(orderData);
       setOrderStatus('new');
-      localStorage.setItem(`order_${tableCode}`, JSON.stringify(orderData));
+      localStorage.setItem(storageKey, JSON.stringify(orderData));
       setOrderSuccess(true);
       setCart([]);
       setOrderNotes('');
@@ -200,8 +239,9 @@ export default function ClientMenuPage() {
   const callStaff = async (callTypeId) => {
     setCallingStaff(true);
     try {
+      const callTableCode = data?.table?.code || tableCode;
       await axios.post(`${API}/public/staff-calls`, { 
-        table_code: tableCode,
+        table_code: callTableCode,
         call_type_id: callTypeId 
       });
       const callType = data?.call_types?.find(ct => ct.id === callTypeId);
@@ -307,24 +347,49 @@ export default function ClientMenuPage() {
           </div>
         </div>
 
-        {/* Category tabs within section */}
+        {/* Category tabs within section - improved mobile UX */}
         {sectionCategories.length > 0 && (
-          <div className="overflow-x-auto scrollbar-hide border-t border-border/50">
-            <div className="flex px-4 py-2 gap-2 min-w-max">
-              {sectionCategories.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                    selectedCategory === cat.id
-                      ? 'bg-brown-500 text-white'
-                      : 'bg-transparent text-muted-foreground hover:text-foreground'
-                  }`}
-                  data-testid={`category-tab-${cat.id}`}
-                >
-                  {cat.name}
-                </button>
-              ))}
+          <div className="relative border-t border-border/50">
+            {/* Left fade + arrow */}
+            {canScrollLeft && (
+              <button
+                onClick={() => scrollCategories(-1)}
+                className="absolute left-0 top-0 bottom-0 z-10 w-8 flex items-center justify-center bg-gradient-to-r from-card via-card/90 to-transparent"
+                data-testid="scroll-categories-left"
+              >
+                <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+            {/* Right fade + arrow */}
+            {canScrollRight && (
+              <button
+                onClick={() => scrollCategories(1)}
+                className="absolute right-0 top-0 bottom-0 z-10 w-8 flex items-center justify-center bg-gradient-to-l from-card via-card/90 to-transparent"
+                data-testid="scroll-categories-right"
+              >
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+            <div
+              ref={categoryScrollRef}
+              className="overflow-x-auto scrollbar-hide"
+            >
+              <div className="flex px-4 py-2 gap-2 min-w-max">
+                {sectionCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                      selectedCategory === cat.id
+                        ? 'bg-brown-500 text-white'
+                        : 'bg-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                    data-testid={`category-tab-${cat.id}`}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

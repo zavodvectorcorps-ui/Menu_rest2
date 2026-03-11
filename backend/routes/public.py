@@ -46,6 +46,41 @@ async def get_public_menu(table_code: str):
     }
 
 
+@router.get("/public/menu-by-slug/{slug}/{table_number}")
+async def get_public_menu_by_slug(slug: str, table_number: int):
+    restaurant = await db.restaurants.find_one({"slug": slug}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Ресторан не найден")
+
+    restaurant_id = restaurant['id']
+    table = await db.tables.find_one({"restaurant_id": restaurant_id, "number": table_number}, {"_id": 0})
+    if not table:
+        raise HTTPException(status_code=404, detail="Стол не найден")
+
+    settings = await get_or_create_settings(restaurant_id)
+    sections = await get_or_create_menu_sections(restaurant_id)
+    call_types = await get_or_create_call_types(restaurant_id)
+    categories = await db.categories.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(1000)
+    items = await db.menu_items.find({"restaurant_id": restaurant_id, "is_available": True}, {"_id": 0}).sort("sort_order", 1).to_list(5000)
+    labels = await db.labels.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("sort_order", 1).to_list(500)
+
+    view = MenuView(restaurant_id=restaurant_id, table_code=table.get('code'))
+    doc = view.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.menu_views.insert_one(doc)
+
+    return {
+        "restaurant": serialize_doc(restaurant),
+        "table": serialize_doc(table),
+        "settings": settings,
+        "sections": sections,
+        "call_types": call_types,
+        "categories": [serialize_doc(c) for c in categories],
+        "items": [serialize_doc(i) for i in items],
+        "labels": labels
+    }
+
+
 @router.post("/public/orders")
 async def create_public_order(data: OrderCreate):
     table = await db.tables.find_one({"code": data.table_code}, {"_id": 0})

@@ -1,0 +1,110 @@
+{
+  "summary": "Complete testing of custom URL (slug) feature for client menu. All 17 backend tests passed (100%). Frontend slug-based URLs, category scroll navigation, and Settings page slug field all working correctly.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "passed_tests": [
+    "Backend: GET /api/public/menu-by-slug/{slug}/{table_number} - returns menu data with restaurant, table, settings, sections, categories, items, call_types",
+    "Backend: GET /api/public/menu-by-slug with invalid slug - returns 404 'Ресторан не найден'",
+    "Backend: GET /api/public/menu-by-slug with invalid table number - returns 404 'Стол не найден'",
+    "Backend: GET /api/public/menu-by-slug/{slug}/0 - preorder table accessible via slug",
+    "Backend: GET /api/restaurants/{id} returns slug field",
+    "Backend: PUT /api/restaurants/{id} with valid slug format - saves and returns slug",
+    "Backend: PUT slug with uppercase - converts to lowercase automatically",
+    "Backend: PUT slug with invalid chars (underscore, cyrillic) - returns 400",
+    "Backend: PUT slug already used by another restaurant - returns 400 'занят'",
+    "Backend: PUT empty slug - allowed (removes slug)",
+    "Backend: PUT single char slug - valid",
+    "Backend: QR code endpoint returns slug-based URL for restaurant with slug",
+    "Backend: QR code endpoint returns code-based URL for restaurant without slug",
+    "Backend: GET /api/public/menu/{table_code} (old format) - still works",
+    "Backend: POST /api/public/orders via slug menu - uses table_code from API response",
+    "Backend: POST /api/public/staff-calls via slug menu - works correctly",
+    "Frontend: Slug URL /:slug/:tableNumber loads client menu page",
+    "Frontend: Old format /menu/:tableCode continues to work",
+    "Frontend: Restaurant name and table number displayed correctly in header",
+    "Frontend: Section tabs (Еда, Напитки, Кальяны) visible and working",
+    "Frontend: Category scroll arrows appear on mobile when overflow",
+    "Frontend: Scroll left button hidden at start, appears after scrolling right",
+    "Frontend: Add to cart via slug menu works",
+    "Frontend: Cart dialog opens and shows items",
+    "Frontend: Order submission via slug menu works, order tracker appears",
+    "Frontend: Staff call button works via slug menu",
+    "Frontend: Call modal shows call types (Вызов официанта, Вызов кальянного мастера, Попросить счёт)",
+    "Frontend: Staff call sent successfully via slug menu",
+    "Frontend: Settings page 'О ресторане' tab - slug input field present with value 'myata-sport'",
+    "Frontend: Settings page slug field shows URL preview with base URL",
+    "Frontend: Settings page 'Столы' tab - all action buttons (QR, Copy, Open, Refresh, Edit, Delete) present",
+    "Frontend: QR code dialog shows slug-based URL (https://.../{slug}/{table_number})"
+  ],
+
+  "test_report_links": [
+    "/app/backend/tests/test_slug_feature.py",
+    "/app/test_reports/pytest/pytest_slug_feature.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [],
+
+  "updated_files": [
+    "/app/backend/tests/test_slug_feature.py"
+  ],
+
+  "success_rate": {
+    "backend": "100% (17/17 tests passed)",
+    "frontend": "100%"
+  },
+
+  "seed_data_creation": "Test orders and staff calls created during testing via public API endpoints",
+
+  "retest_needed": false,
+
+  "should_main_agent_self_test": true,
+
+  "context_for_next_testing_agent": "Slug feature fully implemented and tested. Key features: 1) PUT /api/restaurants/{id} accepts 'slug' field with validation (lowercase, alphanumeric + hyphens, unique), 2) GET /api/public/menu-by-slug/{slug}/{table_number} returns menu data for slug-based URLs, 3) QR code endpoint uses slug-based URL when restaurant has slug set, 4) Frontend route /:slug/:tableNumber loads ClientMenuPage in isSlugMode, 5) ClientMenuPage uses table.code from API response for orders/calls (works with both URL formats), 6) Settings page has slug input in 'О ресторане' tab with URL preview, 7) Category scroll arrows and gradient indicators work on mobile. Test credentials remain: admin/220066, restaurant_id: aa25189d-d668-4838-915a-c5d936547f3f, slug: myata-sport, table_code: 697DCAA5 for table #1.",
+
+  "test_credentials": {
+    "superadmin": {
+      "username": "admin",
+      "password": "220066"
+    },
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "restaurant_slug": "myata-sport",
+    "restaurant_2_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "regular_table_code": "697DCAA5",
+    "preorder_table_code": "6E32830E"
+  },
+
+  "slug_feature_verification": {
+    "backend_features": [
+      "Slug field added to Restaurant model",
+      "PUT /api/restaurants/{id} - slug validation: lowercase, alphanumeric + hyphens, unique",
+      "GET /api/public/menu-by-slug/{slug}/{table_number} - menu lookup by slug and table number",
+      "QR code uses /{slug}/{table_number} format when restaurant has slug, /menu/{code} otherwise"
+    ],
+    "frontend_features": [
+      "Route /:slug/:tableNumber in App.js",
+      "ClientMenuPage detects isSlugMode from params (slug && tableNumber)",
+      "API call to /api/public/menu-by-slug/{slug}/{tableNumber} in slug mode",
+      "Uses table.code from API response for orders/staff-calls",
+      "Settings page slug input with URL preview",
+      "getTableUrl() in SettingsPage uses slug format when available"
+    ],
+    "mobile_navigation": [
+      "categoryScrollRef tracks horizontal scroll position",
+      "canScrollLeft/canScrollRight state updated on scroll",
+      "Left/right arrow buttons with gradient fade indicators",
+      "scrollCategories() function for programmatic scroll"
+    ]
+  }
+}

@@ -64,7 +64,14 @@ async def get_table_qr(restaurant_id: str, table_id: str, base_url: Optional[str
     if not base_url:
         base_url = os.environ.get('FRONTEND_URL', 'https://example.com')
 
-    menu_url = f"{base_url}/menu/{table['code']}"
+    # Use slug-based URL if restaurant has a slug
+    restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+    slug = restaurant.get('slug', '') if restaurant else ''
+
+    if slug:
+        menu_url = f"{base_url}/{slug}/{table['number']}"
+    else:
+        menu_url = f"{base_url}/menu/{table['code']}"
 
     qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=2)
     qr.add_data(menu_url)

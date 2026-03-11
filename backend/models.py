@@ -59,6 +59,7 @@ class Restaurant(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
+    slug: Optional[str] = ""
     description: Optional[str] = ""
     address: Optional[str] = ""
     phone: Optional[str] = ""
@@ -70,6 +71,7 @@ class Restaurant(BaseModel):
 
 class RestaurantCreate(BaseModel):
     name: str
+    slug: Optional[str] = ""
     description: Optional[str] = ""
     address: Optional[str] = ""
     phone: Optional[str] = ""
@@ -77,6 +79,7 @@ class RestaurantCreate(BaseModel):
 
 class RestaurantUpdate(BaseModel):
     name: Optional[str] = None
+    slug: Optional[str] = None
     description: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None

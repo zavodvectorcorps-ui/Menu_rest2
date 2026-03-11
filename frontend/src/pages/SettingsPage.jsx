@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Palette, Building2, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2 } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Building2, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2, Link } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -159,8 +159,16 @@ export default function SettingsPage() {
     }
   };
 
-  const copyTableLink = (code) => {
-    const link = `${window.location.origin}/menu/${code}`;
+  const getTableUrl = (table) => {
+    const slug = restaurant?.slug;
+    if (slug) {
+      return `${window.location.origin}/${slug}/${table.number}`;
+    }
+    return `${window.location.origin}/menu/${table.code}`;
+  };
+
+  const copyTableLink = (table) => {
+    const link = getTableUrl(table);
     navigator.clipboard.writeText(link);
     toast.success('Ссылка скопирована');
   };
@@ -485,6 +493,26 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Link className="w-4 h-4" />
+                  URL-адрес меню (slug)
+                </Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">{window.location.origin}/</span>
+                  <Input
+                    value={restaurantForm.slug || ''}
+                    onChange={(e) => setRestaurantForm({ ...restaurantForm, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
+                    placeholder="my-restaurant"
+                    data-testid="restaurant-slug-input"
+                  />
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">/1</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Латинские буквы, цифры и дефис. Будет использоваться в URL клиентского меню и QR-кодах
+                </p>
+              </div>
               
               <div className="space-y-2">
                 <Label>Описание</Label>
@@ -760,7 +788,7 @@ export default function SettingsPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              onClick={() => copyTableLink(table.code)}
+                              onClick={() => copyTableLink(table)}
                               title="Копировать ссылку"
                               data-testid={`copy-link-${table.id}`}
                             >
@@ -770,7 +798,7 @@ export default function SettingsPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              onClick={() => window.open(`/menu/${table.code}`, '_blank')}
+                              onClick={() => window.open(getTableUrl(table), '_blank')}
                               title="Открыть меню"
                               data-testid={`open-menu-${table.id}`}
                             >

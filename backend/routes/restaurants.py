@@ -1,3 +1,4 @@
+import re
 from fastapi import APIRouter, Depends, HTTPException
 from database import db
 from models import Restaurant, RestaurantCreate, RestaurantUpdate
@@ -50,6 +51,18 @@ async def get_restaurant_by_id(restaurant_id: str, current_user: dict = Depends(
 async def update_restaurant(restaurant_id: str, data: RestaurantUpdate, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+
+    # Validate slug uniqueness and format
+    if 'slug' in update_data:
+        slug = update_data['slug'].lower().strip()
+        if slug:
+            if not re.match(r'^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$', slug):
+                raise HTTPException(status_code=400, detail="Slug может содержать только латинские буквы, цифры и дефис")
+            existing = await db.restaurants.find_one({"slug": slug, "id": {"$ne": restaurant_id}}, {"_id": 0})
+            if existing:
+                raise HTTPException(status_code=400, detail="Этот slug уже занят другим рестораном")
+        update_data['slug'] = slug
+
     if update_data:
         await db.restaurants.update_one({"id": restaurant_id}, {"$set": update_data})
     restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})

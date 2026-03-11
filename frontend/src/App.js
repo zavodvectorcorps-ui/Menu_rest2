@@ -266,6 +266,7 @@ function App() {
               
               {/* Client Menu Route (Public) */}
               <Route path="/menu/:tableCode" element={<ClientMenuPage />} />
+              <Route path="/:slug/:tableNumber" element={<ClientMenuPage />} />
               
               {/* Default redirect */}
               <Route path="/" element={<Navigate to={token ? "/admin/profile" : "/login"} replace />} />
