@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ChevronLeft, ImageIcon, Clock, MapPin, Phone, ChevronDown, Loader2 } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ImageIcon, Clock, MapPin, Phone, ChevronDown, Loader2, Hand } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -46,12 +46,15 @@ export default function ClientMenuPage() {
   const categoryScrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [showSwipeHint, setShowSwipeHint] = useState(true);
 
   const checkCategoryScroll = useCallback(() => {
     const el = categoryScrollRef.current;
     if (!el) return;
     setCanScrollLeft(el.scrollLeft > 4);
     setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+    // Hide hint after user scrolls
+    if (el.scrollLeft > 10) setShowSwipeHint(false);
   }, []);
 
   useEffect(() => {
@@ -349,46 +352,62 @@ export default function ClientMenuPage() {
 
         {/* Category tabs within section - improved mobile UX */}
         {sectionCategories.length > 0 && (
-          <div className="relative border-t border-border/50">
-            {/* Left fade + arrow */}
-            {canScrollLeft && (
-              <button
-                onClick={() => scrollCategories(-1)}
-                className="absolute left-0 top-0 bottom-0 z-10 w-8 flex items-center justify-center bg-gradient-to-r from-card via-card/90 to-transparent"
-                data-testid="scroll-categories-left"
+          <div className="border-t border-border/50">
+            {/* Title + swipe hint */}
+            <div className="flex items-center justify-between px-4 pt-2.5 pb-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70" data-testid="category-section-title">
+                Категория меню
+              </span>
+              {canScrollRight && showSwipeHint && (
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/60 animate-pulse" data-testid="swipe-hint">
+                  <Hand className="w-3.5 h-3.5 swipe-hand-anim" />
+                  <span>листайте</span>
+                  <ChevronsRight className="w-3.5 h-3.5" />
+                </span>
+              )}
+            </div>
+            {/* Scrollable categories with arrows */}
+            <div className="relative">
+              {/* Left arrow */}
+              {canScrollLeft && (
+                <button
+                  onClick={() => scrollCategories(-1)}
+                  className="absolute left-0 top-0 bottom-0 z-10 w-9 flex items-center justify-center bg-gradient-to-r from-card via-card/80 to-transparent"
+                  data-testid="scroll-categories-left"
+                >
+                  <ChevronsLeft className="w-4 h-4 text-muted-foreground" />
+                </button>
+              )}
+              {/* Right arrow */}
+              {canScrollRight && (
+                <button
+                  onClick={() => scrollCategories(1)}
+                  className="absolute right-0 top-0 bottom-0 z-10 w-9 flex items-center justify-center bg-gradient-to-l from-card via-card/80 to-transparent"
+                  data-testid="scroll-categories-right"
+                >
+                  <ChevronsRight className="w-4 h-4 text-muted-foreground" />
+                </button>
+              )}
+              <div
+                ref={categoryScrollRef}
+                className="overflow-x-auto scrollbar-hide"
               >
-                <ChevronLeft className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-            {/* Right fade + arrow */}
-            {canScrollRight && (
-              <button
-                onClick={() => scrollCategories(1)}
-                className="absolute right-0 top-0 bottom-0 z-10 w-8 flex items-center justify-center bg-gradient-to-l from-card via-card/90 to-transparent"
-                data-testid="scroll-categories-right"
-              >
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
-            <div
-              ref={categoryScrollRef}
-              className="overflow-x-auto scrollbar-hide"
-            >
-              <div className="flex px-4 py-2 gap-2 min-w-max">
-                {sectionCategories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                      selectedCategory === cat.id
-                        ? 'bg-brown-500 text-white'
-                        : 'bg-transparent text-muted-foreground hover:text-foreground'
-                    }`}
-                    data-testid={`category-tab-${cat.id}`}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
+                <div className="flex px-4 py-2 gap-2 min-w-max">
+                  {sectionCategories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => { setSelectedCategory(cat.id); setShowSwipeHint(false); }}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                        selectedCategory === cat.id
+                          ? 'bg-brown-500 text-white'
+                          : 'bg-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                      data-testid={`category-tab-${cat.id}`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

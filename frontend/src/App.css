@@ -196,3 +196,13 @@
         transform: translateX(0);
     }
 }
+
+
+/* Swipe hand animation for category hint */
+@keyframes swipeHand {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(8px); }
+}
+.swipe-hand-anim {
+  animation: swipeHand 1.2s ease-in-out infinite;
+}
