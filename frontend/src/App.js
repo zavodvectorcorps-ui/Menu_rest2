@@ -17,6 +17,7 @@ import ClientMenuPage from "@/pages/ClientMenuPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import UsersPage from "@/pages/UsersPage";
 import TelegramBotPage from "@/pages/TelegramBotPage";
+import CaffestaPage from "@/pages/CaffestaPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -259,6 +260,7 @@ function App() {
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="telegram-bot" element={<TelegramBotPage />} />
+                <Route path="caffesta" element={<CaffestaPage />} />
                 <Route path="users" element={user?.role === 'superadmin' ? <UsersPage /> : <Navigate to="/admin/profile" replace />} />
                 <Route path="help" element={<HelpCenterPage />} />
                 <Route path="support" element={<SupportPage />} />

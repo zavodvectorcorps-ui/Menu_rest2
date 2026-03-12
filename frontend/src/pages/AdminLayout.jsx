@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Building2,
   Bot,
+  Coffee,
   Wifi,
   WifiOff,
   Volume2,
@@ -41,6 +42,7 @@ const navItems = [
   { path: '/admin/analytics', label: 'Аналитика', icon: BarChart3 },
   { path: '/admin/settings', label: 'Настройки', icon: Settings },
   { path: '/admin/telegram-bot', label: 'Telegram-бот', icon: Bot },
+  { path: '/admin/caffesta', label: 'Caffesta POS', icon: Coffee },
   { path: '/admin/help', label: 'Справочный центр', icon: HelpCircle },
   { path: '/admin/support', label: 'Поддержка', icon: MessageSquare },
 ];

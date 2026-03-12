@@ -7,6 +7,7 @@ from models import (
 )
 from helpers import serialize_doc, get_or_create_settings, get_or_create_menu_sections, get_or_create_call_types
 from services.telegram import notify_restaurant_telegram, build_order_keyboard, build_call_keyboard
+from services.caffesta import is_caffesta_enabled, caffesta_send_order
 from services.websocket import manager
 
 router = APIRouter()
@@ -122,6 +123,10 @@ async def create_public_order(data: OrderCreate):
 
     keyboard = build_order_keyboard(doc['id'])
     await notify_restaurant_telegram(restaurant_id, msg, keyboard)
+
+    # Send to Caffesta POS if enabled
+    if await is_caffesta_enabled(restaurant_id):
+        await caffesta_send_order(restaurant_id, doc)
 
     await manager.broadcast(restaurant_id, "new_order", doc)
 
