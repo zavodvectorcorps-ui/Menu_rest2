@@ -1,6 +1,7 @@
 import logging
 import httpx
 from database import db
+import html as html_module
 
 TELEGRAM_API = "https://api.telegram.org/bot"
 
@@ -12,6 +13,8 @@ async def send_telegram_message(bot_token: str, chat_id: str, text: str, reply_m
             payload["reply_markup"] = reply_markup
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(f"{TELEGRAM_API}{bot_token}/sendMessage", json=payload)
+            if resp.status_code != 200:
+                logging.warning(f"Telegram sendMessage failed ({resp.status_code}): chat_id={chat_id}, body={resp.text[:200]}")
             return resp.status_code == 200
     except Exception as e:
         logging.error(f"Telegram send error: {e}")
@@ -25,6 +28,8 @@ async def edit_telegram_message(bot_token: str, chat_id: str, message_id: int, t
             payload["reply_markup"] = reply_markup
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(f"{TELEGRAM_API}{bot_token}/editMessageText", json=payload)
+            if resp.status_code != 200:
+                logging.warning(f"Telegram editMessage failed ({resp.status_code}): {resp.text[:200]}")
             return resp.status_code == 200
     except Exception as e:
         logging.error(f"Telegram edit error: {e}")

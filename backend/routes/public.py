@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+import html as html_module
 
 from database import db
 from models import (
@@ -111,13 +112,13 @@ async def create_public_order(data: OrderCreate):
 
     # Telegram notification with inline buttons
     table_num = table.get('number', '?')
-    items_text = "\n".join([f"  • {i.name} x{i.quantity}" for i in data.items])
+    items_text = "\n".join([f"  • {html_module.escape(i.name)} x{i.quantity}" for i in data.items])
     if is_preorder:
-        msg = f"📋 <b>Предзаказ</b>\n👤 {data.customer_name or '—'}\n📱 {data.customer_phone or '—'}\n📅 {data.preorder_date or '—'} {data.preorder_time or ''}\n\n{items_text}\n\n💰 <b>Итого: {total} BYN</b>"
+        msg = f"📋 <b>Предзаказ</b>\n👤 {html_module.escape(data.customer_name or '—')}\n📱 {html_module.escape(data.customer_phone or '—')}\n📅 {data.preorder_date or '—'} {data.preorder_time or ''}\n\n{items_text}\n\n💰 <b>Итого: {total} BYN</b>"
     else:
         msg = f"🍽 <b>Новый заказ</b>\n📍 Стол #{table_num}\n\n{items_text}\n\n💰 <b>Итого: {total} BYN</b>"
     if data.notes:
-        msg += f"\n📝 {data.notes}"
+        msg += f"\n📝 {html_module.escape(data.notes)}"
 
     keyboard = build_order_keyboard(doc['id'])
     await notify_restaurant_telegram(restaurant_id, msg, keyboard)

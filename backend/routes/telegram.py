@@ -209,6 +209,7 @@ async def telegram_webhook(restaurant_id: str, request: dict):
 async def handle_callback_query(bot_token: str, restaurant_id: str, callback: dict):
     from services.telegram import answer_callback_query, edit_telegram_message, build_order_keyboard, STATUS_LABELS
     from services.websocket import manager
+    import html as html_module
 
     callback_id = callback.get("id", "")
     data = callback.get("data", "")
@@ -245,18 +246,37 @@ async def handle_callback_query(bot_token: str, restaurant_id: str, callback: di
 
         await db.orders.update_one({"id": order_id}, {"$set": {"status": new_status}})
 
-        # Update the message text with new status
-        original_text = message.get("text", "")
-        # Remove old status line if present
-        lines = original_text.split("\n")
-        lines = [l for l in lines if not l.startswith("📊 Статус:")]
-        updated_text = "\n".join(lines) + f"\n\n📊 Статус: {status_text}"
+        # Reconstruct the message text from DB data (instead of reusing plain text from callback)
+        is_pre = order.get('is_preorder', False)
+        items_text = "\n".join([f"  • {html_module.escape(i.get('name',''))} x{i.get('quantity',1)}" for i in order.get('items', [])])
+        total = order.get('total', 0)
+        table_num = order.get('table_number', '?')
+
+        if is_pre:
+            updated_text = (
+                f"📋 <b>Предзаказ</b>\n"
+                f"👤 {html_module.escape(order.get('customer_name', '—'))}\n"
+                f"📱 {html_module.escape(order.get('customer_phone', '—'))}\n"
+                f"📅 {order.get('preorder_date', '—')} {order.get('preorder_time', '')}\n\n"
+                f"{items_text}\n\n"
+                f"💰 <b>Итого: {total} BYN</b>"
+            )
+        else:
+            updated_text = (
+                f"🍽 <b>Новый заказ</b>\n"
+                f"📍 Стол #{table_num}\n\n"
+                f"{items_text}\n\n"
+                f"💰 <b>Итого: {total} BYN</b>"
+            )
+        if order.get('notes'):
+            updated_text += f"\n📝 {html_module.escape(order['notes'])}"
+        updated_text += f"\n\n📊 Статус: {status_text}"
 
         new_keyboard = build_order_keyboard(order_id, new_status) if new_status == "in_progress" else None
         await edit_telegram_message(bot_token, chat_id, message_id, updated_text, new_keyboard)
         await answer_callback_query(bot_token, callback_id, status_text)
 
-        # Broadcast to admin WS and notify all subscribers
+        # Broadcast to admin WS
         updated_order = await db.orders.find_one({"id": order_id}, {"_id": 0})
         if updated_order:
             from helpers import serialize_doc
@@ -272,8 +292,10 @@ async def handle_callback_query(bot_token: str, restaurant_id: str, callback: di
 
         await db.staff_calls.update_one({"id": call_id}, {"$set": {"status": "completed"}})
 
-        original_text = message.get("text", "")
-        updated_text = original_text + "\n\n✅ Выполнен"
+        # Reconstruct call message
+        call_type_name = html_module.escape(call.get('call_type_name', 'Вызов'))
+        table_num = call.get('table_number', '?')
+        updated_text = f"🔔 <b>{call_type_name}</b>\nСтол #{table_num}\n\n✅ Выполнен"
         await edit_telegram_message(bot_token, chat_id, message_id, updated_text, None)
         await answer_callback_query(bot_token, callback_id, "✅ Вызов закрыт")
 
