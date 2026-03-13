@@ -57,6 +57,7 @@ export default function MenuPage() {
   const [editingLabel, setEditingLabel] = useState(null);
   const [labelForm, setLabelForm] = useState({ name: '', color: '#ef4444' });
   const [downloadingImages, setDownloadingImages] = useState(false);
+  const [caffestaProducts, setCaffestaProducts] = useState([]);
   
   const [categoryForm, setCategoryForm] = useState({ name: '', section_id: '', display_mode: 'card', sort_order: 0, is_active: true });
   const [itemForm, setItemForm] = useState({
@@ -96,6 +97,13 @@ export default function MenuPage() {
       setCurrency(settingsRes.data?.currency || 'BYN');
       if (categoriesRes.data.length > 0 && !selectedCategory) {
         setSelectedCategory(categoriesRes.data[0].id);
+      }
+      // Load Caffesta products for mapping (non-blocking)
+      try {
+        const cafResp = await axios.get(`${API}/restaurants/${currentRestaurantId}/caffesta/products`, authHeaders);
+        setCaffestaProducts(Array.isArray(cafResp.data) ? cafResp.data : []);
+      } catch {
+        // Caffesta not configured — ok, just no products
       }
     } catch {
       toast.error('Ошибка загрузки данных');
@@ -473,7 +481,7 @@ export default function MenuPage() {
 
       {/* Dialogs */}
       <CategoryDialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen} editing={editingCategory} form={categoryForm} setForm={setCategoryForm} menuSections={menuSections} onSave={saveCategoryHandler} />
-      <ItemDialog open={itemDialogOpen} onOpenChange={setItemDialogOpen} editing={editingItem} form={itemForm} setForm={setItemForm} categories={categories} labels={labels} currency={currency} onSave={saveItemHandler} onToggleLabel={toggleItemLabel} />
+      <ItemDialog open={itemDialogOpen} onOpenChange={setItemDialogOpen} editing={editingItem} form={itemForm} setForm={setItemForm} categories={categories} labels={labels} currency={currency} onSave={saveItemHandler} onToggleLabel={toggleItemLabel} caffestaProducts={caffestaProducts} />
       <DeleteDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} target={deleteTarget} onConfirm={confirmDelete} />
       <ImportJsonDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} importJson={importJson} setImportJson={setImportJson} importing={importing} onImport={handleImportMenu} />
       <ImportModeDialog open={importModeDialogOpen} onOpenChange={(open) => { if (!open) { setImportModeDialogOpen(false); setPendingImportFile(null); } }} pendingFile={pendingImportFile} importing={importing} onExecute={executeImport} />

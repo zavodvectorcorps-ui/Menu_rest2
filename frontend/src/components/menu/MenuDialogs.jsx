@@ -1,4 +1,5 @@
-import { Flame, Star, Sparkles, Tag, Plus, Loader2, RefreshCw, Edit2, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Flame, Star, Sparkles, Tag, Plus, Loader2, RefreshCw, Edit2, Trash2, Check, ChevronsUpDown, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,6 +7,9 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
 import { ImageUpload } from './ImageUpload';
 
 export function CategoryDialog({ open, onOpenChange, editing, form, setForm, menuSections, onSave }) {
@@ -66,7 +70,11 @@ export function CategoryDialog({ open, onOpenChange, editing, form, setForm, men
   );
 }
 
-export function ItemDialog({ open, onOpenChange, editing, form, setForm, categories, labels, currency, onSave, onToggleLabel }) {
+export function ItemDialog({ open, onOpenChange, editing, form, setForm, categories, labels, currency, onSave, onToggleLabel, caffestaProducts = [] }) {
+  const [caffestaOpen, setCaffestaOpen] = useState(false);
+
+  const selectedCafProduct = caffestaProducts.find(p => p.product_id === Number(form.caffesta_product_id));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -123,14 +131,63 @@ export function ItemDialog({ open, onOpenChange, editing, form, setForm, categor
 
           {!form.is_banner && (
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Caffesta Product ID</Label>
-              <Input
-                type="number"
-                value={form.caffesta_product_id}
-                onChange={(e) => setForm({ ...form, caffesta_product_id: e.target.value })}
-                placeholder="ID товара в Caffesta (необязательно)"
-                data-testid="caffesta-product-id-input"
-              />
+              <Label className="text-xs text-muted-foreground">Привязка к Caffesta</Label>
+              {caffestaProducts.length > 0 ? (
+                <div className="flex items-center gap-2">
+                  <Popover open={caffestaOpen} onOpenChange={setCaffestaOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between font-normal h-9 text-sm"
+                        data-testid="caffesta-product-combobox"
+                      >
+                        {selectedCafProduct
+                          ? `${selectedCafProduct.title} (ID: ${selectedCafProduct.product_id})`
+                          : 'Выберите товар из Caffesta...'}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Поиск товара..." />
+                        <CommandList>
+                          <CommandEmpty>Товар не найден</CommandEmpty>
+                          <CommandGroup className="max-h-[200px] overflow-y-auto">
+                            {caffestaProducts.map((p) => (
+                              <CommandItem
+                                key={p.product_id}
+                                value={`${p.title} ${p.product_id}`}
+                                onSelect={() => {
+                                  setForm({ ...form, caffesta_product_id: String(p.product_id) });
+                                  setCaffestaOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", Number(form.caffesta_product_id) === p.product_id ? "opacity-100" : "opacity-0")} />
+                                <span className="truncate">{p.title}</span>
+                                <span className="ml-auto text-xs text-muted-foreground">ID: {p.product_id}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {form.caffesta_product_id && (
+                    <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setForm({ ...form, caffesta_product_id: '' })} data-testid="caffesta-product-clear">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Input
+                  type="number"
+                  value={form.caffesta_product_id}
+                  onChange={(e) => setForm({ ...form, caffesta_product_id: e.target.value })}
+                  placeholder="ID товара в Caffesta (настройте интеграцию для автозагрузки)"
+                  data-testid="caffesta-product-id-input"
+                />
+              )}
             </div>
           )}
 
