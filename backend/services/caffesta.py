@@ -26,13 +26,25 @@ def _headers(api_key: str) -> dict:
     return {"X-API-KEY": api_key, "Content-Type": "application/json"}
 
 
+def _safe_json(resp) -> dict:
+    """Safely parse JSON response from Caffesta. Returns error dict if not JSON."""
+    if not resp.text or not resp.text.strip():
+        logger.warning(f"Caffesta empty response: status={resp.status_code} url={resp.url}")
+        return {"success": False, "data": {"error": f"Пустой ответ от Caffesta (HTTP {resp.status_code})"}}
+    try:
+        return _safe_json(resp)
+    except Exception:
+        logger.warning(f"Caffesta non-JSON response: status={resp.status_code} body={resp.text[:200]}")
+        return {"success": False, "data": {"error": f"Некорректный ответ от Caffesta (HTTP {resp.status_code})"}}
+
+
 async def caffesta_test_connection(account_name: str, api_key: str) -> dict:
     """Test connection to Caffesta API."""
     try:
         url = f"{_base_url(account_name)}/v1.0/storage/test"
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get(url, headers=_headers(api_key))
-            data = resp.json()
+            data = _safe_json(resp)
             if data.get("success"):
                 return {"ok": True, "message": "Подключение успешно"}
             return {"ok": False, "message": data.get("error", "Неизвестная ошибка")}
@@ -105,7 +117,7 @@ async def caffesta_send_order(restaurant_id: str, order: dict) -> dict:
         url = f"{_base_url(account_name)}/v1.1/draft/receipts"
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(url, headers=_headers(api_key), json={"bill": bill})
-            data = resp.json()
+            data = _safe_json(resp)
             if data.get("success"):
                 caffesta_uuid = data.get("data", {}).get("message", "")
                 # Save caffesta UUID to our order
@@ -137,9 +149,11 @@ async def caffesta_get_order_status(restaurant_id: str, caffesta_uuid: str) -> d
         url = f"{_base_url(account_name)}/v1.0/draft/receipts/{caffesta_uuid}/info"
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get(url, headers=_headers(api_key))
-            data = resp.json()
+            data = _safe_json(resp)
             if isinstance(data, list) and len(data) > 0:
                 return {"ok": True, "status": data[0].get("status", "unknown"), "data": data[0]}
+            if isinstance(data, dict) and data.get("success") is False:
+                return {"ok": False, "message": data.get("data", {}).get("error", "Ошибка Caffesta")}
             return {"ok": False, "message": "Заказ не найден в Caffesta"}
     except Exception as e:
         logger.error(f"Caffesta order status failed: {e}")
@@ -161,7 +175,7 @@ async def caffesta_get_sales(restaurant_id: str, start_date: str, end_date: str,
             url += f"&add_gr_by={group_by}"
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(url, headers=_headers(api_key))
-            data = resp.json()
+            data = _safe_json(resp)
             if data.get("success"):
                 return {"ok": True, "data": data.get("data", [])}
             err = data.get("data", {})
@@ -185,7 +199,7 @@ async def caffesta_get_sales_totals(restaurant_id: str, start_date: str, end_dat
         url = f"{_base_url(account_name)}/v1.0/product/export_sales_totals?start={start_date}&end={end_date}&add_gr_by={group_by}"
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(url, headers=_headers(api_key))
-            data = resp.json()
+            data = _safe_json(resp)
             if data.get("success"):
                 return {"ok": True, "data": data.get("data", [])}
             err = data.get("data", {})
@@ -209,7 +223,7 @@ async def caffesta_get_sales_shift_day(restaurant_id: str, start_date: str, end_
         url = f"{_base_url(account_name)}/v1.0/product/export_sales_shift_day?start={start_date}&end={end_date}"
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.get(url, headers=_headers(api_key))
-            data = resp.json()
+            data = _safe_json(resp)
             if data.get("success"):
                 return {"ok": True, "data": data.get("data", [])}
             err = data.get("data", {})
@@ -234,7 +248,7 @@ async def caffesta_get_products(restaurant_id: str) -> dict:
         url = f"{_base_url(account_name)}/v1.0/draft/get_products/{pos_id}/0/0"
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(url, headers=_headers(api_key))
-            data = resp.json()
+            data = _safe_json(resp)
             logger.info(f"Caffesta products response code: {data.get('code', 'unknown')}")
             raw_products = []
             if data.get("code") == "ok":
