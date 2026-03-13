@@ -148,6 +148,7 @@ class MenuItem(BaseModel):
     is_banner: bool = False
     sort_order: int = 0
     label_ids: list = []
+    caffesta_product_id: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class MenuItemCreate(BaseModel):
@@ -166,6 +167,7 @@ class MenuItemCreate(BaseModel):
     is_banner: bool = False
     sort_order: int = 0
     label_ids: list = []
+    caffesta_product_id: Optional[int] = None
 
 class MenuItemUpdate(BaseModel):
     category_id: Optional[str] = None
@@ -183,6 +185,7 @@ class MenuItemUpdate(BaseModel):
     is_banner: Optional[bool] = None
     sort_order: Optional[int] = None
     label_ids: Optional[list] = None
+    caffesta_product_id: Optional[int] = None
 
 class Label(BaseModel):
     model_config = ConfigDict(extra="ignore")

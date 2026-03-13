@@ -63,7 +63,7 @@ export default function MenuPage() {
     category_id: '', name: '', description: '', price: '', weight: '', image_url: '',
     is_available: true, is_business_lunch: false, is_promotion: false,
     is_hit: false, is_new: false, is_spicy: false, is_banner: false,
-    sort_order: 0, label_ids: []
+    sort_order: 0, label_ids: [], caffesta_product_id: ''
   });
 
   const jsonFileRef = useRef(null);
@@ -188,7 +188,7 @@ export default function MenuPage() {
         is_available: item.is_available, is_business_lunch: item.is_business_lunch,
         is_promotion: item.is_promotion, is_hit: item.is_hit, is_new: item.is_new,
         is_spicy: item.is_spicy, is_banner: item.is_banner, sort_order: item.sort_order,
-        label_ids: item.label_ids || []
+        label_ids: item.label_ids || [], caffesta_product_id: item.caffesta_product_id ?? ''
       });
     } else {
       setEditingItem(null);
@@ -196,7 +196,8 @@ export default function MenuPage() {
         category_id: selectedCategory || '', name: '', description: '', price: '0', weight: '',
         image_url: '', is_available: true, is_business_lunch: false, is_promotion: false,
         is_hit: false, is_new: false, is_spicy: false, is_banner: isBanner,
-        sort_order: menuItems.filter(i => i.category_id === selectedCategory).length, label_ids: []
+        sort_order: menuItems.filter(i => i.category_id === selectedCategory).length, label_ids: [],
+        caffesta_product_id: ''
       });
     }
     setItemDialogOpen(true);
@@ -204,7 +205,12 @@ export default function MenuPage() {
 
   const saveItemHandler = async () => {
     try {
-      const data = { ...itemForm, price: parseFloat(itemForm.price) || 0, sort_order: parseInt(itemForm.sort_order) || 0 };
+      const data = {
+        ...itemForm,
+        price: parseFloat(itemForm.price) || 0,
+        sort_order: parseInt(itemForm.sort_order) || 0,
+        caffesta_product_id: itemForm.caffesta_product_id ? parseInt(itemForm.caffesta_product_id) : null
+      };
       if (editingItem) {
         await axios.put(`${API}/restaurants/${currentRestaurantId}/menu-items/${editingItem.id}`, data, authHeaders);
         toast.success('Позиция обновлена');

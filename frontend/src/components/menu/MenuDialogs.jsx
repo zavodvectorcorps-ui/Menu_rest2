@@ -121,6 +121,19 @@ export function ItemDialog({ open, onOpenChange, editing, form, setForm, categor
             </div>
           )}
 
+          {!form.is_banner && (
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Caffesta Product ID</Label>
+              <Input
+                type="number"
+                value={form.caffesta_product_id}
+                onChange={(e) => setForm({ ...form, caffesta_product_id: e.target.value })}
+                placeholder="ID товара в Caffesta (необязательно)"
+                data-testid="caffesta-product-id-input"
+              />
+            </div>
+          )}
+
           <ImageUpload value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} />
 
           {!form.is_banner && (
