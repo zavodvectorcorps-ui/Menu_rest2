@@ -32,7 +32,7 @@ def _safe_json(resp) -> dict:
         logger.warning(f"Caffesta empty response: status={resp.status_code} url={resp.url}")
         return {"success": False, "data": {"error": f"Пустой ответ от Caffesta (HTTP {resp.status_code})"}}
     try:
-        return _safe_json(resp)
+        return resp.json()
     except Exception:
         logger.warning(f"Caffesta non-JSON response: status={resp.status_code} body={resp.text[:200]}")
         return {"success": False, "data": {"error": f"Некорректный ответ от Caffesta (HTTP {resp.status_code})"}}
