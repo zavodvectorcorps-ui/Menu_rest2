@@ -74,6 +74,7 @@ export function ItemDialog({ open, onOpenChange, editing, form, setForm, categor
   const [caffestaOpen, setCaffestaOpen] = useState(false);
 
   const selectedCafProduct = caffestaProducts.find(p => p.product_id === Number(form.caffesta_product_id));
+  const typeLabel = (t) => t === 'tech_map' ? 'Тех.карта' : 'Товар';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -143,8 +144,8 @@ export function ItemDialog({ open, onOpenChange, editing, form, setForm, categor
                         data-testid="caffesta-product-combobox"
                       >
                         {selectedCafProduct
-                          ? `${selectedCafProduct.title} (ID: ${selectedCafProduct.product_id})`
-                          : 'Выберите товар из Caffesta...'}
+                          ? `[${typeLabel(selectedCafProduct.type)}] ${selectedCafProduct.title} (ID: ${selectedCafProduct.product_id})`
+                          : 'Выберите товар или тех.карту из Caffesta...'}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
@@ -157,13 +158,16 @@ export function ItemDialog({ open, onOpenChange, editing, form, setForm, categor
                             {caffestaProducts.map((p) => (
                               <CommandItem
                                 key={p.product_id}
-                                value={`${p.title} ${p.product_id}`}
+                                value={`${p.title} ${p.product_id} ${p.type === 'tech_map' ? 'тех.карта техкарта' : 'товар'}`}
                                 onSelect={() => {
                                   setForm({ ...form, caffesta_product_id: String(p.product_id) });
                                   setCaffestaOpen(false);
                                 }}
                               >
                                 <Check className={cn("mr-2 h-4 w-4", Number(form.caffesta_product_id) === p.product_id ? "opacity-100" : "opacity-0")} />
+                                <span className={`mr-1.5 text-[10px] px-1 py-0.5 rounded ${p.type === 'tech_map' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                  {p.type === 'tech_map' ? 'ТК' : 'Т'}
+                                </span>
                                 <span className="truncate">{p.title}</span>
                                 <span className="ml-auto text-xs text-muted-foreground">ID: {p.product_id}</span>
                               </CommandItem>

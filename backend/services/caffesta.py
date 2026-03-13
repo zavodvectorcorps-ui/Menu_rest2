@@ -235,7 +235,7 @@ async def caffesta_get_sales_shift_day(restaurant_id: str, start_date: str, end_
 
 
 async def caffesta_get_products(restaurant_id: str) -> dict:
-    """Get products from Caffesta for mapping. Normalizes response to have consistent title/product_id fields."""
+    """Get products + tech cards from Caffesta for mapping. Handles pagination."""
     config = await get_caffesta_config(restaurant_id)
     if not config or not config.get("enabled"):
         return {"ok": False, "message": "Caffesta не настроена"}
@@ -244,33 +244,61 @@ async def caffesta_get_products(restaurant_id: str) -> dict:
     api_key = config["api_key"]
     pos_id = config.get("pos_id", 1)
 
+    all_raw = []
+    start_id = 0
     try:
-        url = f"{_base_url(account_name)}/v1.0/draft/get_products/{pos_id}/0/0"
         async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.get(url, headers=_headers(api_key))
-            data = _safe_json(resp)
-            logger.info(f"Caffesta products response code: {data.get('code', 'unknown')}")
-            raw_products = []
-            if data.get("code") == "ok":
-                raw_products = data.get("data", [])
-            elif data.get("success"):
-                raw_products = data.get("data", [])
-            else:
-                logger.warning(f"Caffesta products unexpected response: {str(data)[:300]}")
-                return {"ok": False, "message": "Ошибка получения товаров"}
+            # Paginate: fetch until no more data
+            for _ in range(20):  # safety limit
+                url = f"{_base_url(account_name)}/v1.0/draft/get_products/{pos_id}/{start_id}/0"
+                resp = await client.get(url, headers=_headers(api_key))
+                data = _safe_json(resp)
 
-            # Normalize product fields — try title, name, product_name
-            products = []
-            for p in raw_products:
-                title = p.get("title") or p.get("name") or p.get("product_name") or p.get("product_title") or ""
-                pid = p.get("product_id") or p.get("id") or 0
-                products.append({
-                    "product_id": pid,
-                    "title": title,
-                    "price": p.get("price", p.get("prices", [{}])[0].get("price", 0) if isinstance(p.get("prices"), list) and p.get("prices") else 0),
-                    "description": p.get("description", ""),
-                })
-            return {"ok": True, "data": products}
+                raw_list = []
+                if data.get("code") == "ok":
+                    raw_list = data.get("data", [])
+                elif data.get("success"):
+                    raw_list = data.get("data", [])
+                elif isinstance(data, list):
+                    raw_list = data
+                else:
+                    if not all_raw:
+                        logger.warning(f"Caffesta products response: {str(data)[:300]}")
+                    break
+
+                if not raw_list:
+                    break
+
+                all_raw.extend(raw_list)
+                # Check for pagination - use last product_id as next start_id
+                last_id = raw_list[-1].get("product_id") or raw_list[-1].get("id") or 0
+                if last_id and last_id != start_id and len(raw_list) >= 100:
+                    start_id = last_id
+                else:
+                    break
+
+        logger.info(f"Caffesta: loaded {len(all_raw)} products/tech_cards for pos {pos_id}")
+
+        # Normalize product fields
+        products = []
+        for p in all_raw:
+            title = p.get("title") or p.get("name") or p.get("product_name") or p.get("product_title") or ""
+            pid = p.get("product_id") or p.get("id") or 0
+            entity_type = p.get("entityType") or p.get("entity_type") or p.get("type") or "product"
+            price_val = 0
+            if isinstance(p.get("prices"), list) and p["prices"]:
+                price_val = p["prices"][0].get("price", 0) if isinstance(p["prices"][0], dict) else 0
+            elif p.get("price"):
+                price_val = p["price"]
+
+            products.append({
+                "product_id": pid,
+                "title": title,
+                "type": entity_type,
+                "price": price_val,
+                "description": p.get("description", ""),
+            })
+        return {"ok": True, "data": products}
     except Exception as e:
         logger.error(f"Caffesta get products failed: {e}")
         return {"ok": False, "message": str(e)}
