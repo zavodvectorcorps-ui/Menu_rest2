@@ -164,7 +164,9 @@ async def caffesta_get_sales(restaurant_id: str, start_date: str, end_date: str,
             data = resp.json()
             if data.get("success"):
                 return {"ok": True, "data": data.get("data", [])}
-            return {"ok": False, "message": data.get("data", {}).get("error", "Ошибка")}
+            err = data.get("data", {})
+            msg = err.get("error", str(err)) if isinstance(err, dict) else str(err)
+            return {"ok": False, "message": msg}
     except Exception as e:
         logger.error(f"Caffesta sales export failed: {e}")
         return {"ok": False, "message": str(e)}
@@ -186,14 +188,40 @@ async def caffesta_get_sales_totals(restaurant_id: str, start_date: str, end_dat
             data = resp.json()
             if data.get("success"):
                 return {"ok": True, "data": data.get("data", [])}
-            return {"ok": False, "message": data.get("data", {}).get("error", "Ошибка")}
+            err = data.get("data", {})
+            msg = err.get("error", str(err)) if isinstance(err, dict) else str(err)
+            return {"ok": False, "message": msg}
     except Exception as e:
         logger.error(f"Caffesta sales totals failed: {e}")
         return {"ok": False, "message": str(e)}
 
 
+async def caffesta_get_sales_shift_day(restaurant_id: str, start_date: str, end_date: str) -> dict:
+    """Get detailed sales by shift day (includes waiter/cashier info)."""
+    config = await get_caffesta_config(restaurant_id)
+    if not config or not config.get("enabled"):
+        return {"ok": False, "message": "Caffesta не настроена"}
+
+    account_name = config["account_name"]
+    api_key = config["api_key"]
+
+    try:
+        url = f"{_base_url(account_name)}/v1.0/product/export_sales_shift_day?start={start_date}&end={end_date}"
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.get(url, headers=_headers(api_key))
+            data = resp.json()
+            if data.get("success"):
+                return {"ok": True, "data": data.get("data", [])}
+            err = data.get("data", {})
+            msg = err.get("error", str(err)) if isinstance(err, dict) else str(err)
+            return {"ok": False, "message": msg}
+    except Exception as e:
+        logger.error(f"Caffesta sales shift day failed: {e}")
+        return {"ok": False, "message": str(e)}
+
+
 async def caffesta_get_products(restaurant_id: str) -> dict:
-    """Get products from Caffesta for mapping."""
+    """Get products from Caffesta for mapping. Normalizes response to have consistent title/product_id fields."""
     config = await get_caffesta_config(restaurant_id)
     if not config or not config.get("enabled"):
         return {"ok": False, "message": "Caffesta не настроена"}
@@ -207,9 +235,28 @@ async def caffesta_get_products(restaurant_id: str) -> dict:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(url, headers=_headers(api_key))
             data = resp.json()
+            logger.info(f"Caffesta products response code: {data.get('code', 'unknown')}")
+            raw_products = []
             if data.get("code") == "ok":
-                return {"ok": True, "data": data.get("data", [])}
-            return {"ok": False, "message": "Ошибка получения товаров"}
+                raw_products = data.get("data", [])
+            elif data.get("success"):
+                raw_products = data.get("data", [])
+            else:
+                logger.warning(f"Caffesta products unexpected response: {str(data)[:300]}")
+                return {"ok": False, "message": "Ошибка получения товаров"}
+
+            # Normalize product fields — try title, name, product_name
+            products = []
+            for p in raw_products:
+                title = p.get("title") or p.get("name") or p.get("product_name") or p.get("product_title") or ""
+                pid = p.get("product_id") or p.get("id") or 0
+                products.append({
+                    "product_id": pid,
+                    "title": title,
+                    "price": p.get("price", p.get("prices", [{}])[0].get("price", 0) if isinstance(p.get("prices"), list) and p.get("prices") else 0),
+                    "description": p.get("description", ""),
+                })
+            return {"ok": True, "data": products}
     except Exception as e:
         logger.error(f"Caffesta get products failed: {e}")
         return {"ok": False, "message": str(e)}

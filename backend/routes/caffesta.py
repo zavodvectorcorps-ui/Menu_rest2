@@ -8,7 +8,7 @@ from auth import get_current_user, check_restaurant_access
 from services.caffesta import (
     caffesta_test_connection, caffesta_get_sales, caffesta_get_sales_totals,
     caffesta_get_products, caffesta_send_order, caffesta_get_order_status,
-    get_caffesta_config, is_caffesta_enabled,
+    caffesta_get_sales_shift_day, get_caffesta_config, is_caffesta_enabled,
 )
 
 router = APIRouter()
@@ -120,15 +120,34 @@ async def get_caffesta_analytics(restaurant_id: str, days: int = 30, current_use
     sales_data = sales.get("data", []) if sales.get("ok") else []
     totals_data = totals.get("data", []) if totals.get("ok") else []
 
-    # Aggregate
-    total_revenue = sum(float(t.get("total_pay", 0) or 0) for t in totals_data)
-    total_qty = sum(int(t.get("qnt", 0) or 0) for t in totals_data)
-    total_cash = sum(float(t.get("cash", 0) or 0) for t in totals_data)
-    total_card = sum(float(t.get("card", 0) or 0) for t in totals_data)
-    total_discount = sum(float(t.get("discount", 0) or 0) for t in totals_data)
+    # Safe aggregation
+    total_revenue = 0
+    total_qty = 0
+    total_cash = 0
+    total_card = 0
+    total_discount = 0
+    for t in totals_data:
+        try:
+            total_revenue += float(t.get("total_pay", 0) or 0)
+            total_qty += int(float(t.get("qnt", 0) or 0))
+            total_cash += float(t.get("cash", 0) or 0)
+            total_card += float(t.get("card", 0) or 0)
+            total_discount += float(t.get("discount", 0) or 0)
+        except (ValueError, TypeError):
+            continue
 
     # Top products
-    top_products = sorted(sales_data, key=lambda x: float(x.get("total_pay", 0) or 0), reverse=True)[:20]
+    top_products = []
+    for p in sorted(sales_data, key=lambda x: float(x.get("total_pay", 0) or 0), reverse=True)[:20]:
+        try:
+            top_products.append({
+                "name": p.get("name", p.get("title", p.get("product_title", ""))),
+                "qty": int(float(p.get("qnt", 0) or 0)),
+                "revenue": round(float(p.get("total_pay", 0) or 0), 2),
+                "price": str(p.get("price", "0")),
+            })
+        except (ValueError, TypeError):
+            continue
 
     return {
         "period": {"start": start_date, "end": end_date, "days": days},
@@ -140,14 +159,90 @@ async def get_caffesta_analytics(restaurant_id: str, days: int = 30, current_use
             "discount": round(total_discount, 2),
             "avg_check": round(total_revenue / max(total_qty, 1), 2),
         },
-        "top_products": [
-            {
-                "name": p.get("name", ""),
-                "qty": int(p.get("qnt", 0) or 0),
-                "revenue": round(float(p.get("total_pay", 0) or 0), 2),
-                "price": p.get("price", "0"),
-            }
-            for p in top_products
-        ],
+        "top_products": top_products,
         "by_terminal": totals_data,
+        "errors": [
+            msg for ok, msg in [
+                (sales.get("ok"), sales.get("message")),
+                (totals.get("ok"), totals.get("message")),
+            ] if not ok and msg
+        ],
+    }
+
+
+@router.get("/restaurants/{restaurant_id}/caffesta/sales-report")
+async def get_caffesta_sales_report(restaurant_id: str, days: int = 7, cashier: str = "", current_user: dict = Depends(get_current_user)):
+    """Detailed sales report by shift day with waiter/cashier filter."""
+    await check_restaurant_access(current_user, restaurant_id)
+
+    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    result = await caffesta_get_sales_shift_day(restaurant_id, start_date, end_date)
+    if not result.get("ok"):
+        return {
+            "period": {"start": start_date, "end": end_date, "days": days},
+            "receipts": [],
+            "by_cashier": [],
+            "cashiers": [],
+            "error": result.get("message", "Ошибка загрузки")
+        }
+
+    raw_data = result.get("data", [])
+
+    # Extract unique cashiers
+    cashiers = sorted(set(
+        r.get("cashier_title", r.get("cashier_name", "")) for r in raw_data
+        if r.get("cashier_title") or r.get("cashier_name")
+    ))
+
+    # Filter by cashier if specified
+    if cashier:
+        raw_data = [r for r in raw_data if (r.get("cashier_title", r.get("cashier_name", "")) == cashier)]
+
+    # Aggregate by cashier
+    by_cashier = {}
+    for r in raw_data:
+        c_name = r.get("cashier_title", r.get("cashier_name", "Неизвестно"))
+        if c_name not in by_cashier:
+            by_cashier[c_name] = {"cashier": c_name, "receipts": 0, "revenue": 0, "items": 0, "discount": 0}
+        try:
+            by_cashier[c_name]["revenue"] += float(r.get("total_pay", 0) or 0)
+            by_cashier[c_name]["items"] += int(float(r.get("product_qty", r.get("qnt", 0)) or 0))
+            by_cashier[c_name]["discount"] += float(r.get("discount_sum", r.get("discount", 0)) or 0)
+        except (ValueError, TypeError):
+            pass
+        by_cashier[c_name]["receipts"] += 1
+
+    # Round values
+    for v in by_cashier.values():
+        v["revenue"] = round(v["revenue"], 2)
+        v["discount"] = round(v["discount"], 2)
+
+    # Build receipt list (limited to 200)
+    receipts = []
+    for r in raw_data[:200]:
+        try:
+            receipts.append({
+                "receipt_number": r.get("receipt_number", r.get("id", "")),
+                "date": r.get("date", ""),
+                "time": r.get("time", ""),
+                "cashier": r.get("cashier_title", r.get("cashier_name", "")),
+                "terminal": r.get("terminal_title", r.get("terminal_name", "")),
+                "product": r.get("product_title", r.get("product_name", r.get("name", ""))),
+                "qty": int(float(r.get("product_qty", r.get("qnt", 0)) or 0)),
+                "price": round(float(r.get("product_price", r.get("price", 0)) or 0), 2),
+                "sum": round(float(r.get("product_sum", r.get("total_pay", 0)) or 0), 2),
+                "discount": round(float(r.get("discount_sum", r.get("discount", 0)) or 0), 2),
+                "payment_type": r.get("payment_type", ""),
+            })
+        except (ValueError, TypeError):
+            continue
+
+    return {
+        "period": {"start": start_date, "end": end_date, "days": days},
+        "cashiers": cashiers,
+        "by_cashier": sorted(by_cashier.values(), key=lambda x: x["revenue"], reverse=True),
+        "receipts": receipts,
+        "total_receipts": len(raw_data),
     }

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plug, PlugZap, Save, TestTube, DollarSign, ShoppingCart, TrendingUp, Award } from 'lucide-react';
+import { Loader2, Plug, PlugZap, Save, TestTube, DollarSign, ShoppingCart, TrendingUp, Award, Users, FileText, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { API, useApp } from '@/App';
 import axios from 'axios';
@@ -26,6 +26,12 @@ export default function CaffestaPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsPeriod, setAnalyticsPeriod] = useState('30');
+
+  // Sales report state
+  const [reportLoading, setReportLoading] = useState(false);
+  const [report, setReport] = useState(null);
+  const [reportPeriod, setReportPeriod] = useState('7');
+  const [reportCashier, setReportCashier] = useState('');
 
   const fetchConfig = async () => {
     if (!currentRestaurantId) return;
@@ -115,6 +121,21 @@ export default function CaffestaPage() {
     }
   }, [currentRestaurantId, analyticsPeriod, config.enabled]);
 
+  const fetchReport = async () => {
+    if (!currentRestaurantId) return;
+    setReportLoading(true);
+    try {
+      let url = `${API}/restaurants/${currentRestaurantId}/caffesta/sales-report?days=${reportPeriod}`;
+      if (reportCashier) url += `&cashier=${encodeURIComponent(reportCashier)}`;
+      const resp = await axios.get(url, authHeaders);
+      setReport(resp.data);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Ошибка загрузки отчёта');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -139,6 +160,7 @@ export default function CaffestaPage() {
         <TabsList data-testid="caffesta-tabs">
           <TabsTrigger value="settings" data-testid="tab-settings">Настройки</TabsTrigger>
           <TabsTrigger value="analytics" data-testid="tab-analytics">Аналитика POS</TabsTrigger>
+          <TabsTrigger value="report" data-testid="tab-report">Реализация</TabsTrigger>
         </TabsList>
 
         <TabsContent value="settings" className="space-y-4 mt-4">
@@ -348,6 +370,154 @@ export default function CaffestaPage() {
                 <Card>
                   <CardContent className="py-8 text-center text-muted-foreground">
                     Нажмите «Обновить» для загрузки данных из Caffesta
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+        </TabsContent>
+
+        {/* Sales Report Tab */}
+        <TabsContent value="report" className="space-y-4 mt-4">
+          {!config.enabled || !config.account_name ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <Plug className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Настройте и включите интеграцию с Caffesta для доступа к отчётам</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Отчёт реализации
+                </h3>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Select value={reportPeriod} onValueChange={setReportPeriod}>
+                    <SelectTrigger className="w-28" data-testid="report-period-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Сегодня</SelectItem>
+                      <SelectItem value="7">7 дней</SelectItem>
+                      <SelectItem value="14">14 дней</SelectItem>
+                      <SelectItem value="30">30 дней</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {report?.cashiers?.length > 0 && (
+                    <Select value={reportCashier} onValueChange={setReportCashier}>
+                      <SelectTrigger className="w-44" data-testid="report-cashier-select">
+                        <Filter className="w-3.5 h-3.5 mr-1" />
+                        <SelectValue placeholder="Все официанты" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Все официанты</SelectItem>
+                        {report.cashiers.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Button variant="outline" size="sm" onClick={fetchReport} disabled={reportLoading} data-testid="report-refresh-btn">
+                    {reportLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Загрузить"}
+                  </Button>
+                </div>
+              </div>
+
+              {reportLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <Loader2 className="w-6 h-6 animate-spin text-mint-500" />
+                </div>
+              ) : report ? (
+                <>
+                  {report.error && (
+                    <Card><CardContent className="py-4 text-sm text-red-400">{report.error}</CardContent></Card>
+                  )}
+
+                  {/* By cashier summary */}
+                  {report.by_cashier?.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          По официантам
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border/50 text-muted-foreground">
+                                <th className="text-left py-2 pr-4">Официант</th>
+                                <th className="text-right py-2 px-3">Чеков</th>
+                                <th className="text-right py-2 px-3">Позиций</th>
+                                <th className="text-right py-2 px-3">Скидки</th>
+                                <th className="text-right py-2 pl-3">Выручка</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {report.by_cashier.map((c, i) => (
+                                <tr key={i} className="border-b border-border/20 hover:bg-muted/30 cursor-pointer" onClick={() => { setReportCashier(c.cashier); fetchReport(); }} data-testid={`cashier-row-${i}`}>
+                                  <td className="py-2.5 pr-4 font-medium">{c.cashier}</td>
+                                  <td className="text-right py-2.5 px-3 text-muted-foreground">{c.receipts}</td>
+                                  <td className="text-right py-2.5 px-3 text-muted-foreground">{c.items}</td>
+                                  <td className="text-right py-2.5 px-3 text-muted-foreground">{c.discount} BYN</td>
+                                  <td className="text-right py-2.5 pl-3 font-semibold">{c.revenue} BYN</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Receipts table */}
+                  {report.receipts?.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Детализация ({report.total_receipts} записей)</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-border/50 text-muted-foreground text-xs">
+                                <th className="text-left py-2 pr-2">Дата</th>
+                                <th className="text-left py-2 px-2">Официант</th>
+                                <th className="text-left py-2 px-2">Товар</th>
+                                <th className="text-right py-2 px-2">Кол-во</th>
+                                <th className="text-right py-2 px-2">Цена</th>
+                                <th className="text-right py-2 pl-2">Сумма</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {report.receipts.map((r, i) => (
+                                <tr key={i} className="border-b border-border/10 text-xs">
+                                  <td className="py-1.5 pr-2 text-muted-foreground whitespace-nowrap">{r.date} {r.time}</td>
+                                  <td className="py-1.5 px-2">{r.cashier}</td>
+                                  <td className="py-1.5 px-2 max-w-[200px] truncate">{r.product}</td>
+                                  <td className="text-right py-1.5 px-2 text-muted-foreground">{r.qty}</td>
+                                  <td className="text-right py-1.5 px-2 text-muted-foreground">{r.price}</td>
+                                  <td className="text-right py-1.5 pl-2 font-medium">{r.sum}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {!report.by_cashier?.length && !report.error && (
+                    <Card><CardContent className="py-8 text-center text-muted-foreground">Нет данных за выбранный период</CardContent></Card>
+                  )}
+                </>
+              ) : (
+                <Card>
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    Нажмите «Загрузить» для получения отчёта реализации из Caffesta
                   </CardContent>
                 </Card>
               )}
