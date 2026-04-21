@@ -44,6 +44,9 @@ export default function ClientMenuPage() {
 
   // Category scroll state
   const categoryScrollRef = useRef(null);
+  const headerRef = useRef(null);
+  const categoryRefs = useRef({});
+  const isProgrammaticScrollRef = useRef(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [showSwipeHint, setShowSwipeHint] = useState(true);
@@ -156,6 +159,66 @@ export default function ClientMenuPage() {
     }
   }, [selectedSection, sectionCategories]);
 
+  // Scroll to top when switching sections (avoid staying mid-page on old content)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [selectedSection]);
+
+  // Scroll to category section (with sticky header offset)
+  const scrollToCategory = useCallback((catId) => {
+    setSelectedCategory(catId);
+    setShowSwipeHint(false);
+    const el = categoryRefs.current[catId];
+    if (!el) return;
+    const headerHeight = headerRef.current?.offsetHeight || 0;
+    const top = el.getBoundingClientRect().top + window.scrollY - headerHeight - 8;
+    isProgrammaticScrollRef.current = true;
+    window.scrollTo({ top, behavior: 'smooth' });
+    window.clearTimeout(scrollToCategory._t);
+    scrollToCategory._t = window.setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, 700);
+  }, []);
+
+  // IntersectionObserver — ScrollSpy: auto-highlight active category while scrolling
+  useEffect(() => {
+    if (!sectionCategories.length) return;
+    const headerHeight = headerRef.current?.offsetHeight || 0;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (isProgrammaticScrollRef.current) return;
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length > 0) {
+          const catId = visible[0].target.dataset.categoryId;
+          if (catId) setSelectedCategory(catId);
+        }
+      },
+      {
+        root: null,
+        rootMargin: `-${headerHeight + 8}px 0px -55% 0px`,
+        threshold: 0,
+      }
+    );
+    sectionCategories.forEach(cat => {
+      const el = categoryRefs.current[cat.id];
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [sectionCategories, data, selectedSection]);
+
+  // Auto-scroll the horizontal category tabs to keep the active one centered
+  useEffect(() => {
+    if (!selectedCategory) return;
+    const container = categoryScrollRef.current;
+    if (!container) return;
+    const btn = container.querySelector(`[data-category-btn-id="${selectedCategory}"]`);
+    if (!btn) return;
+    const target = btn.offsetLeft - container.clientWidth / 2 + btn.clientWidth / 2;
+    container.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+  }, [selectedCategory]);
+
   const addToCart = (item) => {
     if (item.is_banner) return; // Don't add banners to cart
     
@@ -257,10 +320,7 @@ export default function ClientMenuPage() {
     }
   };
 
-  const filteredItems = data?.items.filter(item => item.category_id === selectedCategory) || [];
   const currency = data?.settings?.currency || 'BYN';
-  const currentCategory = data?.categories.find(cat => cat.id === selectedCategory);
-  const displayMode = currentCategory?.display_mode || 'card';
 
   if (loading) {
     return (
@@ -294,7 +354,7 @@ export default function ClientMenuPage() {
   return (
     <div className="min-h-screen bg-background" data-testid="client-menu-page">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border">
+      <header ref={headerRef} className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border">
         <div className="px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -396,7 +456,8 @@ export default function ClientMenuPage() {
                   {sectionCategories.map((cat) => (
                     <button
                       key={cat.id}
-                      onClick={() => { setSelectedCategory(cat.id); setShowSwipeHint(false); }}
+                      data-category-btn-id={cat.id}
+                      onClick={() => scrollToCategory(cat.id)}
                       className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
                         selectedCategory === cat.id
                           ? 'bg-brown-500 text-white'
@@ -486,190 +547,194 @@ export default function ClientMenuPage() {
           </div>
         )}
 
-        <div className={displayMode === 'compact' ? 'space-y-1' : 'space-y-4'} data-testid="menu-items-grid">
-          {filteredItems.length === 0 ? (
+        <div className="space-y-8" data-testid="menu-items-grid">
+          {sectionCategories.length === 0 ? (
             <div className="text-center py-12">
               <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">В этой категории пока нет позиций</p>
+              <p className="text-muted-foreground">В этом разделе пока нет категорий</p>
             </div>
           ) : (
-            <>
-              {/* Compact mode - list view */}
-              {displayMode === 'compact' && (
-                <div className="bg-card rounded-2xl shadow-md overflow-hidden">
-                  {filteredItems.map((item, index) => (
-                    item.is_banner ? (
-                      // Banner in compact mode
-                      <div
-                        key={item.id}
-                        className="p-4 border-b border-border last:border-b-0"
-                        data-testid={`banner-${item.id}`}
-                      >
-                        {item.image_url && (
-                          <img src={item.image_url} alt={item.name} className="w-full h-auto rounded-lg mb-2" />
-                        )}
-                        {item.name && <h3 className="font-heading font-semibold text-foreground">{item.name}</h3>}
-                        {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
-                      </div>
-                    ) : (
-                      // Compact menu item - just name, weight, price
-                      <div
-                        key={item.id}
-                        className={`flex items-center justify-between px-4 py-3 ${index !== filteredItems.length - 1 ? 'border-b border-border/50' : ''}`}
-                        data-testid={`menu-item-${item.id}`}
-                      >
-                        <div className="flex-1 min-w-0 pr-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-foreground truncate">{item.name}</span>
-                            {item.is_hit && <Star className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
-                            {item.is_new && <Sparkles className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
-                            {(item.label_ids || []).map(lid => {
-                              const lbl = labelsMap[lid];
-                              return lbl ? (
-                                <span key={lid} className="text-[10px] font-medium px-1.5 py-0 rounded-full text-white flex-shrink-0" style={{ backgroundColor: lbl.color }}>
-                                  {lbl.name}
-                                </span>
-                              ) : null;
-                            })}
-                          </div>
-                          {item.weight && (
-                            <span className="text-xs text-muted-foreground">{item.weight}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <span className="font-bold text-mint-500 whitespace-nowrap">{item.price} {currency}</span>
-                          {settings.online_orders_enabled && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 rounded-full hover:bg-mint-100 dark:hover:bg-mint-900/30 p-0"
-                              onClick={() => addToCart(item)}
-                              data-testid={`add-to-cart-${item.id}`}
-                            >
-                              <Plus className="w-4 h-4 text-mint-500" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  ))}
-                </div>
-              )}
+            sectionCategories.map((cat) => {
+              const catItems = (data?.items || []).filter(i => i.category_id === cat.id);
+              if (catItems.length === 0) return null;
+              const mode = cat.display_mode || 'card';
+              return (
+                <section
+                  key={cat.id}
+                  ref={(el) => { if (el) categoryRefs.current[cat.id] = el; else delete categoryRefs.current[cat.id]; }}
+                  data-category-id={cat.id}
+                  data-testid={`category-section-${cat.id}`}
+                  className="scroll-mt-4"
+                >
+                  <h2 className="font-heading font-bold text-base text-foreground mb-3 px-1 flex items-center gap-2">
+                    <span className="w-1 h-5 rounded-full bg-mint-500" />
+                    {cat.name}
+                  </h2>
 
-              {/* Card mode - original view with images */}
-              {displayMode === 'card' && filteredItems.map((item) => (
-                item.is_banner ? (
-                  // Banner item - full width image
-                  <div
-                    key={item.id}
-                    className="rounded-2xl overflow-hidden shadow-md"
-                    data-testid={`banner-${item.id}`}
-                  >
-                    {item.image_url && (
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        className="w-full h-auto object-cover"
-                      />
-                    )}
-                    {(item.name || item.description) && (
-                      <div className="p-4 bg-card">
-                        {item.name && (
-                          <h3 className="font-heading font-semibold text-foreground">{item.name}</h3>
-                        )}
-                        {item.description && (
-                          <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  // Regular menu item with image
-                  <div
-                    key={item.id}
-                    className="bg-card rounded-2xl shadow-md overflow-hidden menu-item-card"
-                    data-testid={`menu-item-${item.id}`}
-                  >
-                    <div className="flex">
-                      {/* Image */}
-                      <div className="w-28 h-28 flex-shrink-0 bg-muted">
-                        {item.image_url ? (
-                          <img
-                            src={item.image_url}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                          />
+                  {mode === 'compact' ? (
+                    <div className="bg-card rounded-2xl shadow-md overflow-hidden">
+                      {catItems.map((item, index) => (
+                        item.is_banner ? (
+                          <div
+                            key={item.id}
+                            className={`p-4 ${index !== catItems.length - 1 ? 'border-b border-border' : ''}`}
+                            data-testid={`banner-${item.id}`}
+                          >
+                            {item.image_url && (
+                              <img src={item.image_url} alt={item.name} className="w-full h-auto rounded-lg mb-2" />
+                            )}
+                            {item.name && <h3 className="font-heading font-semibold text-foreground">{item.name}</h3>}
+                            {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
+                          </div>
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
+                          <div
+                            key={item.id}
+                            className={`flex items-center justify-between px-4 py-3 ${index !== catItems.length - 1 ? 'border-b border-border/50' : ''}`}
+                            data-testid={`menu-item-${item.id}`}
+                          >
+                            <div className="flex-1 min-w-0 pr-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-foreground truncate">{item.name}</span>
+                                {item.is_hit && <Star className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
+                                {item.is_new && <Sparkles className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
+                                {(item.label_ids || []).map(lid => {
+                                  const lbl = labelsMap[lid];
+                                  return lbl ? (
+                                    <span key={lid} className="text-[10px] font-medium px-1.5 py-0 rounded-full text-white flex-shrink-0" style={{ backgroundColor: lbl.color }}>
+                                      {lbl.name}
+                                    </span>
+                                  ) : null;
+                                })}
+                              </div>
+                              {item.weight && (
+                                <span className="text-xs text-muted-foreground">{item.weight}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              <span className="font-bold text-mint-500 whitespace-nowrap">{item.price} {currency}</span>
+                              {settings.online_orders_enabled && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 rounded-full hover:bg-mint-100 dark:hover:bg-mint-900/30 p-0"
+                                  onClick={() => addToCart(item)}
+                                  data-testid={`add-to-cart-${item.id}`}
+                                >
+                                  <Plus className="w-4 h-4 text-mint-500" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 p-3 flex flex-col">
-                        <div className="flex-1">
-                          <div className="flex items-start gap-1 flex-wrap mb-1">
-                            <h3 className="font-heading font-semibold text-foreground text-sm leading-tight">
-                              {item.name}
-                            </h3>
-                            {item.is_hit && (
-                              <Badge className="bg-red-500 text-white text-[10px] px-1.5 py-0">
-                                <Star className="w-3 h-3 mr-0.5" />Хит
-                              </Badge>
-                            )}
-                            {item.is_new && (
-                              <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0">
-                                <Sparkles className="w-3 h-3 mr-0.5" />Новинка
-                              </Badge>
-                            )}
-                            {item.is_spicy && (
-                              <Badge className="bg-orange-500 text-white text-[10px] px-1.5 py-0">
-                                <Flame className="w-3 h-3 mr-0.5" />Острое
-                              </Badge>
-                            )}
-                            {(item.label_ids || []).map(lid => {
-                              const lbl = labelsMap[lid];
-                              return lbl ? (
-                                <Badge key={lid} className="text-white text-[10px] px-1.5 py-0" style={{ backgroundColor: lbl.color }}>
-                                  {lbl.name}
-                                </Badge>
-                              ) : null;
-                            })}
-                          </div>
-                          
-                          {item.description && (
-                            <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                              {item.description}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-bold text-mint-500">{item.price} {currency}</span>
-                            {item.weight && (
-                              <span className="text-xs text-muted-foreground ml-2">{item.weight}</span>
-                            )}
-                          </div>
-                          
-                          {settings.online_orders_enabled && (
-                            <Button
-                              size="sm"
-                              className="h-8 rounded-full bg-mint-500 hover:bg-mint-600 text-white px-3"
-                              onClick={() => addToCart(item)}
-                              data-testid={`add-to-cart-${item.id}`}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
+                        )
+                      ))}
                     </div>
-                  </div>
-                )
-              ))}
-            </>
+                  ) : (
+                    <div className="space-y-4">
+                      {catItems.map((item) => (
+                        item.is_banner ? (
+                          <div
+                            key={item.id}
+                            className="rounded-2xl overflow-hidden shadow-md"
+                            data-testid={`banner-${item.id}`}
+                          >
+                            {item.image_url && (
+                              <img src={item.image_url} alt={item.name} className="w-full h-auto object-cover" />
+                            )}
+                            {(item.name || item.description) && (
+                              <div className="p-4 bg-card">
+                                {item.name && (
+                                  <h3 className="font-heading font-semibold text-foreground">{item.name}</h3>
+                                )}
+                                {item.description && (
+                                  <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            key={item.id}
+                            className="bg-card rounded-2xl shadow-md overflow-hidden menu-item-card"
+                            data-testid={`menu-item-${item.id}`}
+                          >
+                            <div className="flex">
+                              <div className="w-28 h-28 flex-shrink-0 bg-muted">
+                                {item.image_url ? (
+                                  <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex-1 p-3 flex flex-col">
+                                <div className="flex-1">
+                                  <div className="flex items-start gap-1 flex-wrap mb-1">
+                                    <h3 className="font-heading font-semibold text-foreground text-sm leading-tight">
+                                      {item.name}
+                                    </h3>
+                                    {item.is_hit && (
+                                      <Badge className="bg-red-500 text-white text-[10px] px-1.5 py-0">
+                                        <Star className="w-3 h-3 mr-0.5" />Хит
+                                      </Badge>
+                                    )}
+                                    {item.is_new && (
+                                      <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0">
+                                        <Sparkles className="w-3 h-3 mr-0.5" />Новинка
+                                      </Badge>
+                                    )}
+                                    {item.is_spicy && (
+                                      <Badge className="bg-orange-500 text-white text-[10px] px-1.5 py-0">
+                                        <Flame className="w-3 h-3 mr-0.5" />Острое
+                                      </Badge>
+                                    )}
+                                    {(item.label_ids || []).map(lid => {
+                                      const lbl = labelsMap[lid];
+                                      return lbl ? (
+                                        <Badge key={lid} className="text-white text-[10px] px-1.5 py-0" style={{ backgroundColor: lbl.color }}>
+                                          {lbl.name}
+                                        </Badge>
+                                      ) : null;
+                                    })}
+                                  </div>
+
+                                  {item.description && (
+                                    <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                                      {item.description}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <span className="font-bold text-mint-500">{item.price} {currency}</span>
+                                    {item.weight && (
+                                      <span className="text-xs text-muted-foreground ml-2">{item.weight}</span>
+                                    )}
+                                  </div>
+
+                                  {settings.online_orders_enabled && (
+                                    <Button
+                                      size="sm"
+                                      className="h-8 rounded-full bg-mint-500 hover:bg-mint-600 text-white px-3"
+                                      onClick={() => addToCart(item)}
+                                      data-testid={`add-to-cart-${item.id}`}
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })
           )}
         </div>
       </main>

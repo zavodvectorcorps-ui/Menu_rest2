@@ -19,7 +19,7 @@ except ImportError:
     WEBSOCKETS_AVAILABLE = False
     print("websockets library not installed")
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://table-tracker-28.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://order-hub-pro-5.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 ADMIN_USERNAME = "admin"

@@ -1,165 +1,157 @@
-<analysis>**original_problem_statement:**
-Пользователь хочет создать веб-приложение Личный кабинет ресторана (аналог LunchPad) с мультитенантной архитектурой для поддержки нескольких заведений.
+<analysis>**original_problem_statement**: 
+Пользователь хочет создать веб-приложение Личный кабинет ресторана с мультитенантной архитектурой. 
+PRODUCT REQUIREMENTS: 
+1. Мультитенантная архитектура (роли суперадмин, менеджер).
+2. Аналитика продаж и вызовов.
+3. Управление меню, импорт из  и , управление метками (хит, новинка).
+4. Кастомные URL (slug) для клиентского меню и генерация QR-кодов.
+5. Система заказов, предзаказов и WebSocket-уведомлений (со звуком) для админ-панели.
+6. Интеграция с Telegram-ботом (кнопки управления статусами заказов, уведомления).
+7. Интеграция с Caffesta POS (отправка заказов, подтягивание тех. карт и товаров, маппинг блюд, аналитика продаж по официантам).
+8. Подготовка инфраструктуры (Docker, Nginx) для деплоя на собственный внешний VPS-сервер и экспорт базы данных/изображений.
 
-**PRODUCT REQUIREMENTS:**
-1.  **Архитектура и Роли:** Мультитенантная система с ролями суперадмин и менеджер.
-2.  **Аналитика:** Отдельная страница с графиками (выручка, средний чек, количество заказов).
-3.  **Управление меню:**
-    *   Загрузка изображений для блюд.
-    *   Импорт меню из файлов  и  (LunchPad) с выбором режима: полностью заменить или дополнить.
-    *   Поддержка импорта баннеров, вложенных категорий и разных форматов цен из файлов .
-    *   Возможность добавлять настраиваемые ярлыки (Хит, Новинка) к блюдам.
-    *   Быстрое управление активностью категории и режимом её отображения (карточки / список).
-4.  **Управление столами и URL:**
-    *   Генерация QR-кодов для столов.
-    *   Возможность задавать кастомный  для ресторана, чтобы клиентское меню открывалось по URL вида .
-5.  **Заказы и Уведомления:**
-    *   Реализовать систему предзаказов через специальный стол Предзаказ с формой для клиента (имя, телефон, дата, время).
-    *   Реализовать WebSocket-уведомления в реальном времени (со звуком, toast-сообщениями и счетчиком) в админ-панели для новых заказов и вызовов персонала.
-    *   В админ-панели добавить кнопки для массового завершения всех активных заказов и вызовов.
-6.  **Интеграция с Telegram:**
-    *   Для каждого ресторана должен быть свой бот, отправляющий уведомления о новых заказах и вызовах персонала.
-    *   Бот должен позволять управлять статусом заказа (принять, завершить, отменить) с помощью inline-кнопок и команд (, ).
-    *   Клиент должен видеть трекер статуса своего заказа после его оформления.
-7.  **Интерфейс:**
-    *   Добавить футер Made by Knyazev на все страницы.
-    *   Заменить логотип на странице входа и добавить favicon для сайта.
+**User's preferred language**: Russian (Русский). **INSTRUCT NEXT AGENT TO RESPOND IN THE USER'S PREFERRED LANGUAGE ONLY.**
 
-**User's preferred language**: Русский
+**what currently exists?** 
+Создано полнофункциональное production-ready приложение (FastAPI, MongoDB, React). Настроены WebSockets, кастомные URL (), Telegram-бот полностью функционален (с исправленным парсингом HTML). Реализована полная двусторонняя интеграция с Caffesta POS (отправка заказов, загрузка товаров и тех. карт в Combobox, аналитика по официантам с безопасным парсингом). Подготовлены файлы для миграции на внешний VPS (, , скрипты деплоя) и созданы эндпоинты выгрузки бэкапа MongoDB и файлового хранилища (, ).
 
-**what currently exists?**
-Создано полнофункциональное мультитенантное веб-приложение.
--   **Backend (FastAPI/MongoDB):** Реализована модульная архитектура (, , ). JWT-аутентификация с ролями, API для аналитики, управления пользователями, меню, столами, заказами и ярлыками. Реализован импорт меню из файлов , фоновая загрузка изображений, предзаказы и массовое закрытие заказов/вызовов. Интегрированы WebSocket для real-time уведомлений и Telegram-бот для управления заказами.
--   **Frontend (React):** Реализованы все необходимые страницы (вход, аналитика, пользователи, меню, заказы, настройки Telegram). Админ-панель имеет переключатель ресторанов. Страница заказов обновляется в реальном времени через WebSocket, отображает toast-уведомления и счетчик новых заказов. Клиентское меню показывает трекер статуса заказа после его оформления. Компоненты () были рефакторены для лучшей поддержки.
+**Last working item**: 
+    - **Last item agent was working**: Переработка  для отображения всех блюд единым скроллируемым списком (continuous scroll). Вместо переключения табов категорий, табы теперь должны работать как якорные ссылки, а блюда выводиться списком с разбивкой по категориям.
+    - **Status**: IN PROGRESS
+    - **Agent Testing Done**: N
+    - **Which testing method agent to use?**: Frontend testing agent
+    - **User Testing Done**: N
 
-**Last working item**:
--   **Last item agent was working:** Реализация кастомных URL для клиентского меню. Пользователь хочет, чтобы вместо  использовался формат , где  задается в настройках ресторана.
--   **Status:** IN PROGRESS
--   **Agent Testing Done:** N
--   **Which testing method agent to use?** both
--   **User Testing Done:** N
+**All Pending/In progress Issue list**: 
+  Issue 1: Сделать все блюда в клиентском меню видимыми при пролистывании вниз.
+     - Attempted fixes: Агент только начал просмотр файла , чтобы понять текущую логику фильтрации ().
+     - Next debug checklist: 
+       1. Изменить логику рендера в : вместо  мапить все категории и внутри них мапить блюда.
+       2. Обновить верхний слайдер категорий: клик по категории должен скроллить к соответствующему блоку (якорные ссылки).
+       3. Желательно добавить  (Scrollspy), чтобы при скролле активная категория в верхнем слайдере подсвечивалась автоматически.
+     - Why fix this issue and what will be achieved with the fix?: Улучшение UX по прямой просьбе пользователя — клиентам ресторана удобнее скроллить всё меню вниз, чем переключать вкладки.
+     - Status: IN PROGRESS
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix?: Frontend
+     - Blocked on other issue: None
 
-**All Pending/In progress Issue list**:
--   Нет нерешенных проблем. Текущая работа - это реализация новой функции.
-
-**In progress Task List**:
--   **Task 1:** (P0) Реализовать кастомные URL-адреса (slugs) для клиентского меню.
-    -   **Where to resume:** Начать реализацию с бэкенда.
-        1.  Добавить поле  в Pydantic-модель  и в MongoDB-модель в файле .
-        2.  Обновить эндпоинт обновления ресторана в  для сохранения слага.
-        3.  Создать новый публичный эндпоинт в , который будет находить ресторан по  и стол по номеру для отдачи меню.
-        4.  Перейти к фронтенду.
-    -   **What will be achieved with this?** Клиентские меню будут доступны по интуитивно понятным, настраиваемым URL-адресам, например, .
-    -   **Status:** IN PROGRESS
-    -   **Should Test frontend/backend/both after fix?** both
-    -   **Blocked on something:** None
+**In progress Task List**: 
+  - Task 1: Переработка  (см. Issue 1).
+     - Where to resume: Файл .
+     - What will be achieved with this?: Непрерывный скролл всех блюд меню.
+     - Status: IN PROGRESS
+     - Should Test frontend/backend/both after fix?: Frontend
+     - Blocked on something: None
 
 **Upcoming and Future Tasks**
--   **Upcoming Tasks:**
-    -   (P1) Интеграция с POS-системой **Caffesta**. (Статус: **BLOCKED**, ожидаем от пользователя документацию по API).
+    Upcoming Tasks:
+    - (P1) Автоматический массовый маппинг блюд с товарами Caffesta по названию (fuzzy match).
+    - (P1) Синхронизация стоп-листа из Caffesta.
+    Future Tasks:
+    - (P2) Мультиязычность клиентского меню.
+    - (P2) Экспорт отчётов (Excel/PDF).
+    - (P2) Система лояльности.
 
 **Completed work in this session**
--   **Реализация предзаказов и массовых действий:** Внедрена и протестирована система предзаказов и кнопки Завершить все для заказов/вызовов.
--   **Масштабный рефакторинг:**
-    -   **Backend:** Монолитный  разбит на модули (, , , ).
-    -   **Frontend:** Компонент  разбит на более мелкие (, , ).
--   **Real-time уведомления:**
-    -   Реализованы WebSocket для мгновенного обновления данных в админ-панели (новые заказы, вызовы).
-    -   Добавлены индикатор подключения, звуковые и toast-уведомления.
--   **Счетчик уведомлений:** Реализован бейдж на пункте меню Заказы, который показывает количество новых заказов.
--   **Расширение функционала Telegram-бота:**
-    -   Добавлены inline-кнопки для управления статусом заказа.
-    -   Реализован трекер статуса заказа на стороне клиента.
--   **Исправление багов:**
-    -   Устранена ошибка  при обновлении статуса вызова персонала.
-    -   Исправлена работа кнопок в уведомлениях Telegram.
--   **Улучшения UI/UX:**
-    -   Добавлен favicon для сайта.
+- Реализация кастомных URL (slugs) для клиентского меню () (DONE)
+- Улучшение UI категорий на мобильном (анимация свайпа, двойные стрелки) (DONE)
+- Исправление бага кнопок Telegram-бота: добавлено  для спецсимволов  в названиях блюд (DONE)
+- Интеграция Caffesta POS (отправка заказов, аналитика, маппинг) (DONE)
+- Выпадающий список (Combobox) с автозагрузкой товаров и тех.карт () из Caffesta в редакторе блюд (DONE)
+- Исправление бага 500 и  в статистике Caffesta () (DONE)
+- Создание инфраструктуры для деплоя на внешний VPS: , , Dockerfiles (DONE)
+- Создание эндпоинтов резервного копирования:  и  (DONE)
 
 **Earlier issues found/mentioned but not fixed**
--   None.
+   - None
 
 **Known issue recurrence from previous fork**
--   None.
+  - Recurrence count: 0
+  - Status: RESOLVED
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **Backend:** FastAPI, MongoDB (motor), Pydantic, JWT (), WebSockets, , .
--   **Frontend:** React, React Router, Tailwind CSS, , , , Custom Hooks.
--   **Архитектура:** Мультитенантность, REST API, Модульный бэкенд, Real-time через WebSockets.
+- Frontend: React, Tailwind CSS, Shadcn UI (, ), IntersectionObserver (needed for next step)
+- Backend: FastAPI, MongoDB (Motor), Pydantic
+- 3rd Party POS: Caffesta API (Headers: )
+- Infra: Docker Compose, Nginx Reverse Proxy, Bash scripting
 
 **key DB schema**
--   ****: {id, name, owner_id, telegram_bot_token, telegram_chat_id, **slug: str (to be added)**}
--   ****: {id, username, hashed_password, role, allowed_restaurant_ids}
--   ****: {id, restaurant_id, table_number, items, total, status, is_preorder: bool, preorder_details: dict}
--   ****: {id, restaurant_id, number, code, is_preorder: bool}
--   *... и другие коллекции (categories, menu_items, staff_calls, labels)*
+  - : {restaurant_id, account_name, api_key, pos_id, payment_id, enabled}
+  - : added 
+  - : added 
 
 **changes in tech stack**
--   None
+  - Added Docker, Nginx configs, and shell deployment scripts to support independent VPS migration.
 
-**All files of reference**
--   : Нужно будет обновить, добавив поле .
--   : Нужно будет обновить для сохранения .
--   : Нужно будет добавить новый эндпоинт.
--   : Нужно будет обновить логику генерации QR-кода.
--   : Нужно будет добавить поле для ввода .
--   : Нужно будет добавить новый маршрут для .
+**All files of reference** 
+-  (CURRENT FOCUS - needs continuous scrolling refactor)
+-  (Contains the POS logic; note the  helper to prevent 500s)
+-  (Caffesta UI settings & analytics)
+-  (Contains Combobox integration for Caffesta dish mapping)
+-  (Endpoints serving  and )
+-  &  (Docs created for the user's VPS migration)
 
-**Areas that need refactoring**:
--   Значительный рефакторинг уже был проведен. В данный момент новых требований по рефакторингу нет.
+**Areas that need refactoring**: 
+- : Needs a structural update. Currently, it relies on a  state that filters  into . This must be changed to render ALL categories and their items, turning the category header into a sticky anchor navigation with scroll tracking (ScrollSpy logic).
 
 **key api endpoints**
--   : Будет использоваться для сохранения .
--   : Существующий эндпоинт для меню.
--   **NEW (to be created):** : Новый эндпоинт.
--   : WebSocket для админ-панели.
+- 
+-  (Automatically pushes to Caffesta if configured)
+- 
+- 
+- 
 
-**Critical Info for New Agent**
--   Основная задача — реализация кастомных URL-адресов () для клиентских меню. План подтвержден пользователем.
--   Реализация затрагивает как бэкенд (модель БД, новый API-эндпоинт), так и фронтенд (UI в настройках, роутинг).
--   Необходимо обновить логику генерации QR-кодов, чтобы они указывали на новые URL-адреса.
--   Пользователь уточнил, что для стола Предзаказ должен сохраниться старый формат ссылки (), чтобы не сломать существующие QR-коды для этой функции. Это нужно учесть при реализации.
+**Critical Info for New Agent** 
+- The user is preparing to migrate away from the Emergent platform to their own VPS. Do NOT delete or modify the , , or  files unless specifically requested.
+- **Caffesta Integration Alert**: Caffesta API can sometimes return empty responses that break . A custom  parser was added. If making new Caffesta API calls, ALWAYS use  instead of . Also, previously there was a  bug where  called itself - ensure this doesn't come back.
+- **Next step**: User explicitly asked: *давай в меню сделаем что бы все блюда были видны пролистывая вниз, а не только при открытии категории*. Proceed to modify  to show all dishes grouped by categories in a single scrolling view.
 
-**documents and test reports created in this job**
--   
--   Множество отчетов о тестировании в , последний из которых подтвердил успешность реализации расширения для Telegram-бота.
+**documents and test reports created in this job** 
+  - 
+  - 
+  - 
+  - 
 
-**Last 10 User Messages and any pending HUMAN messages**
-1.  **#298:** Пользователь подтверждает план по  и просит оставить старую схему URL для стола Предзаказ. **(PENDING IMPLEMENTATION)**
-2.  **#296:** Агент предлагает план по реализации кастомных URL.
-3.  **#295:** Пользователь просит изменить URL клиентского меню с  на . **(PENDING IMPLEMENTATION)**
-4.  **#276:** Пользователь просит добавить favicon. **(RESOLVED)**
-5.  **#274:** Агент подтверждает, что WebSocket работает в превью-окружении.
-6.  **#257:** Пользователь сообщает о багах: ошибка 422 при обновлении статуса вызова и неработающие кнопки в Telegram. **(RESOLVED)**
-7.  **#198:** Пользователь подтверждает, что хочет все предложенные функции для Telegram-бота. **(RESOLVED)**
-8.  **#196:** Агент предлагает план по расширению функционала Telegram-бота.
-9.  **#195:** Пользователь просит расширить функционал Telegram-бота. **(RESOLVED)**
-10. **#166:** Пользователь просит добавить счетчик уведомлений. **(RESOLVED)**
+**Last 10 User Messages and any pending HUMAN messages** 
+ - User: Make all menu items visible by scrolling down instead of clicking categories. (PENDING IMPLEMENTATION)
+ - User:  URL not found. (RESOLVED - File was too large for browser, guided to use )
+ - User: Give detailed instructions on how to migrate the project to VPS. (RESOLVED)
+ - User: What if from the preview environment? (RESOLVED - It is the prod environment, dumps are ready)
+ - User: Support query about Emergent regional restrictions. (RESOLVED)
+ - User: Expecting value: line 1 column 1 in report. (RESOLVED - Caffesta empty response handled)
+ - User: Tech cards () are missing from Caffesta product load. (RESOLVED)
+ - User: Caffesta stats disappeared completely with unknown error (RESOLVED - Fixed recursion bug in safe json parser)
 
 **Project Health Check:**
--   **Broken:** None.
--   **Mocked:** None.
+- Broken: None
+- Mocked: Caffesta (when keys are missing on preview, gracefully returns Caffesta не настроена)
 
-**3rd Party Integrations**
--   **Telegram Bot API:** Для уведомлений и управления заказами.
--   ****: Хеширование паролей.
--   ****: Работа с JWT.
--   ****: Генерация QR-кодов.
--   ****: Графики на фронтенде.
+**3rd Party Integrations** 
+ - Telegram Bot API — requires User Bot Token
+ - Caffesta POS API — requires User API Key () & Account Name
 
 **Testing status**
--   **Testing agent used after significant changes:** YES.
--   **Troubleshoot agent used after agent stuck in loop:** NO.
--   **Test files created:** None.
--   **Known regressions:** None. Последний запуск тестов прошел успешно.
+  - Testing agent used after significant changes: YES
+  - Troubleshoot agent used after agent stuck in loop: NO
+  - Test files created: None
+  - Known regressions: None
 
 **Credentials to test flow:**
--   **Роль:** Суперадмин
--   **Логин:** 
--   **Пароль:** 
+Admin user:  / 
 
 **What agent forgot to execute**
--   Интеграция с **Caffesta** отложена и находится в статусе , так как ожидается информация от пользователя. Других забытых задач нет.</analysis>
+Agent was just reading the  file to implement the continuous scroll request but context ended. Pick it up from there immediately.
+
+**Debugging checklist for current issue**
+    Issue: Client menu needs continuous vertical scroll instead of category tabs.
+    Frontend files to check: 
+    - 
+    Steps to fix:
+    1. Remove filtering by .
+    2. Map over all , and for each category, map its associated items.
+    3. Add refs to category sections for scrolling.
+    4. Implement an  on the category blocks to update the active tab in the sticky top nav as the user scrolls.
+    5. Test scrolling performance on mobile view via Screenshot tool.</analysis>

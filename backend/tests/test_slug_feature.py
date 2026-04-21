@@ -240,7 +240,7 @@ class TestQRCodeWithSlug:
         assert table is not None, "Table #1 not found"
         
         # Get QR code
-        base_url = "https://table-tracker-28.preview.emergentagent.com"
+        base_url = "https://order-hub-pro-5.preview.emergentagent.com"
         response = requests.get(
             f"{BASE_URL}/api/restaurants/{RESTAURANT_WITH_SLUG}/tables/{table['id']}/qr?base_url={base_url}",
             headers=auth_headers
@@ -279,7 +279,7 @@ class TestQRCodeWithSlug:
         table = tables[0]
         
         # Get QR code
-        base_url = "https://table-tracker-28.preview.emergentagent.com"
+        base_url = "https://order-hub-pro-5.preview.emergentagent.com"
         response = requests.get(
             f"{BASE_URL}/api/restaurants/{RESTAURANT_WITHOUT_SLUG}/tables/{table['id']}/qr?base_url={base_url}",
             headers=auth_headers
