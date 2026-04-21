@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ImageIcon, Clock, MapPin, Phone, ChevronDown, Loader2, Hand } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ImageIcon, Clock, MapPin, Phone, ChevronDown, Loader2, Hand, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -41,6 +41,7 @@ export default function ClientMenuPage() {
     return null;
   });
   const [orderStatus, setOrderStatus] = useState(activeOrderId?.status || null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Category scroll state
   const categoryScrollRef = useRef(null);
@@ -151,7 +152,21 @@ export default function ClientMenuPage() {
   const sectionCategories = data?.categories.filter(cat => cat.section_id === selectedSection) || [];
   const labelsMap = {};
   (data?.labels || []).forEach(l => { labelsMap[l.id] = l; });
-  
+
+  // Search helpers
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const matchesQuery = (item) => {
+    if (!normalizedQuery) return true;
+    const n = (item.name || '').toLowerCase();
+    const d = (item.description || '').toLowerCase();
+    return n.includes(normalizedQuery) || d.includes(normalizedQuery);
+  };
+  const getCategoryItems = (catId) =>
+    (data?.items || []).filter(i => i.category_id === catId && matchesQuery(i));
+  // Categories of current section that have at least one matching item
+  const visibleCategories = sectionCategories.filter(cat => getCategoryItems(cat.id).length > 0);
+  const totalMatches = visibleCategories.reduce((acc, cat) => acc + getCategoryItems(cat.id).length, 0);
+
   // Set first category when section changes
   useEffect(() => {
     if (sectionCategories.length > 0 && !sectionCategories.find(c => c.id === selectedCategory)) {
@@ -206,7 +221,7 @@ export default function ClientMenuPage() {
       if (el) observer.observe(el);
     });
     return () => observer.disconnect();
-  }, [sectionCategories, data, selectedSection]);
+  }, [sectionCategories, data, selectedSection, normalizedQuery]);
 
   // Auto-scroll the horizontal category tabs to keep the active one centered
   useEffect(() => {
@@ -218,6 +233,8 @@ export default function ClientMenuPage() {
     const target = btn.offsetLeft - container.clientWidth / 2 + btn.clientWidth / 2;
     container.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
   }, [selectedCategory]);
+
+  // Search helpers moved above
 
   const addToCart = (item) => {
     if (item.is_banner) return; // Don't add banners to cart
@@ -410,8 +427,33 @@ export default function ClientMenuPage() {
           </div>
         </div>
 
+        {/* Search input */}
+        <div className="px-4 pb-3">
+          <div className="relative">
+            <Search className="w-4 h-4 text-muted-foreground/70 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Поиск по названию..."
+              className="w-full h-10 pl-9 pr-9 rounded-xl bg-muted/70 border border-transparent focus:border-mint-500 focus:bg-background outline-none text-sm text-foreground placeholder:text-muted-foreground/70 transition-colors"
+              data-testid="menu-search-input"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full hover:bg-muted flex items-center justify-center"
+                data-testid="menu-search-clear"
+                aria-label="Очистить поиск"
+              >
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Category tabs within section - improved mobile UX */}
-        {sectionCategories.length > 0 && (
+        {visibleCategories.length > 0 && (
           <div className="border-t border-border/50">
             {/* Title + swipe hint */}
             <div className="flex items-center justify-between px-4 pt-2.5 pb-1">
@@ -453,7 +495,7 @@ export default function ClientMenuPage() {
                 className="overflow-x-auto scrollbar-hide"
               >
                 <div className="flex px-4 py-2 gap-2 min-w-max">
-                  {sectionCategories.map((cat) => (
+                  {visibleCategories.map((cat) => (
                     <button
                       key={cat.id}
                       data-category-btn-id={cat.id}
@@ -553,9 +595,23 @@ export default function ClientMenuPage() {
               <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">В этом разделе пока нет категорий</p>
             </div>
+          ) : normalizedQuery && totalMatches === 0 ? (
+            <div className="text-center py-12" data-testid="menu-search-empty">
+              <Search className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">Ничего не найдено по запросу «{searchQuery}»</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 rounded-full"
+                onClick={() => setSearchQuery('')}
+                data-testid="menu-search-empty-clear"
+              >
+                Сбросить поиск
+              </Button>
+            </div>
           ) : (
             sectionCategories.map((cat) => {
-              const catItems = (data?.items || []).filter(i => i.category_id === cat.id);
+              const catItems = getCategoryItems(cat.id);
               if (catItems.length === 0) return null;
               const mode = cat.display_mode || 'card';
               return (
