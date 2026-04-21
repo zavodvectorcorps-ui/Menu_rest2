@@ -1,0 +1,443 @@
+[
+  {
+    "_id": {
+      "$oid": "6977a85337cac41daf3aca15"
+    },
+    "id": "e60bf70b-dfa0-4fa5-b691-d1127526ce6e",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "status": "completed",
+    "created_at": "2026-01-26T17:45:55.788295+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a8bb37cac41daf3aca1b"
+    },
+    "id": "13f338bc-c086-49a3-8105-3b4a32524d32",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "status": "completed",
+    "created_at": "2026-01-26T17:47:39.775290+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977aa5f37cac41daf3aca20"
+    },
+    "id": "f0e01ecc-5b10-428d-ba5b-e3c4edb0d922",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "status": "completed",
+    "created_at": "2026-01-26T17:54:39.534957+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977ab3437cac41daf3aca24"
+    },
+    "id": "da805f70-ea3c-48ad-a8fc-f6cd889898b6",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "status": "completed",
+    "created_at": "2026-01-26T17:58:12.829183+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977ac2037cac41daf3aca27"
+    },
+    "id": "f8cdddf5-7171-4367-b8f9-0acbdba49322",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "status": "completed",
+    "created_at": "2026-01-26T18:02:08.352888+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977adab24b7b113200131bb"
+    },
+    "id": "b0b9535c-3999-4554-89ed-449a5dcdb345",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "status": "completed",
+    "created_at": "2026-01-26T18:08:43.056148+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977ae0924b7b113200131bc"
+    },
+    "id": "2bcbbb9a-d7a9-475a-9d4b-bb7fab08b842",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "status": "completed",
+    "created_at": "2026-01-26T18:10:17.698333+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977b527a361594ed980b164"
+    },
+    "id": "56471987-7750-4d7b-8502-d228d9e84d1d",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "completed",
+    "created_at": "2026-01-26T18:40:39.639216+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977b55420bd7caa0f830650"
+    },
+    "id": "2740bdfa-cff1-44b2-bc41-cb9b606c413a",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "completed",
+    "created_at": "2026-01-26T18:41:24.671264+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977b5e320bd7caa0f830656"
+    },
+    "id": "26806a1c-b752-48cb-a777-3811d35c0cd6",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "completed",
+    "created_at": "2026-01-26T18:43:47.428342+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977ba783a9e0c3cddfa0911"
+    },
+    "id": "f200b9a1-33a0-4bde-8d5f-b0a6ea4ed4fc",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "completed",
+    "created_at": "2026-01-26T19:03:20.346431+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "69b0297acb65dd37689ef9ba"
+    },
+    "id": "717bb9ed-a878-4ea6-a2a4-0b619194b82b",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "completed",
+    "created_at": "2026-03-10T14:23:54.300351+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b02c738ac91512d02bc1d6"
+    },
+    "id": "cfc4f5d6-b16e-4317-9250-8e6ad0ebbc66",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "completed",
+    "created_at": "2026-03-10T14:36:35.797604+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b02c748ac91512d02bc1d7"
+    },
+    "id": "455254c5-99ce-4c2e-9137-94c6a5281d2c",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "completed",
+    "created_at": "2026-03-10T14:36:36.142563+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b02c748ac91512d02bc1d9"
+    },
+    "id": "e3118ce5-79f0-4c8a-a1ec-91e3cc686960",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "completed",
+    "created_at": "2026-03-10T14:36:36.989143+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b02cd28ac91512d02bc1dd"
+    },
+    "id": "6d569508-fc5d-4044-b796-583766c0c8c5",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "completed",
+    "created_at": "2026-03-10T14:38:10.481436+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b02cd28ac91512d02bc1de"
+    },
+    "id": "97acc999-9edc-42c1-97ee-b791ceb1422a",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "completed",
+    "created_at": "2026-03-10T14:38:10.970821+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b02cd38ac91512d02bc1e0"
+    },
+    "id": "d70c13bf-d3a3-4434-aca0-26fcc4681c9a",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "completed",
+    "created_at": "2026-03-10T14:38:11.839078+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0458713d3695be940d734"
+    },
+    "id": "0732ff4e-38b1-44af-9730-659e78b5eb41",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "completed",
+    "created_at": "2026-03-10T16:23:35.188668+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0459313d3695be940d735"
+    },
+    "id": "fea14031-15af-4799-a3e7-e3b9e50bef85",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-hookah",
+    "call_type_name": "Вызов кальянного мастера",
+    "status": "completed",
+    "created_at": "2026-03-10T16:23:47.174857+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0459a13d3695be940d736"
+    },
+    "id": "76bddb23-e808-41d5-bb5e-e2d8b9c02b27",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-bill",
+    "call_type_name": "Попросить счёт",
+    "status": "completed",
+    "created_at": "2026-03-10T16:23:54.008879+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b04646b20785506d0619b4"
+    },
+    "id": "fc6551b2-4f59-4f17-8a42-e168f2acbf90",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "completed",
+    "created_at": "2026-03-10T16:26:46.628565+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b04651b20785506d0619b5"
+    },
+    "id": "a45233a6-0e3c-4c93-815c-00be60e71cf1",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-hookah",
+    "call_type_name": "Вызов кальянного мастера",
+    "status": "completed",
+    "created_at": "2026-03-10T16:26:57.206610+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0465bb20785506d0619b6"
+    },
+    "id": "348200e6-9413-42e0-9058-792f06a51d63",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-bill",
+    "call_type_name": "Попросить счёт",
+    "status": "completed",
+    "created_at": "2026-03-10T16:27:07.879535+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b051119f634e091a7f4ab7"
+    },
+    "id": "06c003dc-6459-4a34-9da1-215bb58eb430",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "pending",
+    "created_at": "2026-03-10T17:12:49.937034+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b05390b2b60c50abb7b838"
+    },
+    "id": "a42aa86f-cdde-4f4a-be4c-698e9092cd80",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "pending",
+    "created_at": "2026-03-10T17:23:28.017173+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b053e381891fd050ee5b4c"
+    },
+    "id": "d5645438-9961-4dba-b3f5-dd9cdbcccd98",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "pending",
+    "created_at": "2026-03-10T17:24:51.792378+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b053e581891fd050ee5b4f"
+    },
+    "id": "46635fd8-14bf-47a5-881d-059ae647b83a",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "pending",
+    "created_at": "2026-03-10T17:24:53.470189+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0542d81891fd050ee5b51"
+    },
+    "id": "c7343397-5b12-41cc-8907-50f0321c8321",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "pending",
+    "created_at": "2026-03-10T17:26:05.551787+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057893fc63d65ae8cdd5c"
+    },
+    "id": "3e4c6c24-4791-456d-ae8c-71ba5a70b3d5",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "completed",
+    "created_at": "2026-03-10T17:40:25.375292+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057963fc63d65ae8cdd5e"
+    },
+    "id": "d0d36e70-2aa0-4a8f-8a6b-361e789cf8a6",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "pending",
+    "created_at": "2026-03-10T17:40:38.883305+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057973fc63d65ae8cdd5f"
+    },
+    "id": "d0820c24-4890-45d3-9551-ef7bf0882f4b",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "pending",
+    "created_at": "2026-03-10T17:40:39.877000+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b13315047c774170386d8c"
+    },
+    "id": "6cd02b5b-4a8d-4df6-a121-ec22e82de100",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": null,
+    "call_type_name": null,
+    "status": "completed",
+    "created_at": "2026-03-11T09:17:09.817410+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b15aa727da0f300442fcaa"
+    },
+    "id": "c2554283-f358-48b7-b939-bf6e8dc304b4",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "pending",
+    "created_at": "2026-03-11T12:05:59.770047+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b15ae227da0f300442fcb4"
+    },
+    "id": "0f9b5873-a43c-43f7-af7d-dab9279d6616",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "call_type_id": "ct-waiter",
+    "call_type_name": "Вызов официанта",
+    "status": "pending",
+    "created_at": "2026-03-11T12:06:58.662365+00:00"
+  }
+]

@@ -1,0 +1,1224 @@
+[
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ac31"
+    },
+    "id": "768fe425-3b91-40c4-9df9-0090f2b3ed06",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Завтраки до 16.00",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 0,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.193660+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ac42"
+    },
+    "id": "59d4cc5a-264e-4f37-a70f-6cd74d11d186",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Завтраки до 16.00 — Добавки к завтракам",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 1,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.206956+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ac46"
+    },
+    "id": "ae2d8153-3c58-407c-8f1e-ce1bc8bd96ca",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Новое меню",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 2,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.210129+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ac47"
+    },
+    "id": "28ee654b-99d1-447d-a3f9-8e3cbe904217",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Сезонное меню",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 3,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.210830+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ac51"
+    },
+    "id": "9b7cbbd5-1860-484c-baed-23c5c9b3ecd1",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Суши",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 4,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.218560+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ac72"
+    },
+    "id": "cdd10130-4b6a-4a9e-9920-df59500ac9cc",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Суши — Гарнир",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 5,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.245844+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ac78"
+    },
+    "id": "b25891b1-6aa6-4567-ad32-a7290f46b678",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Салаты",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 6,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.249990+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ac80"
+    },
+    "id": "fae33aa9-85ee-42c6-a37f-d5693b31e32d",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Закуски",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 7,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.254772+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ac92"
+    },
+    "id": "01d03573-9ba8-493a-8555-001802be9390",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Плато",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 8,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.268680+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ac97"
+    },
+    "id": "644263ef-ff91-4c1b-b395-193317be3506",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Плато — Добавки",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 9,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.272983+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ac9e"
+    },
+    "id": "76f387c7-649d-4030-bf5a-30a8f654ffe6",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Сеты",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 10,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.279045+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818aca3"
+    },
+    "id": "ddac5810-6d2e-4dc2-8213-d683b0ab1f31",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Бургеры и Сэндвичи",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 11,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.283240+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818aca9"
+    },
+    "id": "bd472d06-72e7-490a-aacb-56711b4749c1",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Супы",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 12,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.288445+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acb0"
+    },
+    "id": "c8b2dc17-012c-49bf-beef-a2ee038df04e",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Паста",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 13,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.294092+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acb5"
+    },
+    "id": "3850ed20-79ae-45b1-9b88-e45e3692cd44",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Горячие блюда",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 14,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.298089+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acbd"
+    },
+    "id": "cdc9ee4d-656f-43be-967f-f2acdcf297b9",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Горячие блюда — Драники",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 15,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.304463+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acc0"
+    },
+    "id": "12f2414e-6bbb-4a75-81bb-d380a0d0a9ae",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Гарниры",
+    "section_id": "food",
+    "display_mode": "compact",
+    "sort_order": 16,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.306971+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acc9"
+    },
+    "id": "f05dd7f0-0303-415e-aab4-6b6eef151223",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Десерты",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 17,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.313430+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acd2"
+    },
+    "id": "6ffea110-0bb0-44b9-a81a-2a0f5c39882e",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Основное меню",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 18,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.321228+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acd3"
+    },
+    "id": "fa0326f6-a06e-425e-8982-9393c0ce4fca",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 19,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.321917+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acd4"
+    },
+    "id": "edb4cb4c-1815-4a6a-8c75-2c7bff04d25f",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Коктейли Планеты",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 20,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.322569+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acde"
+    },
+    "id": "9a8e0dbc-d972-49a1-8a96-d5fad94208e3",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Сезонные на основе Schweppes",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 21,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.331415+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ace2"
+    },
+    "id": "aedd674b-c2fe-4c69-88c6-6c62d170ec5e",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Шоты и экстримыShotcocktails",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 22,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.333959+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ace9"
+    },
+    "id": "50072218-2dcb-432d-8f8f-1a82dbbe5876",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Фирменные настойки / Branded tinctures",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 23,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.339318+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acf0"
+    },
+    "id": "0e761b20-13b8-4ebe-bc69-fb3dd32db20a",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Игристые вина (Sparkling wine)",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 24,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.344813+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acf8"
+    },
+    "id": "e43cc9c2-8112-4a1d-9cee-98c258a2f849",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Шампанское (Champagne)",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 25,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.349853+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818acfb"
+    },
+    "id": "17ba7842-ae56-4e13-8968-7e6f14f6a218",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Водка \\ Vodka",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 26,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.352414+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad01"
+    },
+    "id": "50af4de6-5c13-445b-b4c3-891f5545a0e0",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Ром \\ Rum",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 27,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.357354+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad09"
+    },
+    "id": "4f676c6e-cc3b-4427-b7e7-f142987aa184",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Текила \\ Tequila",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 28,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.372776+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad0f"
+    },
+    "id": "54bdea22-a34c-4e6c-9978-80fd6232e180",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Джин \\ Gin",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 29,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.377381+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad14"
+    },
+    "id": "7d473629-b075-437c-b7f1-77a91e624fcb",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Вермут \\ Vermouth",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 30,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.380830+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad19"
+    },
+    "id": "118cbb1a-f1d0-4a00-8147-0d1b569f4f07",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Ликёры \\ L﻿﻿﻿﻿﻿﻿iquor",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 31,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.385116+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad26"
+    },
+    "id": "c1168806-39e3-4fc7-88dc-60b20e7f3173",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Коньяк \\ Cognac",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 32,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.394996+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad2d"
+    },
+    "id": "73662757-6f0e-418f-a9ca-ef5646ad4e33",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Портвейн и ХересPort wine and Sherry",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 33,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.399218+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad31"
+    },
+    "id": "cf51e0fa-6c3f-4010-ae6a-90bd5eac4b88",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Барное меню — Энергетический сет | Energy set&nbsp;",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 34,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.402004+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad35"
+    },
+    "id": "b342e22f-fd4a-4289-a3e0-82ddffdccda2",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Безалкогольные напитки",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 35,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.405261+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad36"
+    },
+    "id": "17178d1a-4081-40b7-b9f7-2bfc1ffe40cc",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Безалкогольные напитки — Безалкогольные напиткиSoft drinks&nbsp;",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 36,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.405751+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad3f"
+    },
+    "id": "8553b6e7-ae57-404a-9688-affc4b3f3bad",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Кофе \\ Coffee",
+    "section_id": "drinks",
+    "display_mode": "compact",
+    "sort_order": 37,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.412510+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad49"
+    },
+    "id": "a01564f5-0a7c-4ab9-97dc-a0f34fdd824b",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Чай \\ Кофе",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 38,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.421601+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad4a"
+    },
+    "id": "d129e8d1-d7fa-4b36-b9e4-c4310fe56415",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Чай \\ Кофе — Чай \\ Tea",
+    "section_id": "drinks",
+    "display_mode": "card",
+    "sort_order": 39,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.422126+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad53"
+    },
+    "id": "5e77cb3a-b526-4d68-ac71-19b1b8a9f68b",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Чай от мастера",
+    "section_id": "drinks",
+    "display_mode": "compact",
+    "sort_order": 40,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.429436+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad55"
+    },
+    "id": "b4a96b86-7059-4cb6-a38a-ae2a98e50098",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Зеленый чай",
+    "section_id": "drinks",
+    "display_mode": "compact",
+    "sort_order": 41,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.430776+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad59"
+    },
+    "id": "259415fd-69f4-4466-a03e-34fd7eb0fa4f",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Красный чай",
+    "section_id": "drinks",
+    "display_mode": "compact",
+    "sort_order": 42,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.433325+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad5d"
+    },
+    "id": "2ad9b4e5-fbcf-4407-ba60-622c1eda64c5",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Тизаны (травяные чаи)",
+    "section_id": "food",
+    "display_mode": "compact",
+    "sort_order": 43,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.436270+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad63"
+    },
+    "id": "c7a9060a-2985-40f5-896c-870710b775d0",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Пуэр",
+    "section_id": "food",
+    "display_mode": "compact",
+    "sort_order": 44,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.441502+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad68"
+    },
+    "id": "5119a937-c93f-473c-8058-e3c2c88059ba",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Улуны",
+    "section_id": "food",
+    "display_mode": "compact",
+    "sort_order": 45,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.446272+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad6e"
+    },
+    "id": "ebf2e3d0-b26c-485f-9425-635316963a91",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Кальянное меню",
+    "section_id": "hookah",
+    "display_mode": "card",
+    "sort_order": 46,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.451518+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad75"
+    },
+    "id": "498389f7-947f-4abd-84d7-cac58338dddb",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Кальянное меню — Авторские кальяны",
+    "section_id": "hookah",
+    "display_mode": "card",
+    "sort_order": 47,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.457608+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad7e"
+    },
+    "id": "a109a8bd-7054-403e-90b9-e7c65c0850cb",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Караоке",
+    "section_id": "food",
+    "display_mode": "compact",
+    "sort_order": 48,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.475777+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad92"
+    },
+    "id": "00423716-79ba-493a-bebc-b470eb7832d7",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Специальные предложения",
+    "section_id": "food",
+    "display_mode": "card",
+    "sort_order": 49,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.493436+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad93"
+    },
+    "id": "0ddeedbb-5d08-43ed-8fcf-c25ad574fe5b",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Специальные предложения от шефа",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 0,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.765352+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ad9a"
+    },
+    "id": "646e05d7-2efa-4310-8285-374df4b3aa67",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Закуски",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 1,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.772234+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ada8"
+    },
+    "id": "124eb91a-70e1-4bc0-94cd-e30cfd71bf20",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Салаты",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 2,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.784503+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818adb2"
+    },
+    "id": "60b077a0-639d-4abd-8908-30c52ff726fd",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Супы",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 3,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.793807+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818adb9"
+    },
+    "id": "4c6adc4d-abaa-4eec-95d8-2b8307b31965",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Ризотто",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 4,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.800521+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818adbc"
+    },
+    "id": "f311250b-069f-4765-8f55-75d47a17ff26",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Паста",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 5,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.803836+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818adc1"
+    },
+    "id": "3d67cbbb-7ea0-490c-a1dd-cbef1372f52d",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бургеры",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 6,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.808895+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818adc5"
+    },
+    "id": "0fc716cb-cfd2-4f64-98a5-4cbcde75e4a4",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Горячие блюда",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 7,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.811894+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818add3"
+    },
+    "id": "1876ce6b-ecd3-43ea-870c-99c5d9411dcf",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Гарниры",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 8,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.825617+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818addb"
+    },
+    "id": "daa51d6a-88ee-4002-ae76-9125c3cd3861",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Белорусское меню",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 9,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.833268+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ade0"
+    },
+    "id": "26e3bc4f-957a-485f-b27b-868af1f8e0bc",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Десерты",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 10,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.837607+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ade8"
+    },
+    "id": "67aa1284-76d0-436a-91ca-550ed66d1ec5",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 11,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.846034+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ade9"
+    },
+    "id": "89fea0a5-7149-4759-a525-2365a1766e41",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — СПЕЦИАЛЬНОЕ ПРЕДЛОЖЕНИЕ ДО 18:00 ЕЖЕДНЕВНО",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 12,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.846696+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818adee"
+    },
+    "id": "1866e6d3-ab45-4690-8571-b0bee0a16e4b",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — Акция \"ЛЕТО\" ЕЖЕДНЕВНО на летней террасе",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 13,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.855014+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818adf1"
+    },
+    "id": "e5322979-6891-4fb6-9c41-5ba94cec77bc",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — СЕЗОННОЕ ПРЕДЛОЖЕНИЕ",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 14,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.857043+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818adf6"
+    },
+    "id": "dd1b6f22-5d4b-4d20-ab62-30a0cd7d961b",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — АВТОРСКИЕ КОКТЕЙЛИ | AUTHOR'S COCKTAILS",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 15,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.861270+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae04"
+    },
+    "id": "63ceb922-682a-4f1c-b219-237f02be32a4",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — КОКТЕЙЛИ | COCKTAILS",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 16,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.875989+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae27"
+    },
+    "id": "433c1f87-d351-4da0-9263-bb75d02dae2f",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ВОДКА | VODKA 40 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 17,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.907590+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae2d"
+    },
+    "id": "b37d8f1c-6c3b-4d72-9ecf-26fc7edeb3a8",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ДЖИН | GIN 40 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 18,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.912787+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae32"
+    },
+    "id": "6e8a2cc5-0744-4822-8392-85dea3f4122d",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ТЕКИЛА | TEQUILA 40 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 19,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.916761+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae37"
+    },
+    "id": "4710fcb9-60c2-48c1-aa01-ca1e6326067a",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — РОМ | RUM 40 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 20,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.919694+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae3e"
+    },
+    "id": "db5850ec-e8c2-421b-b7e7-80f2944cae4d",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ВИСКИ | WHISKY 40 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 21,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.923940+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae51"
+    },
+    "id": "cfbcc0a4-8442-4d8d-b7f8-adf7f98d0aa5",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ВИСКИ | WHISKY 0,7 L/1L",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 22,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.941837+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae56"
+    },
+    "id": "46976ba5-31e8-44d3-9862-e5178a1ab595",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — КОНЬЯК | COGNAC 40 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 23,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.947145+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae5e"
+    },
+    "id": "0cae4fdd-746d-43df-987d-e5b61015bb2f",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — БРЕНДИ | BRANDY 40 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 24,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.953052+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae64"
+    },
+    "id": "980f2c19-c33c-4ebe-bc43-8e4bd8f142d4",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — БРЕНДИ | BRANDY 0,5/0,7 L",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 25,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.958591+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae67"
+    },
+    "id": "d75231fa-dee8-40c8-be23-3c39db1d2e79",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ПОРТВЕЙН | ХЕРЕС | PORT WINE | JAREZ 50 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 26,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.970442+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae6b"
+    },
+    "id": "1596a007-f885-4271-b22d-704e3b032a1e",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ВЕРМУТ | VERMOUTH 50 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 27,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.974096+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae70"
+    },
+    "id": "5f021cdc-2171-4dfd-9550-db1e59c664ef",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ФИРМЕННЫЕ НАСТОЙКИ | BRANDED TINCTURES 50 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 28,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.978104+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae7b"
+    },
+    "id": "05d39ca2-0b30-4bd1-b2c8-47c9740bca15",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — НАСТОЙКИ И ЛИКЕРЫ | INFUSION AND BITTER 40 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 29,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.988156+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421e573d08037818ae85"
+    },
+    "id": "a2f862ac-5698-4aa7-bf11-f1a73dd406dc",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ИГРИСТЫЕ ВИНА | ШАМПАНСКОЕ | SPARKLING WINE | CHAMPAGNE",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 30,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:02.997127+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818ae92"
+    },
+    "id": "2a20bb05-30cb-4994-b177-87c8b4538c02",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ВИНО КРАСНОЕ | RED WINE",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 31,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.014173+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818ae9c"
+    },
+    "id": "7cbdd053-77ce-46ec-bb02-d9a069f6d955",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ВИНО БЕЛОЕ | WHITE WINE",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 32,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.024367+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818aea6"
+    },
+    "id": "6ad17fee-aae4-40b7-b20f-9fd013b9d2dd",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ВИНО РОЗОВОЕ / ROSE WINE",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 33,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.034435+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818aea9"
+    },
+    "id": "ef61448c-dbc6-44f8-b5f7-0ca1f4599479",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ПИВО | BEER",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 34,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.037143+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818aeb4"
+    },
+    "id": "f17501aa-e690-4416-beca-3287ba74e76d",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ВОДА | WATER",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 35,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.048663+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818aec2"
+    },
+    "id": "f92d6fd0-db61-4d69-96cd-8e42742aa458",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ЛИМОНАДЫ | LEMONADE 300 ML",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 36,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.060843+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818aecb"
+    },
+    "id": "ebcd29e4-f773-441a-a5e3-1ea1997a03bd",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — КОФЕ | COFFEE",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 37,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.076634+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818aed8"
+    },
+    "id": "83140ea7-6db3-49fc-89b2-3bde91d81edf",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ЧАЙ | TEA",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 38,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.088776+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818aee3"
+    },
+    "id": "a6b8c470-8285-4938-a4e1-dc411d99d254",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ДОМАШНИЕ СЕЗОННЫЕ ЧАИ",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 39,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.099248+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818aeec"
+    },
+    "id": "f76693be-5021-4f25-bb9f-c43e2d5dac31",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Бар — ФРЕШИ",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 40,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.107827+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818aef3"
+    },
+    "id": "03823067-1d07-4e43-af34-a312a0090702",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "СОКИ",
+    "section_id": "866bc42f-3e32-4520-b868-07004338f395",
+    "display_mode": "card",
+    "sort_order": 41,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.114631+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818aefd"
+    },
+    "id": "6ce5a332-56d9-4c24-bbb4-49cb6756b22b",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "КАЛЬЯНЫ",
+    "section_id": "437cf6a6-679e-4221-a262-73ef2a5f2cb9",
+    "display_mode": "card",
+    "sort_order": 42,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.124744+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0421f573d08037818af02"
+    },
+    "id": "4efb72bd-023c-49c8-97df-9ced6e6b7cfa",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Специальные предложения",
+    "section_id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "display_mode": "card",
+    "sort_order": 43,
+    "is_active": true,
+    "created_at": "2026-03-10T16:09:03.129630+00:00"
+  }
+]

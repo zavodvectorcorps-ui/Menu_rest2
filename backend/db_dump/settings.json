@@ -1,0 +1,38 @@
+[
+  {
+    "_id": {
+      "$oid": "6977a68737cac41daf3ac9e0"
+    },
+    "id": "main",
+    "online_menu_enabled": true,
+    "staff_call_enabled": true,
+    "online_orders_enabled": true,
+    "business_lunch_enabled": true,
+    "promotions_enabled": true,
+    "theme": "dark",
+    "primary_color": "#5DA9A4",
+    "secondary_color": "#8D6E63",
+    "telegram_bot_token": "8630668810:AAFOYNjw9SnFxjzCE-eBTd-8MRmSNfboUyE",
+    "telegram_chat_id": "",
+    "currency": "BYN",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977c15b95513cc74ce6b78c"
+    },
+    "id": "959ea65f-d36b-42ff-b3ae-aee651cb2182",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "online_menu_enabled": true,
+    "staff_call_enabled": false,
+    "online_orders_enabled": false,
+    "business_lunch_enabled": true,
+    "promotions_enabled": true,
+    "theme": "light",
+    "primary_color": "#5DA9A4",
+    "secondary_color": "#8D6E63",
+    "currency": "BYN",
+    "telegram_bot_token": "",
+    "telegram_chat_id": ""
+  }
+]

@@ -1,0 +1,1079 @@
+[
+  {
+    "_id": {
+      "$oid": "6977a85337cac41daf3aca14"
+    },
+    "id": "ee7b6d62-6c86-4e47-b94a-c1e5336eb7d9",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "926b9f1e-c65c-40de-a79a-3461a56834e6",
+        "name": "Брускетта с томатами",
+        "quantity": 2,
+        "price": 350.0
+      }
+    ],
+    "total": 700.0,
+    "status": "completed",
+    "notes": "Тестовый заказ",
+    "created_at": "2026-01-26T17:45:55.647810+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977aa6537cac41daf3aca21"
+    },
+    "id": "96fd6b29-0b7e-40d9-851a-c4ce1f721139",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "3a5db368-3737-48ec-95ab-be0d0bf87de9",
+        "name": "Цезарь с курицей",
+        "quantity": 1,
+        "price": 420.0
+      }
+    ],
+    "total": 420.0,
+    "status": "completed",
+    "notes": "Тестовый заказ",
+    "created_at": "2026-01-26T17:54:45.043398+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977ac1537cac41daf3aca26"
+    },
+    "id": "62f5cac7-79a2-41fb-b127-4b6057c6d40e",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "3a5db368-3737-48ec-95ab-be0d0bf87de9",
+        "name": "Цезарь с курицей",
+        "quantity": 1,
+        "price": 420.0
+      },
+      {
+        "menu_item_id": "bfcdb5e6-0039-4411-82c7-6c7ce8023d0c",
+        "name": "Лосось на гриле",
+        "quantity": 1,
+        "price": 890.0
+      }
+    ],
+    "total": 1310.0,
+    "status": "completed",
+    "notes": "",
+    "created_at": "2026-01-26T18:01:57.095224+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "69b02c748ac91512d02bc1d8"
+    },
+    "id": "7330b51f-b656-4c91-a920-fafbdafc8840",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test-item-1",
+        "name": "Test Item",
+        "quantity": 2,
+        "price": 10.5
+      }
+    ],
+    "total": 21.0,
+    "status": "completed",
+    "notes": "Test order without bot",
+    "created_at": "2026-03-10T14:36:36.493302+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b02c758ac91512d02bc1da"
+    },
+    "id": "7ed3ff63-b783-4ebb-9700-4d27949164ca",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "Test",
+        "quantity": 1,
+        "price": 1.0
+      }
+    ],
+    "total": 1.0,
+    "status": "completed",
+    "notes": "",
+    "created_at": "2026-03-10T14:36:37.228065+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b02cd38ac91512d02bc1df"
+    },
+    "id": "a981648c-4914-400d-885e-bfff33d9c418",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test-item-1",
+        "name": "Test Item",
+        "quantity": 2,
+        "price": 10.5
+      }
+    ],
+    "total": 21.0,
+    "status": "completed",
+    "notes": "Test order without bot",
+    "created_at": "2026-03-10T14:38:11.359915+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b02cd48ac91512d02bc1e1"
+    },
+    "id": "a6a68358-0702-4d4e-8cfe-31b34bf0f5f2",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "Test",
+        "quantity": 1,
+        "price": 1.0
+      }
+    ],
+    "total": 1.0,
+    "status": "completed",
+    "notes": "",
+    "created_at": "2026-03-10T14:38:12.164971+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b045a813d3695be940d737"
+    },
+    "id": "25175874-f526-4762-8ed7-f459054f7528",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "810fb03e-36ef-4496-adc6-ecd617d331a5",
+        "name": "Сырники со сметаной и соусом \"Розмариновая вишня\"",
+        "quantity": 1,
+        "price": 15.0
+      },
+      {
+        "menu_item_id": "7c6ca865-1949-4ab5-8076-f3f8d80d1917",
+        "name": "Овсянка со сливочным сыром",
+        "quantity": 1,
+        "price": 12.0
+      },
+      {
+        "menu_item_id": "4a7614b6-f2d8-4cae-9438-3eb0e1dc66a8",
+        "name": "Гранола с сезонными фруктами",
+        "quantity": 1,
+        "price": 17.0
+      }
+    ],
+    "total": 44.0,
+    "status": "completed",
+    "notes": "",
+    "created_at": "2026-03-10T16:24:08.772918+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b04663b20785506d0619b7"
+    },
+    "id": "5e3aa03a-c6d0-4943-be26-fe4dea15dd66",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "7c6ca865-1949-4ab5-8076-f3f8d80d1917",
+        "name": "Овсянка со сливочным сыром",
+        "quantity": 1,
+        "price": 12.0
+      },
+      {
+        "menu_item_id": "810fb03e-36ef-4496-adc6-ecd617d331a5",
+        "name": "Сырники со сметаной и соусом \"Розмариновая вишня\"",
+        "quantity": 1,
+        "price": 15.0
+      }
+    ],
+    "total": 27.0,
+    "status": "completed",
+    "notes": "",
+    "created_at": "2026-03-10T16:27:15.342272+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b04a3f0c8bb7ee21841b55"
+    },
+    "id": "875fce68-1aa2-4e14-95a4-4a7bdcd627b3",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "69304bd2-2dce-4192-82e3-4f8b9f88c55a",
+    "table_number": 0,
+    "items": [
+      {
+        "menu_item_id": "test-1",
+        "name": "Тестовое блюдо",
+        "quantity": 2,
+        "price": 500.0
+      }
+    ],
+    "total": 1000.0,
+    "status": "completed",
+    "notes": "Тестовый предзаказ",
+    "is_preorder": true,
+    "customer_name": "Иван Петров",
+    "customer_phone": "+375291234567",
+    "preorder_date": "2026-03-15",
+    "preorder_time": "18:00",
+    "created_at": "2026-03-10T16:43:43.407746+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b04b25792e7b506d6aad4f"
+    },
+    "id": "6ca27b10-b93c-4763-9547-f7658bcff989",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "69304bd2-2dce-4192-82e3-4f8b9f88c55a",
+    "table_number": 0,
+    "items": [
+      {
+        "menu_item_id": "test-item-id",
+        "name": "Тестовое блюдо",
+        "quantity": 1,
+        "price": 15.0
+      }
+    ],
+    "total": 15.0,
+    "status": "completed",
+    "notes": "Тестовый предзаказ",
+    "is_preorder": true,
+    "customer_name": "TEST_Тест Клиент",
+    "customer_phone": "+375291234567",
+    "preorder_date": "2026-03-11",
+    "preorder_time": "19:00",
+    "created_at": "2026-03-10T16:47:33.651125+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b04b26792e7b506d6aad50"
+    },
+    "id": "0b839426-8bc0-4302-a668-d3ff8355bb2f",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test-item-id",
+        "name": "Тестовое блюдо обычное",
+        "quantity": 2,
+        "price": 10.0
+      }
+    ],
+    "total": 20.0,
+    "status": "completed",
+    "notes": "Тестовый обычный заказ",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T16:47:34.389565+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b04b3d85829e94a5511608"
+    },
+    "id": "c28cc1f4-4b3c-47e4-b4b7-5de93094c911",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "69304bd2-2dce-4192-82e3-4f8b9f88c55a",
+    "table_number": 0,
+    "items": [
+      {
+        "menu_item_id": "test-item-id",
+        "name": "Тестовое блюдо",
+        "quantity": 1,
+        "price": 15.0
+      }
+    ],
+    "total": 15.0,
+    "status": "completed",
+    "notes": "Тестовый предзаказ",
+    "is_preorder": true,
+    "customer_name": "TEST_Тест Клиент",
+    "customer_phone": "+375291234567",
+    "preorder_date": "2026-03-11",
+    "preorder_time": "19:00",
+    "created_at": "2026-03-10T16:47:57.921453+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b04b3e85829e94a5511609"
+    },
+    "id": "4a9404b8-5f64-498e-b158-2905fb10cbd4",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test-item-id",
+        "name": "Тестовое блюдо обычное",
+        "quantity": 2,
+        "price": 10.0
+      }
+    ],
+    "total": 20.0,
+    "status": "completed",
+    "notes": "Тестовый обычный заказ",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T16:47:58.555853+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b051119f634e091a7f4ab6"
+    },
+    "id": "953ad06c-1b2e-4bc2-9fe2-3d0da61fac26",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "45a34f6a-a780-4087-9d95-63a5eaaa6ebe",
+        "name": "Курица",
+        "quantity": 1,
+        "price": 4.0
+      }
+    ],
+    "total": 4.0,
+    "status": "new",
+    "notes": "TEST_ORDER - Please ignore",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:12:49.060074+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b052f119c1bed93b05168c"
+    },
+    "id": "80d08d82-b326-4881-919e-65241397da72",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "WS Test Order",
+        "quantity": 1,
+        "price": 99.0
+      }
+    ],
+    "total": 99.0,
+    "status": "new",
+    "notes": "WebSocket test",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:20:49.651137+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0530c19c1bed93b05168d"
+    },
+    "id": "ae15573d-6361-494f-beea-02dea56641c9",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "WS Broadcast Test",
+        "quantity": 2,
+        "price": 50.0
+      }
+    ],
+    "total": 100.0,
+    "status": "new",
+    "notes": "Testing WebSocket broadcast",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:21:16.155054+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b053e281891fd050ee5b4b"
+    },
+    "id": "fdd82a18-45ab-419c-9190-fbd65311d5c8",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "45a34f6a-a780-4087-9d95-63a5eaaa6ebe",
+        "name": "WS Test Item",
+        "quantity": 1,
+        "price": 5.0
+      }
+    ],
+    "total": 5.0,
+    "status": "new",
+    "notes": "WebSocket test order",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:24:50.521772+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b053e481891fd050ee5b4d"
+    },
+    "id": "3813e807-6b99-4bde-a803-b7110f271fa2",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "45a34f6a-a780-4087-9d95-63a5eaaa6ebe",
+        "name": "Test Item 1",
+        "quantity": 2,
+        "price": 10.0
+      },
+      {
+        "menu_item_id": "45a34f6a-a780-4087-9d95-63a5eaaa6ebe",
+        "name": "Test Item 2",
+        "quantity": 1,
+        "price": 5.5
+      }
+    ],
+    "total": 25.5,
+    "status": "new",
+    "notes": "Test order from pytest",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:24:52.408543+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b053e481891fd050ee5b4e"
+    },
+    "id": "fd89f30e-5d8b-4e81-a743-eb60d7178dad",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "69304bd2-2dce-4192-82e3-4f8b9f88c55a",
+    "table_number": 0,
+    "items": [
+      {
+        "menu_item_id": "45a34f6a-a780-4087-9d95-63a5eaaa6ebe",
+        "name": "Preorder Item",
+        "quantity": 1,
+        "price": 15.0
+      }
+    ],
+    "total": 15.0,
+    "status": "new",
+    "notes": "",
+    "is_preorder": true,
+    "customer_name": "Test Customer",
+    "customer_phone": "+375291234567",
+    "preorder_date": "2026-02-15",
+    "preorder_time": "18:00",
+    "created_at": "2026-03-10T17:24:52.932469+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0542981891fd050ee5b50"
+    },
+    "id": "595dd1c0-cd85-4620-a5b9-64f639f695cc",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "45a34f6a-a780-4087-9d95-63a5eaaa6ebe",
+        "name": "WS Auto-Refresh Test",
+        "quantity": 1,
+        "price": 99.99
+      }
+    ],
+    "total": 99.99,
+    "status": "new",
+    "notes": "Testing WS auto-refresh",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:26:01.835293+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0554e81891fd050ee5b52"
+    },
+    "id": "3a396338-6ec9-4d8b-9cd4-759e462a1fc5",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "Badge Test",
+        "quantity": 1,
+        "price": 100.0
+      }
+    ],
+    "total": 100.0,
+    "status": "new",
+    "notes": "test",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:30:54.135543+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0554f81891fd050ee5b53"
+    },
+    "id": "449553e0-0f81-4a51-9879-d6da61d9b85d",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "Badge Test",
+        "quantity": 1,
+        "price": 100.0
+      }
+    ],
+    "total": 100.0,
+    "status": "new",
+    "notes": "test",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:30:55.695774+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0555181891fd050ee5b54"
+    },
+    "id": "320cbf02-f33e-47ec-bd60-90fe414e8955",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "Badge Test",
+        "quantity": 1,
+        "price": 100.0
+      }
+    ],
+    "total": 100.0,
+    "status": "new",
+    "notes": "test",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:30:57.247264+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b056ef52556104bce96601"
+    },
+    "id": "c75dbf41-5859-4b13-bdad-48d2a6b08b5a",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "Тест трекер",
+        "quantity": 1,
+        "price": 150.0
+      }
+    ],
+    "total": 150.0,
+    "status": "in_progress",
+    "notes": "Тест трекера статуса",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:37:51.153603+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0577f3fc63d65ae8cdd53"
+    },
+    "id": "6d471468-4888-48f0-9a01-3e862e231d2b",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test-item-1",
+        "name": "TEST_Burger",
+        "quantity": 2,
+        "price": 15.5
+      }
+    ],
+    "total": 31.0,
+    "status": "new",
+    "notes": "Test order - check id returned",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:40:15.270833+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b0577f3fc63d65ae8cdd54"
+    },
+    "id": "1eadf852-cd3f-4228-812a-83cd4823976a",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "69304bd2-2dce-4192-82e3-4f8b9f88c55a",
+    "table_number": 0,
+    "items": [
+      {
+        "menu_item_id": "test-item-pre",
+        "name": "TEST_PreorderDish",
+        "quantity": 1,
+        "price": 25.0
+      }
+    ],
+    "total": 25.0,
+    "status": "new",
+    "notes": "",
+    "is_preorder": true,
+    "customer_name": "Test Customer",
+    "customer_phone": "+375291234567",
+    "preorder_date": "2026-01-20",
+    "preorder_time": "18:00",
+    "created_at": "2026-03-10T17:40:15.934746+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057803fc63d65ae8cdd55"
+    },
+    "id": "34c604d4-df57-4274-a075-8a302afa6d83",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "TEST_Item",
+        "quantity": 1,
+        "price": 10.0
+      }
+    ],
+    "total": 10.0,
+    "status": "new",
+    "notes": "",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:40:16.457230+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057813fc63d65ae8cdd56"
+    },
+    "id": "fbab4c2c-c34e-49ff-b9c7-19914d25d899",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "TEST_Public",
+        "quantity": 1,
+        "price": 5.0
+      }
+    ],
+    "total": 5.0,
+    "status": "new",
+    "notes": "",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:40:17.233669+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057823fc63d65ae8cdd57"
+    },
+    "id": "fbc74a0e-25b7-4d47-bea9-2a0186a96c1e",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "flow-test",
+        "name": "TEST_FlowItem",
+        "quantity": 1,
+        "price": 20.0
+      }
+    ],
+    "total": 20.0,
+    "status": "completed",
+    "notes": "Flow test",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:40:18.256369+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057833fc63d65ae8cdd58"
+    },
+    "id": "ba465cd5-ed9b-43fe-b70a-fee90ccfac95",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "cancel-test",
+        "name": "TEST_CancelItem",
+        "quantity": 1,
+        "price": 15.0
+      }
+    ],
+    "total": 15.0,
+    "status": "cancelled",
+    "notes": "",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:40:19.372286+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057843fc63d65ae8cdd59"
+    },
+    "id": "3b0ed626-bf58-449a-9728-178d15e51abf",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "cb-test",
+        "name": "TEST_CBItem",
+        "quantity": 1,
+        "price": 10.0
+      }
+    ],
+    "total": 10.0,
+    "status": "in_progress",
+    "notes": "",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:40:20.249598+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057863fc63d65ae8cdd5a"
+    },
+    "id": "0f1e837e-ce19-43cb-8463-0e0bf150a6fc",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "done-test",
+        "name": "TEST_DoneItem",
+        "quantity": 1,
+        "price": 10.0
+      }
+    ],
+    "total": 10.0,
+    "status": "completed",
+    "notes": "",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:40:22.030664+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057873fc63d65ae8cdd5b"
+    },
+    "id": "6f964333-23e5-4fba-8dfc-010ed8cc0d84",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "cancel-cb",
+        "name": "TEST_CancelCB",
+        "quantity": 1,
+        "price": 10.0
+      }
+    ],
+    "total": 10.0,
+    "status": "cancelled",
+    "notes": "",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:40:23.825684+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057b03fc63d65ae8cdd63"
+    },
+    "id": "4e31d782-ebe3-486b-9a3f-2c70b4a442ef",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "810fb03e-36ef-4496-adc6-ecd617d331a5",
+        "name": "Сырники со сметаной и соусом \"Розмариновая вишня\"",
+        "quantity": 1,
+        "price": 15.0
+      }
+    ],
+    "total": 15.0,
+    "status": "new",
+    "notes": "",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:41:04.238301+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b057f43fc63d65ae8cdd68"
+    },
+    "id": "96a622f9-d91f-46fe-90eb-e1d4f40876c5",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "810fb03e-36ef-4496-adc6-ecd617d331a5",
+        "name": "Сырники со сметаной и соусом \"Розмариновая вишня\"",
+        "quantity": 1,
+        "price": 15.0
+      }
+    ],
+    "total": 15.0,
+    "status": "in_progress",
+    "notes": "",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-10T17:42:12.243756+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b13317047c774170386d8d"
+    },
+    "id": "e7384d6f-12a4-46e4-9494-4c40b1e04008",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "t",
+        "name": "Test",
+        "quantity": 1,
+        "price": 10.0
+      }
+    ],
+    "total": 10.0,
+    "status": "in_progress",
+    "notes": "",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-11T09:17:11.043851+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b15aa627da0f300442fca8"
+    },
+    "id": "e9354438-330a-473b-9235-d974f03b949d",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "45a34f6a-a780-4087-9d95-63a5eaaa6ebe",
+        "name": "Курица",
+        "quantity": 1,
+        "price": 4.0
+      }
+    ],
+    "total": 4.0,
+    "status": "new",
+    "notes": "TEST_order_via_slug",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-11T12:05:58.679589+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b15ad327da0f300442fcb1"
+    },
+    "id": "a51ca79f-bc2b-486c-adad-03e79405e199",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "810fb03e-36ef-4496-adc6-ecd617d331a5",
+        "name": "Сырники со сметаной и соусом \"Розмариновая вишня\"",
+        "quantity": 1,
+        "price": 15.0
+      }
+    ],
+    "total": 15.0,
+    "status": "new",
+    "notes": "",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-11T12:06:43.600830+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b2640baf3519857bac92a4"
+    },
+    "id": "b8762140-03b2-4b04-9cd8-fbfc30c7cf4e",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "Тест",
+        "quantity": 1,
+        "price": 10.0
+      }
+    ],
+    "total": 10.0,
+    "status": "in_progress",
+    "notes": "",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-12T06:58:19.145973+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b265008453c6d0cff355d2"
+    },
+    "id": "2c5a9342-1a78-4fec-8413-c8253d1e3da0",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test",
+        "name": "Пицца & Сыр <Моцарелла>",
+        "quantity": 2,
+        "price": 15.0
+      }
+    ],
+    "total": 30.0,
+    "status": "completed",
+    "notes": "Побольше сыра & перца",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-12T07:02:24.809917+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b26536fd85d50446f72f97"
+    },
+    "id": "e184fb83-beb9-45ed-be54-cdd026efd19c",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "table_id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "table_number": 1,
+    "items": [
+      {
+        "menu_item_id": "test2",
+        "name": "Пицца & Сыр <Моцарелла>",
+        "quantity": 2,
+        "price": 15.0
+      }
+    ],
+    "total": 30.0,
+    "status": "new",
+    "notes": "Больше <сыра> & перца",
+    "is_preorder": false,
+    "customer_name": "",
+    "customer_phone": "",
+    "preorder_date": "",
+    "preorder_time": "",
+    "created_at": "2026-03-12T07:03:18.655266+00:00"
+  }
+]

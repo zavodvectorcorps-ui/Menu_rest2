@@ -1,0 +1,38 @@
+[
+  {
+    "_id": {
+      "$oid": "6977a68837cac41daf3aca09"
+    },
+    "id": "acae89b6-087a-420d-8355-75c915291983",
+    "name": "Иван Петров",
+    "role": "Официант",
+    "telegram_id": "",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:16.000066+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a68837cac41daf3aca0a"
+    },
+    "id": "97ce8825-5a47-4ffc-abac-d7414cdd3037",
+    "name": "Мария Сидорова",
+    "role": "Официант",
+    "telegram_id": "",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:16.016411+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a68837cac41daf3aca0b"
+    },
+    "id": "ebcb590e-07d4-4472-b17d-cf6f331b8d5f",
+    "name": "Алексей Козлов",
+    "role": "Администратор",
+    "telegram_id": "",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:16.017042+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  }
+]

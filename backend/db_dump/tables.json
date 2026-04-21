@@ -1,0 +1,160 @@
+[
+  {
+    "_id": {
+      "$oid": "6977a68737cac41daf3ac9ff"
+    },
+    "id": "827c810f-6da7-4d0b-9cbb-833bf4490d34",
+    "number": 1,
+    "code": "697DCAA5",
+    "name": "Стол 1",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:15.975484+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a68737cac41daf3aca00"
+    },
+    "id": "e0e47cbe-f2a7-4e66-8483-b3e1dbdc7fa8",
+    "number": 2,
+    "code": "F20C4408",
+    "name": "Стол 2",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:15.995464+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a68737cac41daf3aca01"
+    },
+    "id": "efe54c31-2a4e-4210-8630-c26dee94aea6",
+    "number": 3,
+    "code": "067FC212",
+    "name": "Стол 3",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:15.996041+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a68737cac41daf3aca02"
+    },
+    "id": "100d4167-2d55-485b-868e-d31db37c27c7",
+    "number": 4,
+    "code": "5B9E0F92",
+    "name": "Стол 4",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:15.996430+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a68737cac41daf3aca03"
+    },
+    "id": "c007d5de-3392-4d16-9118-1cd1c531e9b4",
+    "number": 5,
+    "code": "FAB88AAE",
+    "name": "Стол 5",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:15.996939+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a68737cac41daf3aca04"
+    },
+    "id": "7b533cd3-9e17-42be-9616-684fdfd60e6c",
+    "number": 6,
+    "code": "681BF1EA",
+    "name": "Стол 6",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:15.997374+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a68737cac41daf3aca05"
+    },
+    "id": "c0eecf82-f870-4461-8f9c-9228fc105b46",
+    "number": 7,
+    "code": "73FE52C2",
+    "name": "Стол 7",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:15.997733+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a68737cac41daf3aca06"
+    },
+    "id": "55ca69c0-4a2a-41d4-915c-47d5037fd7f2",
+    "number": 8,
+    "code": "78564E00",
+    "name": "Стол 8",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:15.998080+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a68737cac41daf3aca07"
+    },
+    "id": "eb274187-8843-4b0d-9d9e-2637d689916b",
+    "number": 9,
+    "code": "2A32116C",
+    "name": "Стол 9",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:15.998582+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977a68737cac41daf3aca08"
+    },
+    "id": "770c41e5-c1d4-463f-8c0c-311f9b4d3aa6",
+    "number": 10,
+    "code": "E6B74FDE",
+    "name": "Стол 10",
+    "is_active": true,
+    "created_at": "2026-01-26T17:38:15.998976+00:00",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "69b040befbca418766f9d326"
+    },
+    "id": "2aa2efc1-b019-4040-bc1f-61586cb4ec34",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "number": 1,
+    "code": "A609161A",
+    "name": "",
+    "is_active": true,
+    "created_at": "2026-03-10T16:03:10.016018+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b047cf96d6028b3401cf39"
+    },
+    "id": "69304bd2-2dce-4192-82e3-4f8b9f88c55a",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "number": 0,
+    "code": "6E32830E",
+    "name": "Предзаказ",
+    "is_active": true,
+    "is_preorder": true,
+    "created_at": "2026-03-10T16:33:19.470469+00:00"
+  },
+  {
+    "_id": {
+      "$oid": "69b047cf96d6028b3401cf3a"
+    },
+    "id": "0ea53ae1-a580-439d-8759-e3054c1711bb",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "number": 0,
+    "code": "A0255D8D",
+    "name": "Предзаказ",
+    "is_active": true,
+    "is_preorder": true,
+    "created_at": "2026-03-10T16:33:19.799084+00:00"
+  }
+]

@@ -1,0 +1,68 @@
+[
+  {
+    "_id": {
+      "$oid": "6977b438ec7f9044453d6a70"
+    },
+    "id": "ct-waiter",
+    "name": "Вызов официанта",
+    "telegram_message": "🔔 Стол #{table} - Вызов официанта",
+    "sort_order": 1,
+    "is_active": true,
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977b438ec7f9044453d6a71"
+    },
+    "id": "ct-hookah",
+    "name": "Вызов кальянного мастера",
+    "telegram_message": "💨 Стол #{table} - Вызов кальянного мастера",
+    "sort_order": 2,
+    "is_active": true,
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977b438ec7f9044453d6a72"
+    },
+    "id": "ct-bill",
+    "name": "Попросить счёт",
+    "telegram_message": "💳 Стол #{table} - Просят счёт",
+    "sort_order": 3,
+    "is_active": true,
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977c15c95513cc74ce6b790"
+    },
+    "id": "801cdbe9-801f-4d73-bd0e-eb609954bfe0",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Вызов официанта",
+    "telegram_message": "🔔 Стол #{table} - Вызов официанта",
+    "sort_order": 1,
+    "is_active": true
+  },
+  {
+    "_id": {
+      "$oid": "6977c15c95513cc74ce6b791"
+    },
+    "id": "832a111c-25f2-4880-b1e1-dd0adc160282",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Вызов кальянного мастера",
+    "telegram_message": "💨 Стол #{table} - Вызов кальянного мастера",
+    "sort_order": 2,
+    "is_active": true
+  },
+  {
+    "_id": {
+      "$oid": "6977c15c95513cc74ce6b792"
+    },
+    "id": "036237f5-775a-4207-a712-cc79a5640734",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Попросить счёт",
+    "telegram_message": "💳 Стол #{table} - Просят счёт",
+    "sort_order": 3,
+    "is_active": true
+  }
+]

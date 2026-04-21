@@ -1,0 +1,13 @@
+[
+  {
+    "_id": {
+      "$oid": "69b2e8e8fbcb58ad188b1c66"
+    },
+    "account_name": "test-org",
+    "api_key": "test-key-123",
+    "pos_id": 2,
+    "payment_id": 1,
+    "enabled": false,
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  }
+]

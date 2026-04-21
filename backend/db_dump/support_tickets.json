@@ -1,0 +1,13 @@
+[
+  {
+    "_id": {
+      "$oid": "6977a85437cac41daf3aca17"
+    },
+    "id": "0dc899cb-899b-4f40-8466-f3bd56288d0c",
+    "subject": "Техническая проблема",
+    "description": "Тестовое обращение в поддержку",
+    "contact_email": "test@example.com",
+    "status": "open",
+    "created_at": "2026-01-26T17:45:56.190143+00:00"
+  }
+]

@@ -1,0 +1,62 @@
+[
+  {
+    "_id": {
+      "$oid": "6977b42874ca4aa981cb0bec"
+    },
+    "id": "food",
+    "name": "Еда",
+    "sort_order": 1,
+    "is_active": true,
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977b42874ca4aa981cb0bed"
+    },
+    "id": "drinks",
+    "name": "Напитки",
+    "sort_order": 2,
+    "is_active": true,
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977b42874ca4aa981cb0bee"
+    },
+    "id": "hookah",
+    "name": "Кальяны",
+    "sort_order": 3,
+    "is_active": true,
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  {
+    "_id": {
+      "$oid": "6977c15c95513cc74ce6b78d"
+    },
+    "id": "e465f35e-8c49-4520-9b21-9e022715d3a2",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Еда",
+    "sort_order": 1,
+    "is_active": true
+  },
+  {
+    "_id": {
+      "$oid": "6977c15c95513cc74ce6b78e"
+    },
+    "id": "866bc42f-3e32-4520-b868-07004338f395",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Напитки",
+    "sort_order": 2,
+    "is_active": true
+  },
+  {
+    "_id": {
+      "$oid": "6977c15c95513cc74ce6b78f"
+    },
+    "id": "437cf6a6-679e-4221-a262-73ef2a5f2cb9",
+    "restaurant_id": "d433dc80-02e6-41ca-9527-df7f78f4b4aa",
+    "name": "Кальяны",
+    "sort_order": 3,
+    "is_active": true
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "_id": {
+      "$oid": "69b044f713d3695be940d72b"
+    },
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "chat_id": "368396848",
+    "username": "knyazevmaksim",
+    "first_name": "Maksim",
+    "is_active": true,
+    "subscribed_at": "2026-03-10T16:21:11.345696+00:00"
+  }
+]

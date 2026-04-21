@@ -1,0 +1,32 @@
+[
+  {
+    "_id": {
+      "$oid": "69b033fd5c5c31499ac70dce"
+    },
+    "id": "ff0be255-7b9c-4da3-b1f9-1747882dada5",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Хит",
+    "color": "#ef4444",
+    "sort_order": 0
+  },
+  {
+    "_id": {
+      "$oid": "69b033fd5c5c31499ac70dcf"
+    },
+    "id": "13637be8-3601-404f-bbbc-e4cbbb937c0a",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Сезонное",
+    "color": "#f97316",
+    "sort_order": 0
+  },
+  {
+    "_id": {
+      "$oid": "69b033fd5c5c31499ac70dd0"
+    },
+    "id": "c9b0d1e1-4f90-4153-b85c-a7e16f1314f0",
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f",
+    "name": "Выбор гостей",
+    "color": "#8b5cf6",
+    "sort_order": 0
+  }
+]
