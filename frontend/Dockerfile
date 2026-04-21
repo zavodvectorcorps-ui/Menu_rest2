@@ -2,8 +2,17 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+# Copy package.json (required) and yarn.lock (if present)
+COPY package.json ./
+COPY yarn.lock* ./
+
+# Use frozen-lockfile only if yarn.lock exists, otherwise generate it
+RUN if [ -f yarn.lock ]; then \
+      yarn install --frozen-lockfile; \
+    else \
+      echo "WARNING: yarn.lock not found — installing without lockfile (non-reproducible)"; \
+      yarn install; \
+    fi
 
 COPY . .
 
