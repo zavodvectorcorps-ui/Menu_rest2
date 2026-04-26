@@ -331,6 +331,13 @@ class Settings(BaseModel):
     currency: str = "BYN"
     telegram_bot_token: Optional[str] = ""
     telegram_chat_id: Optional[str] = ""
+    # Splash screen (welcome / promo)
+    splash_enabled: bool = False
+    splash_image_url: Optional[str] = ""
+    splash_title: Optional[str] = ""
+    splash_text: Optional[str] = ""
+    splash_button_text: Optional[str] = "Перейти к меню"
+    splash_link_url: Optional[str] = ""
 
 class SettingsUpdate(BaseModel):
     online_menu_enabled: Optional[bool] = None
@@ -344,6 +351,12 @@ class SettingsUpdate(BaseModel):
     currency: Optional[str] = None
     telegram_bot_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
+    splash_enabled: Optional[bool] = None
+    splash_image_url: Optional[str] = None
+    splash_title: Optional[str] = None
+    splash_text: Optional[str] = None
+    splash_button_text: Optional[str] = None
+    splash_link_url: Optional[str] = None
 
 class MenuView(BaseModel):
     model_config = ConfigDict(extra="ignore")

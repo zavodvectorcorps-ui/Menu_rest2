@@ -44,6 +44,9 @@ export default function ClientMenuPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef(null);
+  const [splashDismissed, setSplashDismissed] = useState(() => {
+    return sessionStorage.getItem(`splash_${storageKey}`) === '1';
+  });
 
   // Category scroll state
   const categoryScrollRef = useRef(null);
@@ -370,8 +373,70 @@ export default function ClientMenuPage() {
 
   const { restaurant, settings, sections, table, call_types } = data;
 
+  const showSplash = settings?.splash_enabled && !splashDismissed && (
+    settings.splash_image_url || settings.splash_title || settings.splash_text
+  );
+  const dismissSplash = () => {
+    sessionStorage.setItem(`splash_${storageKey}`, '1');
+    setSplashDismissed(true);
+  };
+
   return (
     <div className="min-h-screen bg-background" data-testid="client-menu-page">
+      {/* Splash / promo overlay */}
+      {showSplash && (
+        <div
+          className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+          data-testid="splash-overlay"
+        >
+          <div className="w-full max-w-md bg-card rounded-3xl shadow-2xl overflow-hidden border border-border">
+            {settings.splash_image_url && (
+              <div className="w-full bg-muted">
+                <img
+                  src={settings.splash_image_url}
+                  alt="splash"
+                  className="w-full h-auto object-cover max-h-72"
+                  data-testid="splash-image"
+                />
+              </div>
+            )}
+            <div className="p-6 space-y-4 text-center">
+              {settings.splash_title && (
+                <h2 className="text-2xl font-heading font-bold text-foreground" data-testid="splash-title">
+                  {settings.splash_title}
+                </h2>
+              )}
+              {settings.splash_text && (
+                <p className="text-sm text-muted-foreground whitespace-pre-line" data-testid="splash-text">
+                  {settings.splash_text}
+                </p>
+              )}
+              <div className="flex flex-col gap-2 pt-2">
+                <Button
+                  className="w-full h-12 rounded-2xl bg-mint-500 hover:bg-mint-600 text-white font-semibold"
+                  onClick={dismissSplash}
+                  data-testid="splash-continue-btn"
+                >
+                  {settings.splash_button_text || 'Перейти к меню'}
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+                {settings.splash_link_url && (
+                  <a
+                    href={settings.splash_link_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-mint-500 hover:underline"
+                    data-testid="splash-link"
+                  >
+                    Подробнее →
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header ref={headerRef} className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border">
         <div className="px-4 py-4">

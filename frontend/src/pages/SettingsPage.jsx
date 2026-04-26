@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Palette, Building2, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2, Link } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Building2, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2, Link, Megaphone, Upload as UploadIcon, Image as ImageIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,6 +48,7 @@ export default function SettingsPage() {
   
   const [qrData, setQrData] = useState(null);
   const [qrLoading, setQrLoading] = useState(false);
+  const [splashUploading, setSplashUploading] = useState(false);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -95,6 +96,27 @@ export default function SettingsPage() {
       toast.error('Ошибка сохранения');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSplashImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSplashUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const resp = await axios.post(`${API}/upload`, fd, {
+        headers: { ...authHeaders.headers, 'Content-Type': 'multipart/form-data' },
+      });
+      const url = `${BACKEND_URL}${resp.data.url}`;
+      setSettingsForm({ ...settingsForm, splash_image_url: url });
+      toast.success('Изображение загружено');
+    } catch {
+      toast.error('Ошибка загрузки');
+    } finally {
+      setSplashUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -381,6 +403,10 @@ export default function SettingsPage() {
           <TabsTrigger value="appearance" className="gap-2" data-testid="tab-appearance">
             <Palette className="w-4 h-4" />
             Оформление
+          </TabsTrigger>
+          <TabsTrigger value="splash" className="gap-2" data-testid="tab-splash">
+            <Megaphone className="w-4 h-4" />
+            Заставка
           </TabsTrigger>
         </TabsList>
 
@@ -987,6 +1013,140 @@ export default function SettingsPage() {
               >
                 <Save className="w-4 h-4 mr-2" />
                 {saving ? 'Сохранение...' : 'Сохранить оформление'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Splash Tab */}
+        <TabsContent value="splash" className="mt-6">
+          <Card className="border-none shadow-md" data-testid="splash-card">
+            <CardHeader>
+              <CardTitle className="font-heading">Рекламная заставка</CardTitle>
+              <CardDescription>
+                Показывается при первом открытии меню гостем — анонс акций, приглашение в Instagram и т.д.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between py-3 border-b border-border">
+                <div>
+                  <Label className="text-base font-medium">Показывать заставку</Label>
+                  <p className="text-sm text-muted-foreground">Гость увидит её один раз за сессию</p>
+                </div>
+                <Switch
+                  checked={!!settingsForm.splash_enabled}
+                  onCheckedChange={(checked) => setSettingsForm({ ...settingsForm, splash_enabled: checked })}
+                  data-testid="splash-enabled-switch"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Изображение / баннер</Label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {settingsForm.splash_image_url ? (
+                    <div className="relative">
+                      <img
+                        src={settingsForm.splash_image_url}
+                        alt="splash"
+                        className="w-full sm:w-48 h-32 object-cover rounded-xl border border-border"
+                      />
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                        onClick={() => setSettingsForm({ ...settingsForm, splash_image_url: '' })}
+                        data-testid="splash-image-remove"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="w-full sm:w-48 h-32 rounded-xl border border-dashed border-border bg-muted/30 flex items-center justify-center text-muted-foreground">
+                      <ImageIcon className="w-8 h-8" />
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-2 flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="splash-image-file"
+                      className="hidden"
+                      onChange={handleSplashImageUpload}
+                      data-testid="splash-image-file"
+                    />
+                    <Button
+                      variant="outline"
+                      className="rounded-full gap-2"
+                      onClick={() => document.getElementById('splash-image-file').click()}
+                      disabled={splashUploading}
+                      data-testid="splash-image-upload-btn"
+                    >
+                      {splashUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadIcon className="w-4 h-4" />}
+                      {splashUploading ? 'Загрузка...' : 'Загрузить изображение'}
+                    </Button>
+                    <Input
+                      placeholder="или вставьте ссылку https://..."
+                      value={settingsForm.splash_image_url || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, splash_image_url: e.target.value })}
+                      data-testid="splash-image-url-input"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Заголовок</Label>
+                  <Input
+                    placeholder="Например: Подарок при заказе кальяна"
+                    value={settingsForm.splash_title || ''}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, splash_title: e.target.value })}
+                    data-testid="splash-title-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Текст кнопки</Label>
+                  <Input
+                    placeholder="Перейти к меню"
+                    value={settingsForm.splash_button_text || ''}
+                    onChange={(e) => setSettingsForm({ ...settingsForm, splash_button_text: e.target.value })}
+                    data-testid="splash-button-text-input"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Описание</Label>
+                <Textarea
+                  rows={3}
+                  placeholder="Расскажите про акцию или пригласите подписаться в Instagram"
+                  value={settingsForm.splash_text || ''}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, splash_text: e.target.value })}
+                  data-testid="splash-text-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Ссылка (необязательно)</Label>
+                <Input
+                  placeholder="https://instagram.com/myata.sport"
+                  value={settingsForm.splash_link_url || ''}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, splash_link_url: e.target.value })}
+                  data-testid="splash-link-url-input"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Если указано — рядом с основной кнопкой появится ссылка «Подробнее»
+                </p>
+              </div>
+
+              <Button
+                className="w-full bg-mint-500 hover:bg-mint-600 rounded-full"
+                onClick={handleSaveSettings}
+                disabled={saving}
+                data-testid="save-splash-btn"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {saving ? 'Сохранение...' : 'Сохранить заставку'}
               </Button>
             </CardContent>
           </Card>
