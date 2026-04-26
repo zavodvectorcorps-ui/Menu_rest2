@@ -22,6 +22,7 @@ from routes.caffesta import router as caffesta_router
 from routes.backup import router as backup_router
 from routes.seed import router as seed_router
 from routes.ws import router as ws_router
+from routes.faq import router as faq_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -36,7 +37,7 @@ app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads
 for r in [
     auth_router, restaurants_router, menu_router, tables_router,
     orders_router, settings_router, public_router, telegram_router,
-    caffesta_router, backup_router, seed_router, ws_router,
+    caffesta_router, backup_router, seed_router, ws_router, faq_router,
 ]:
     app.include_router(r, prefix="/api")
 
