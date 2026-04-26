@@ -46,6 +46,14 @@ async def complete_all_orders(restaurant_id: str, current_user: dict = Depends(g
     return {"message": f"Завершено заказов: {result.modified_count}", "count": result.modified_count}
 
 
+@router.delete("/restaurants/{restaurant_id}/orders/clear-all")
+async def clear_all_orders(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    """Удаляет ВСЕ заказы ресторана (включая историю). Необратимо."""
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.orders.delete_many({"restaurant_id": restaurant_id})
+    return {"message": f"Удалено заказов: {result.deleted_count}", "count": result.deleted_count}
+
+
 # ============ STAFF CALLS ============
 
 @router.get("/restaurants/{restaurant_id}/staff-calls")
@@ -76,6 +84,14 @@ async def complete_all_staff_calls(restaurant_id: str, current_user: dict = Depe
         {"$set": {"status": "completed"}}
     )
     return {"message": f"Завершено вызовов: {result.modified_count}", "count": result.modified_count}
+
+
+@router.delete("/restaurants/{restaurant_id}/staff-calls/clear-all")
+async def clear_all_staff_calls(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    """Удаляет ВСЕ вызовы ресторана. Необратимо."""
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.staff_calls.delete_many({"restaurant_id": restaurant_id})
+    return {"message": f"Удалено вызовов: {result.deleted_count}", "count": result.deleted_count}
 
 
 # ============ CALL TYPES ============

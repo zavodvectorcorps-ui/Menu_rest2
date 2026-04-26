@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { ShoppingBag, Phone, Clock, CheckCircle, XCircle, Loader2, CheckCheck, CalendarClock, User, PhoneCall } from 'lucide-react';
+import { ShoppingBag, Phone, Clock, CheckCircle, XCircle, Loader2, CheckCheck, CalendarClock, User, PhoneCall, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +28,9 @@ export default function OrdersPage() {
   const [tab, setTab] = useState('orders');
   const [completeAllOpen, setCompleteAllOpen] = useState(false);
   const [completeAllType, setCompleteAllType] = useState('');
+  const [clearAllOpen, setClearAllOpen] = useState(false);
+  const [clearAllType, setClearAllType] = useState('');
+  const [clearing, setClearing] = useState(false);
 
   const fetchData = async () => {
     if (!currentRestaurantId) return;
@@ -85,6 +88,20 @@ export default function OrdersPage() {
       setCompleteAllOpen(false);
       fetchData();
     } catch { toast.error('Ошибка'); }
+  };
+
+  const handleClearAll = async () => {
+    setClearing(true);
+    try {
+      const url = clearAllType === 'orders'
+        ? `${API}/restaurants/${currentRestaurantId}/orders/clear-all`
+        : `${API}/restaurants/${currentRestaurantId}/staff-calls/clear-all`;
+      const resp = await axios.delete(url, authHeaders);
+      toast.success(resp.data.message);
+      setClearAllOpen(false);
+      fetchData();
+    } catch { toast.error('Ошибка очистки'); }
+    finally { setClearing(false); }
   };
 
   const regularOrders = useMemo(() => orders.filter(o => !o.is_preorder), [orders]);
@@ -194,11 +211,18 @@ export default function OrdersPage() {
         </TabsList>
 
         <TabsContent value="orders" className="mt-6 space-y-4">
-          {activeOrders.length > 0 && (
-            <div className="flex justify-end">
-              <Button variant="outline" className="gap-2" onClick={() => { setCompleteAllType('orders'); setCompleteAllOpen(true); }} data-testid="complete-all-orders-btn">
-                <CheckCheck className="w-4 h-4" />Завершить все ({activeOrders.length})
-              </Button>
+          {(activeOrders.length > 0 || regularOrders.length > 0) && (
+            <div className="flex justify-end gap-2 flex-wrap">
+              {activeOrders.length > 0 && (
+                <Button variant="outline" className="gap-2" onClick={() => { setCompleteAllType('orders'); setCompleteAllOpen(true); }} data-testid="complete-all-orders-btn">
+                  <CheckCheck className="w-4 h-4" />Завершить все ({activeOrders.length})
+                </Button>
+              )}
+              {regularOrders.length > 0 && (
+                <Button variant="outline" className="gap-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => { setClearAllType('orders'); setClearAllOpen(true); }} data-testid="clear-all-orders-btn">
+                  <Trash2 className="w-4 h-4" />Очистить все ({regularOrders.length})
+                </Button>
+              )}
             </div>
           )}
           {regularOrders.length === 0 ? (
@@ -209,11 +233,18 @@ export default function OrdersPage() {
         </TabsContent>
 
         <TabsContent value="preorders" className="mt-6 space-y-4">
-          {activePreorders.length > 0 && (
-            <div className="flex justify-end">
-              <Button variant="outline" className="gap-2" onClick={() => { setCompleteAllType('orders'); setCompleteAllOpen(true); }} data-testid="complete-all-preorders-btn">
-                <CheckCheck className="w-4 h-4" />Завершить все ({activePreorders.length})
-              </Button>
+          {(activePreorders.length > 0 || preOrders.length > 0) && (
+            <div className="flex justify-end gap-2 flex-wrap">
+              {activePreorders.length > 0 && (
+                <Button variant="outline" className="gap-2" onClick={() => { setCompleteAllType('orders'); setCompleteAllOpen(true); }} data-testid="complete-all-preorders-btn">
+                  <CheckCheck className="w-4 h-4" />Завершить все ({activePreorders.length})
+                </Button>
+              )}
+              {preOrders.length > 0 && (
+                <Button variant="outline" className="gap-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => { setClearAllType('orders'); setClearAllOpen(true); }} data-testid="clear-all-preorders-btn">
+                  <Trash2 className="w-4 h-4" />Очистить все ({preOrders.length})
+                </Button>
+              )}
             </div>
           )}
           {preOrders.length === 0 ? (
@@ -224,11 +255,18 @@ export default function OrdersPage() {
         </TabsContent>
 
         <TabsContent value="calls" className="mt-6 space-y-4">
-          {activeCalls.length > 0 && (
-            <div className="flex justify-end">
-              <Button variant="outline" className="gap-2" onClick={() => { setCompleteAllType('calls'); setCompleteAllOpen(true); }} data-testid="complete-all-calls-btn">
-                <CheckCheck className="w-4 h-4" />Завершить все ({activeCalls.length})
-              </Button>
+          {(activeCalls.length > 0 || staffCalls.length > 0) && (
+            <div className="flex justify-end gap-2 flex-wrap">
+              {activeCalls.length > 0 && (
+                <Button variant="outline" className="gap-2" onClick={() => { setCompleteAllType('calls'); setCompleteAllOpen(true); }} data-testid="complete-all-calls-btn">
+                  <CheckCheck className="w-4 h-4" />Завершить все ({activeCalls.length})
+                </Button>
+              )}
+              {staffCalls.length > 0 && (
+                <Button variant="outline" className="gap-2 border-destructive text-destructive hover:bg-destructive/10" onClick={() => { setClearAllType('calls'); setClearAllOpen(true); }} data-testid="clear-all-calls-btn">
+                  <Trash2 className="w-4 h-4" />Очистить все ({staffCalls.length})
+                </Button>
+              )}
             </div>
           )}
           {staffCalls.length === 0 ? (
@@ -253,6 +291,26 @@ export default function OrdersPage() {
             <Button variant="outline" onClick={() => setCompleteAllOpen(false)}>Отмена</Button>
             <Button className="bg-green-500 hover:bg-green-600 text-white gap-2" onClick={handleCompleteAll} data-testid="confirm-complete-all">
               <CheckCheck className="w-4 h-4" />Завершить все
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
+        <DialogContent data-testid="clear-all-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading">Очистить все?</DialogTitle>
+            <DialogDescription>
+              {clearAllType === 'orders'
+                ? `Будут удалены ВСЕ заказы (${orders.length}), включая историю и предзаказы. Это действие необратимо.`
+                : `Будут удалены ВСЕ вызовы (${staffCalls.length}). Это действие необратимо.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearAllOpen(false)} disabled={clearing}>Отмена</Button>
+            <Button className="bg-destructive hover:bg-destructive/90 text-white gap-2" onClick={handleClearAll} disabled={clearing} data-testid="confirm-clear-all">
+              {clearing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Очистить все
             </Button>
           </DialogFooter>
         </DialogContent>

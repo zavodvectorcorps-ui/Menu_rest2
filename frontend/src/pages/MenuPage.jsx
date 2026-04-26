@@ -417,9 +417,9 @@ export default function MenuPage() {
         <Input placeholder="Поиск по меню..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 rounded-full" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Categories sidebar */}
-        <Card className="lg:col-span-1 border-none shadow-md h-fit max-h-[70vh] overflow-hidden flex flex-col">
+        <Card className="lg:col-span-2 border-none shadow-md h-fit max-h-[70vh] overflow-hidden flex flex-col">
           <CardHeader className="pb-3 flex-shrink-0">
             <CardTitle className="text-lg font-heading flex items-center gap-2">
               <Layers className="w-4 h-4 text-muted-foreground" />Категории
