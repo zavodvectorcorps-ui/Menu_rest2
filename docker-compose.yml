@@ -21,6 +21,8 @@ services:
       DB_NAME: restaurant_app
       JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_GENERATE_RANDOM_SECRET}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    volumes:
+      - ./backend/uploads:/app/uploads
     depends_on:
       - mongo
 
