@@ -17,6 +17,7 @@ import {
   Building2,
   Bot,
   Coffee,
+  Database,
   Wifi,
   WifiOff,
   Volume2,
@@ -255,6 +256,25 @@ export default function AdminLayout() {
               <Users className="w-5 h-5" />
               <span className="font-medium">Пользователи</span>
               {location.pathname === '/admin/users' && <ChevronRight className="w-4 h-4 ml-auto" />}
+            </NavLink>
+          )}
+
+          {/* Backup link (superadmin only) */}
+          {user?.role === 'superadmin' && (
+            <NavLink
+              to="/admin/backup"
+              onClick={() => setSidebarOpen(false)}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+                location.pathname === '/admin/backup'
+                  ? "bg-mint-500 text-white shadow-lg shadow-mint-500/30"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              data-testid="nav-backup"
+            >
+              <Database className="w-5 h-5" />
+              <span className="font-medium">Резервные копии</span>
+              {location.pathname === '/admin/backup' && <ChevronRight className="w-4 h-4 ml-auto" />}
             </NavLink>
           )}
         </nav>
