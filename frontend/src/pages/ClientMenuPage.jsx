@@ -42,6 +42,8 @@ export default function ClientMenuPage() {
   });
   const [orderStatus, setOrderStatus] = useState(activeOrderId?.status || null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef(null);
 
   // Category scroll state
   const categoryScrollRef = useRef(null);
@@ -389,16 +391,54 @@ export default function ClientMenuPage() {
             </div>
             
             {settings.staff_call_enabled && call_types && call_types.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                onClick={() => setCallModalOpen(true)}
-                data-testid="call-staff-btn"
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    const next = !searchOpen;
+                    setSearchOpen(next);
+                    if (!next) setSearchQuery('');
+                    if (next) setTimeout(() => searchInputRef.current?.focus(), 50);
+                  }}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                    searchOpen
+                      ? 'bg-mint-500 text-white'
+                      : 'border border-border text-foreground/70 hover:bg-muted'
+                  }`}
+                  aria-label="Поиск"
+                  data-testid="toggle-search-btn"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 h-9 px-3"
+                  onClick={() => setCallModalOpen(true)}
+                  data-testid="call-staff-btn"
+                >
+                  <Bell className="w-4 h-4 mr-1" />
+                  Вызов
+                </Button>
+              </div>
+            )}
+            {!(settings.staff_call_enabled && call_types && call_types.length > 0) && (
+              <button
+                onClick={() => {
+                  const next = !searchOpen;
+                  setSearchOpen(next);
+                  if (!next) setSearchQuery('');
+                  if (next) setTimeout(() => searchInputRef.current?.focus(), 50);
+                }}
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                  searchOpen
+                    ? 'bg-mint-500 text-white'
+                    : 'border border-border text-foreground/70 hover:bg-muted'
+                }`}
+                aria-label="Поиск"
+                data-testid="toggle-search-btn"
               >
-                <Bell className="w-4 h-4 mr-1" />
-                Вызов
-              </Button>
+                <Search className="w-4 h-4" />
+              </button>
             )}
           </div>
 
@@ -408,15 +448,15 @@ export default function ClientMenuPage() {
         </div>
 
         {/* Section tabs (Гастрономическое, Барное, Кальянное) */}
-        <div className="px-4 pb-3">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+        <div className="px-4 pb-2.5">
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
             {sections.filter(s => s.is_active).map((section) => (
               <button
                 key={section.id}
                 onClick={() => setSelectedSection(section.id)}
-                className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                className={`px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
                   selectedSection === section.id
-                    ? 'bg-mint-500 text-white shadow-lg shadow-mint-500/30'
+                    ? 'bg-mint-500 text-white shadow-md shadow-mint-500/30'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
                 }`}
                 data-testid={`section-tab-${section.id}`}
@@ -427,30 +467,33 @@ export default function ClientMenuPage() {
           </div>
         </div>
 
-        {/* Search input */}
-        <div className="px-4 pb-3">
-          <div className="relative">
-            <Search className="w-4 h-4 text-muted-foreground/70 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск по названию..."
-              className="w-full h-10 pl-9 pr-9 rounded-xl bg-muted/70 border border-transparent focus:border-mint-500 focus:bg-background outline-none text-sm text-foreground placeholder:text-muted-foreground/70 transition-colors"
-              data-testid="menu-search-input"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full hover:bg-muted flex items-center justify-center"
-                data-testid="menu-search-clear"
-                aria-label="Очистить поиск"
-              >
-                <X className="w-3.5 h-3.5 text-muted-foreground" />
-              </button>
-            )}
+        {/* Search input — collapsible */}
+        {searchOpen && (
+          <div className="px-4 pb-2.5" data-testid="search-panel">
+            <div className="relative">
+              <Search className="w-4 h-4 text-muted-foreground/70 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск по названию..."
+                className="w-full h-10 pl-9 pr-9 rounded-xl bg-muted/70 border border-transparent focus:border-mint-500 focus:bg-background outline-none text-sm text-foreground placeholder:text-muted-foreground/70 transition-colors"
+                data-testid="menu-search-input"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full hover:bg-muted flex items-center justify-center"
+                  data-testid="menu-search-clear"
+                  aria-label="Очистить поиск"
+                >
+                  <X className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Category tabs within section - improved mobile UX */}
         {visibleCategories.length > 0 && (
