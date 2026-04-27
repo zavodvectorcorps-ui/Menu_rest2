@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Palette, Building2, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2, Link, Megaphone, Upload as UploadIcon, Image as ImageIcon } from 'lucide-react';
+import ImageCropDialog from '@/components/ImageCropDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +50,8 @@ export default function SettingsPage() {
   const [qrData, setQrData] = useState(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [splashUploading, setSplashUploading] = useState(false);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [rawImageSrc, setRawImageSrc] = useState(null);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -102,21 +105,33 @@ export default function SettingsPage() {
   const handleSplashImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Read file as data URL and open cropper
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      setRawImageSrc(evt.target.result);
+      setCropOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleCroppedImageUpload = async (blob) => {
     setSplashUploading(true);
     try {
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', blob, 'splash.jpg');
       const resp = await axios.post(`${API}/upload`, fd, {
         headers: { ...authHeaders.headers, 'Content-Type': 'multipart/form-data' },
       });
       const url = `${BACKEND_URL}${resp.data.url}`;
       setSettingsForm({ ...settingsForm, splash_image_url: url });
       toast.success('Изображение загружено');
+      setCropOpen(false);
+      setRawImageSrc(null);
     } catch {
       toast.error('Ошибка загрузки');
     } finally {
       setSplashUploading(false);
-      e.target.value = '';
     }
   };
 
@@ -1127,15 +1142,45 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Ссылка (необязательно)</Label>
-                <Input
-                  placeholder="https://instagram.com/myata.sport"
-                  value={settingsForm.splash_link_url || ''}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, splash_link_url: e.target.value })}
-                  data-testid="splash-link-url-input"
-                />
+                <Label>Режим отображения изображения</Label>
+                <select
+                  value={settingsForm.splash_fit_mode || 'contain'}
+                  onChange={(e) => setSettingsForm({ ...settingsForm, splash_fit_mode: e.target.value })}
+                  className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm"
+                  data-testid="splash-fit-mode-select"
+                >
+                  <option value="contain">Целиком (без обрезки)</option>
+                  <option value="cover">Заполнить (с обрезкой по краям)</option>
+                </select>
                 <p className="text-xs text-muted-foreground">
-                  Если указано — рядом с основной кнопкой появится ссылка «Подробнее»
+                  «Целиком» — картинка показывается полностью в её пропорциях. «Заполнить» — растягивается на всю площадь, лишние края обрезаются.
+                </p>
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <Label className="text-base font-medium mb-3 block">Дополнительная кнопка</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Текст кнопки</Label>
+                    <Input
+                      placeholder="Например: Подписаться в Instagram"
+                      value={settingsForm.splash_link_text || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, splash_link_text: e.target.value })}
+                      data-testid="splash-link-text-input"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Ссылка</Label>
+                    <Input
+                      placeholder="https://instagram.com/myata.sport"
+                      value={settingsForm.splash_link_url || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, splash_link_url: e.target.value })}
+                      data-testid="splash-link-url-input"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Если оба поля заполнены — под основной кнопкой появится вторая кнопка, которая ведёт по ссылке.
                 </p>
               </div>
 
@@ -1435,6 +1480,14 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImageCropDialog
+        open={cropOpen}
+        onOpenChange={(o) => { setCropOpen(o); if (!o) setRawImageSrc(null); }}
+        imageSrc={rawImageSrc}
+        onCropDone={handleCroppedImageUpload}
+        busy={splashUploading}
+      />
     </div>
   );
 }

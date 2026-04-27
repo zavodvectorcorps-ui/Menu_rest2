@@ -391,11 +391,11 @@ export default function ClientMenuPage() {
         >
           <div className="w-full max-w-lg bg-card rounded-3xl shadow-2xl overflow-hidden border border-border max-h-[92vh] flex flex-col">
             {settings.splash_image_url && (
-              <div className="w-full bg-muted flex items-center justify-center">
+              <div className={`w-full bg-muted flex items-center justify-center ${settings.splash_fit_mode === 'cover' ? 'aspect-[16/9]' : ''}`}>
                 <img
                   src={settings.splash_image_url}
                   alt="splash"
-                  className="w-full h-auto object-contain max-h-[60vh]"
+                  className={`w-full ${settings.splash_fit_mode === 'cover' ? 'h-full object-cover' : 'h-auto object-contain max-h-[60vh]'}`}
                   data-testid="splash-image"
                 />
               </div>
@@ -420,16 +420,15 @@ export default function ClientMenuPage() {
                   {settings.splash_button_text || 'Перейти к меню'}
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
-                {settings.splash_link_url && (
-                  <a
-                    href={settings.splash_link_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-mint-500 hover:underline"
-                    data-testid="splash-link"
+                {settings.splash_link_url && settings.splash_link_text && (
+                  <Button
+                    variant="outline"
+                    className="w-full h-12 rounded-2xl border-mint-500 text-mint-500 hover:bg-mint-50 dark:hover:bg-mint-900/20 font-semibold"
+                    onClick={() => window.open(settings.splash_link_url, '_blank', 'noopener,noreferrer')}
+                    data-testid="splash-link-btn"
                   >
-                    Подробнее →
-                  </a>
+                    {settings.splash_link_text}
+                  </Button>
                 )}
               </div>
             </div>

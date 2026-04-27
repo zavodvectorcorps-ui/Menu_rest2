@@ -338,6 +338,8 @@ class Settings(BaseModel):
     splash_text: Optional[str] = ""
     splash_button_text: Optional[str] = "Перейти к меню"
     splash_link_url: Optional[str] = ""
+    splash_link_text: Optional[str] = ""
+    splash_fit_mode: Optional[str] = "contain"  # "contain" | "cover"
 
 class SettingsUpdate(BaseModel):
     online_menu_enabled: Optional[bool] = None
@@ -357,6 +359,8 @@ class SettingsUpdate(BaseModel):
     splash_text: Optional[str] = None
     splash_button_text: Optional[str] = None
     splash_link_url: Optional[str] = None
+    splash_link_text: Optional[str] = None
+    splash_fit_mode: Optional[str] = None
 
 class MenuView(BaseModel):
     model_config = ConfigDict(extra="ignore")
