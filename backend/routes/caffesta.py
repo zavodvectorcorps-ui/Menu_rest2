@@ -9,6 +9,8 @@ from services.caffesta import (
     caffesta_test_connection, caffesta_get_sales, caffesta_get_sales_totals,
     caffesta_get_products, caffesta_send_order, caffesta_get_order_status,
     caffesta_get_sales_shift_day, get_caffesta_config, is_caffesta_enabled,
+    caffesta_get_all_receipts, split_receipt_payments,
+    caffesta_get_product_shop_data,
 )
 
 router = APIRouter()
@@ -168,28 +170,19 @@ async def get_caffesta_analytics(restaurant_id: str, days: int = 30, current_use
         except (ValueError, TypeError):
             continue
 
-    # Payment breakdown by type (from shift_day receipts)
-    shift = await caffesta_get_sales_shift_day(restaurant_id, start_date, end_date)
-    shift_data = shift.get("data", []) if shift.get("ok") else []
+    # Payment breakdown by type — from real receipts (v1.1/draft/receipts_by_shift_day)
+    receipts_res = await caffesta_get_all_receipts(restaurant_id, start_date, end_date)
+    receipts = receipts_res.get("data", []) if receipts_res.get("ok") else []
+    payment_methods = (await get_caffesta_config(restaurant_id) or {}).get("payment_methods", [])
+
     payment_breakdown = {}
-    seen_receipts = set()
-    for r in shift_data:
-        pt = (r.get("payment_type") or r.get("payment_title") or "Не указан").strip() or "Не указан"
-        rcpt_key = r.get("receipt_number") or r.get("receipt_id") or r.get("id")
-        # Aggregate total_pay per receipt once (shift_day returns product rows)
-        key = (rcpt_key, pt)
-        if rcpt_key and key in seen_receipts:
-            continue
-        if rcpt_key:
-            seen_receipts.add(key)
-        try:
-            amount = float(r.get("receipt_total_pay", 0) or r.get("total_pay", 0) or 0)
-        except (ValueError, TypeError):
-            amount = 0
-        if pt not in payment_breakdown:
-            payment_breakdown[pt] = {"name": pt, "amount": 0.0, "count": 0}
-        payment_breakdown[pt]["amount"] += amount
-        payment_breakdown[pt]["count"] += 1
+    for r in receipts:
+        for p in split_receipt_payments(r, payment_methods):
+            key = p["name"]
+            if key not in payment_breakdown:
+                payment_breakdown[key] = {"name": key, "amount": 0.0, "count": 0}
+            payment_breakdown[key]["amount"] += p["amount"]
+            payment_breakdown[key]["count"] += 1
     payments = [
         {"name": p["name"], "amount": round(p["amount"], 2), "count": p["count"]}
         for p in sorted(payment_breakdown.values(), key=lambda x: x["amount"], reverse=True)
@@ -333,17 +326,13 @@ async def caffesta_time_window(
     time_to: str = "23:59",         # HH:MM (if < from, treats as wrap-around past midnight)
     current_user: dict = Depends(get_current_user),
 ):
-    """Sales within a specific day-of-week type and time-of-day window."""
+    """Sales within a specific day-of-week type and time-of-day window.
+    Uses v1.1/draft/receipts_by_shift_day which provides real per-receipt timestamps."""
     await check_restaurant_access(current_user, restaurant_id)
 
     end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    start_date = (datetime.now(timezone.utc) - timedelta(days=max(1, min(days, 120)))).strftime("%Y-%m-%d")
 
-    result = await caffesta_get_sales_shift_day(restaurant_id, start_date, end_date)
-    if not result.get("ok"):
-        raise HTTPException(status_code=400, detail=result.get("message", "Ошибка Caffesta"))
-
-    raw = result.get("data", [])
     try:
         from_min = _hhmm_to_minutes(time_from)
         to_min = _hhmm_to_minutes(time_to)
@@ -354,99 +343,95 @@ async def caffesta_time_window(
         m = dt.hour * 60 + dt.minute
         if from_min <= to_min:
             return from_min <= m <= to_min
-        # wrap-around e.g. 22:00 -> 02:00
         return m >= from_min or m <= to_min
 
     def in_day_type(dt: datetime) -> bool:
-        wd = dt.weekday()  # 0=Mon..6=Sun
+        wd = dt.weekday()
         if day_type == "weekday":
             return wd < 5
         if day_type == "weekend":
             return wd >= 5
         return True
 
-    filtered_rows = []
-    seen = set()
-    total_items = 0
+    res = await caffesta_get_all_receipts(restaurant_id, start_date, end_date)
+    if not res.get("ok"):
+        raise HTTPException(status_code=400, detail=res.get("message", "Ошибка Caffesta"))
+    receipts = res.get("data", [])
+
+    config = await get_caffesta_config(restaurant_id) or {}
+    payment_methods = config.get("payment_methods", [])
+
+    total_revenue = 0.0
     total_discount = 0.0
+    total_receipts = 0
     products = {}
-    receipts = {}
     by_day = {}
     payment_breakdown = {}
+    samples = []
 
-    for r in raw:
-        dt = _parse_receipt_datetime(r)
+    for r in receipts:
+        dt = r.get("created_dt")
         if not dt:
             continue
+        # Strip tz for comparison
+        if dt.tzinfo is not None:
+            dt = dt.replace(tzinfo=None)
         if not in_day_type(dt) or not in_time_window(dt):
             continue
-        filtered_rows.append(r)
 
-        rcpt_id = r.get("receipt_number") or r.get("id") or r.get("receipt_id")
-        pt = (r.get("payment_type") or r.get("payment_title") or "Не указан").strip() or "Не указан"
-
-        try:
-            qty = int(float(r.get("product_qty", r.get("qnt", 0)) or 0))
-            psum = float(r.get("product_sum", 0) or 0)
-            disc = float(r.get("discount_sum", r.get("discount", 0)) or 0)
-        except (ValueError, TypeError):
-            qty, psum, disc = 0, 0, 0
-
-        total_items += qty
-        total_discount += disc
-
-        pname = r.get("product_title") or r.get("product_name") or r.get("name") or "—"
-        if pname not in products:
-            products[pname] = {"name": pname, "qty": 0, "revenue": 0.0}
-        products[pname]["qty"] += qty
-        products[pname]["revenue"] += psum
-
-        # Aggregate revenue per receipt (product rows summed; if receipt_total_pay is present we use the max seen)
-        try:
-            receipt_total = float(r.get("receipt_total_pay", 0) or 0)
-        except (ValueError, TypeError):
-            receipt_total = 0
-
-        if rcpt_id and rcpt_id not in seen:
-            seen.add(rcpt_id)
-            receipts[rcpt_id] = {
-                "id": rcpt_id,
-                "datetime": dt.strftime("%Y-%m-%d %H:%M"),
-                "cashier": r.get("cashier_title") or r.get("cashier_name") or "",
-                "payment_type": pt,
-                "revenue_from_items": 0.0,
-                "receipt_total": receipt_total,
-            }
-            if pt not in payment_breakdown:
-                payment_breakdown[pt] = {"name": pt, "count": 0}
-            payment_breakdown[pt]["count"] += 1
-            day_key = dt.strftime("%Y-%m-%d")
-            by_day.setdefault(day_key, {"date": day_key, "weekday": dt.weekday(), "revenue": 0.0, "receipts": 0})
-            by_day[day_key]["receipts"] += 1
-        if rcpt_id:
-            receipts[rcpt_id]["revenue_from_items"] += psum
-            if receipt_total and receipts[rcpt_id]["receipt_total"] == 0:
-                receipts[rcpt_id]["receipt_total"] = receipt_total
-
-    # Finalize revenue: prefer receipt_total, fallback to summed items
-    total_revenue = 0.0
-    for rc in receipts.values():
-        rev = rc["receipt_total"] or rc["revenue_from_items"]
-        rc["revenue"] = round(rev, 2)
+        rev = float(r.get("total_sum", 0) or 0)
+        disc = float(r.get("discount_sum", 0) or 0)
         total_revenue += rev
-        pt = rc["payment_type"]
-        payment_breakdown[pt].setdefault("amount", 0.0)
-        payment_breakdown[pt]["amount"] += rev
-        day_key = rc["datetime"][:10]
-        if day_key in by_day:
-            by_day[day_key]["revenue"] += rev
+        total_discount += disc
+        total_receipts += 1
+
+        # Payment breakdown
+        for p in split_receipt_payments(r, payment_methods):
+            key = p["name"]
+            payment_breakdown.setdefault(key, {"name": key, "amount": 0.0, "count": 0})
+            payment_breakdown[key]["amount"] += p["amount"]
+            payment_breakdown[key]["count"] += 1
+
+        # Day breakdown
+        day_key = dt.strftime("%Y-%m-%d")
+        by_day.setdefault(day_key, {"date": day_key, "weekday": dt.weekday(), "revenue": 0.0, "receipts": 0})
+        by_day[day_key]["receipts"] += 1
+        by_day[day_key]["revenue"] += rev
+
+        # Top products from order_dishes
+        for od in (r.get("order_dishes") or []):
+            dish = od.get("dish") or od
+            pname = (
+                dish.get("title") or dish.get("name") or dish.get("product_title")
+                or dish.get("ref_code") or "—"
+            )
+            try:
+                qty = float(od.get("count") or od.get("qty") or od.get("qnt") or 1)
+            except (ValueError, TypeError):
+                qty = 1
+            try:
+                psum = float(od.get("total_sum") or od.get("sum") or (od.get("price", 0) or 0) * qty)
+            except (ValueError, TypeError):
+                psum = 0
+            products.setdefault(pname, {"name": pname, "qty": 0, "revenue": 0.0})
+            products[pname]["qty"] += int(qty)
+            products[pname]["revenue"] += psum
+
+        if len(samples) < 20:
+            samples.append({
+                "id": str(r.get("id", ""))[:12],
+                "datetime": dt.strftime("%Y-%m-%d %H:%M"),
+                "weekday": ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"][dt.weekday()],
+                "total": round(rev, 2),
+                "terminal_id": r.get("terminal_id"),
+            })
 
     top_products = sorted(products.values(), key=lambda x: x["revenue"], reverse=True)[:20]
     for p in top_products:
         p["revenue"] = round(p["revenue"], 2)
     payments_list = [
-        {"name": p["name"], "amount": round(p.get("amount", 0), 2), "count": p["count"]}
-        for p in sorted(payment_breakdown.values(), key=lambda x: x.get("amount", 0), reverse=True)
+        {"name": p["name"], "amount": round(p["amount"], 2), "count": p["count"]}
+        for p in sorted(payment_breakdown.values(), key=lambda x: x["amount"], reverse=True)
     ]
     by_day_list = sorted(
         [{**v, "revenue": round(v["revenue"], 2)} for v in by_day.values()],
@@ -464,12 +449,65 @@ async def caffesta_time_window(
         },
         "totals": {
             "revenue": round(total_revenue, 2),
-            "receipts": len(receipts),
-            "items": total_items,
+            "receipts": total_receipts,
+            "items": sum(p["qty"] for p in products.values()),
             "discount": round(total_discount, 2),
-            "avg_check": round(total_revenue / max(len(receipts), 1), 2),
+            "avg_check": round(total_revenue / max(total_receipts, 1), 2),
         },
         "payments": payments_list,
         "top_products": top_products,
         "by_day": by_day_list,
+        "samples": samples,
+    }
+
+
+# ============ STOP LIST SYNC ============
+
+@router.post("/restaurants/{restaurant_id}/caffesta/stop-list/sync")
+async def sync_stop_list(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    """Fetch stop-list status from Caffesta (get_product_shop_data) and update menu items' availability."""
+    await check_restaurant_access(current_user, restaurant_id)
+    res = await caffesta_get_product_shop_data(restaurant_id)
+    if not res.get("ok"):
+        raise HTTPException(status_code=400, detail=res.get("message", "Ошибка Caffesta"))
+    data = res.get("data", [])
+    stop_ids = {row["product_id"]: row for row in data if row.get("inStopList")}
+    in_stock_ids = {row["product_id"]: row for row in data if not row.get("inStopList")}
+
+    # Only affect items that have caffesta_product_id set
+    items = await db.menu_items.find(
+        {"restaurant_id": restaurant_id, "caffesta_product_id": {"$exists": True, "$ne": None}},
+        {"_id": 0, "id": 1, "caffesta_product_id": 1, "is_available": 1, "name": 1},
+    ).to_list(10000)
+
+    disabled = []
+    enabled = []
+    for item in items:
+        cfid = item.get("caffesta_product_id")
+        if not cfid:
+            continue
+        if cfid in stop_ids and item.get("is_available", True) is not False:
+            await db.menu_items.update_one(
+                {"id": item["id"]}, {"$set": {"is_available": False, "stop_list_source": "caffesta"}}
+            )
+            disabled.append(item["name"])
+        elif cfid in in_stock_ids and item.get("is_available", True) is False:
+            # Re-enable only if it was disabled by caffesta sync
+            # (don't re-enable items manually disabled by user)
+            existing = await db.menu_items.find_one({"id": item["id"]}, {"_id": 0, "stop_list_source": 1})
+            if existing and existing.get("stop_list_source") == "caffesta":
+                await db.menu_items.update_one(
+                    {"id": item["id"]}, {"$set": {"is_available": True, "stop_list_source": None}}
+                )
+                enabled.append(item["name"])
+
+    return {
+        "ok": True,
+        "total_in_caffesta": len(data),
+        "in_stop_list": len(stop_ids),
+        "disabled_count": len(disabled),
+        "enabled_count": len(enabled),
+        "disabled": disabled[:30],
+        "enabled": enabled[:30],
+        "linked_items": len(items),
     }

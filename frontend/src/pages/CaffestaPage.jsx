@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plug, PlugZap, Save, TestTube, DollarSign, ShoppingCart, TrendingUp, Award, Users, FileText, Filter, Plus, Trash2, Star, Clock, CalendarDays } from 'lucide-react';
+import { Loader2, Plug, PlugZap, Save, TestTube, DollarSign, ShoppingCart, TrendingUp, Award, Users, FileText, Filter, Plus, Trash2, Star, Clock, CalendarDays, Ban } from 'lucide-react';
 import { toast } from 'sonner';
 import { API, useApp } from '@/App';
 import axios from 'axios';
@@ -200,6 +200,21 @@ export default function CaffestaPage() {
     setTimeout(fetchTimeWindow, 50);
   };
 
+  const syncStopList = async () => {
+    if (!currentRestaurantId) return;
+    try {
+      const r = await axios.post(`${API}/restaurants/${currentRestaurantId}/caffesta/stop-list/sync`, {}, authHeaders);
+      const d = r.data;
+      if (d.disabled_count > 0 || d.enabled_count > 0) {
+        toast.success(`Стоп-лист синхронизирован: -${d.disabled_count}, +${d.enabled_count}`);
+      } else {
+        toast.success(`Стоп-лист синхронизирован. Изменений нет (проверено ${d.linked_items} привязанных позиций)`);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Ошибка синхронизации стоп-листа');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -351,7 +366,7 @@ export default function CaffestaPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-2 flex-wrap">
                 <Button onClick={saveConfig} disabled={saving} data-testid="caffesta-save-btn">
                   {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                   Сохранить
@@ -359,6 +374,10 @@ export default function CaffestaPage() {
                 <Button variant="outline" onClick={testConnection} disabled={testing || !config.account_name || !config.api_key} data-testid="caffesta-test-btn">
                   {testing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <TestTube className="w-4 h-4 mr-2" />}
                   Проверить подключение
+                </Button>
+                <Button variant="outline" onClick={syncStopList} disabled={!config.enabled} data-testid="caffesta-sync-stop-list" title="Скрыть в меню позиции, помеченные в Caffesta как stop-list">
+                  <Ban className="w-4 h-4 mr-2" />
+                  Синхронизировать стоп-лист
                 </Button>
               </div>
             </CardContent>

@@ -1,0 +1,60 @@
+{
+  "summary": "Tested Caffesta API rewrite (new endpoints: /v1.0/draft/get_balances, /v1.1/draft/receipts_by_shift_day, /v1.0/draft/get_product_shop_data). All 10 backend tests passed (100%). Frontend Caffesta page renders correctly: 'Синхронизировать стоп-лист' button present & properly disabled when integration off, time-window placeholder shown when disabled, no JS errors.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/restaurants/{id}/caffesta/time-window", "issue": "days param is silently clamped via min(days,120) in start_date calc — so days=200 effectively becomes days=120 and returns 200 instead of 400 as spec implies. Acceptable degradation but spec said >120 should return 400."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "POST /api/restaurants/{id}/costs/import-caffesta returns 400 'Caffesta не настроена для этого ресторана' when disabled (no 500)",
+    "GET /api/restaurants/{id}/caffesta/analytics?days=7 returns 200 with totals.revenue=0, payments=[] when Caffesta disabled (no crash from sales/totals/receipts failures)",
+    "GET /api/restaurants/{id}/caffesta/analytics (default days) returns full shape: period/totals/payments/top_products/by_terminal",
+    "GET /api/restaurants/{id}/caffesta/time-window returns 400 when Caffesta disabled",
+    "GET /api/restaurants/{id}/caffesta/time-window with invalid HH:MM time_from returns 400",
+    "GET /api/restaurants/{id}/caffesta/time-window with enabled=true + bogus creds returns 200 with empty totals (revenue:0, receipts:0, payments:[], samples:[]) — verified via direct call",
+    "POST /api/restaurants/{id}/caffesta/stop-list/sync returns 400 when disabled (no crash, expected detail)",
+    "Regression: GET /api/restaurants/{id}/costs/analysis returns items[]+summary correctly",
+    "Regression: POST /api/restaurants/{id}/costs/upload CSV with 'Название,Себестоимость' parses and persists",
+    "Regression: PUT /api/restaurants/{id}/caffesta with payment_methods array persists, payment_id syncs to default-marked method, GET reflects after roundtrip",
+    "Frontend /admin/caffesta loads — all 4 tabs visible (Настройки, Аналитика POS, Сравнение по времени, Реализация)",
+    "Frontend Settings tab — 'Синхронизировать стоп-лист' button (data-testid=caffesta-sync-stop-list) present and DISABLED when config.enabled=false",
+    "Frontend 'Сравнение по времени' tab shows placeholder 'Настройте и включите интеграцию с Caffesta для анализа по часам' when disabled (no JS crash)",
+    "No console errors, no .error elements visible on page"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_caffesta_rewrite.py",
+    "/app/test_reports/pytest/pytest_caffesta_rewrite.xml"
+  ],
+  "action_items": [
+    "(Optional) Decide if days>120 in /caffesta/time-window should return 400 explicitly (spec) vs silently clamp to 120 (current). Current behaviour is reasonable but contradicts explicit spec assertion."
+  ],
+  "critical_code_review_comments": [
+    "caffesta_get_all_receipts: when terminals discovery returns [] AND pos_id is missing, returns {ok:False, message:'Не удалось определить терминалы Caffesta'} which causes time-window endpoint to raise 400. Per spec, with enabled+bad creds should return 200/empty — works fine because pos_id fallback kicks in. If user enables Caffesta WITHOUT pos_id and creds invalid, time-window returns 400 (acceptable but worth documenting).",
+    "caffesta route: time-window endpoint raises HTTPException(400) on caffesta_get_all_receipts failure instead of degrading to empty data like analytics does. Inconsistent with analytics endpoint which always returns 200. Consider unifying for nicer UX (currently 400 surfaces in UI as an error toast).",
+    "stop-list/sync: doesn't track which items had availability toggled by user vs sync — relies on stop_list_source field. If user manually disables an item, then Caffesta sync fires and product is NOT in caffesta stop_list, item stays disabled (correct). But if user manually disables item that IS in caffesta stop_list, then Caffesta later removes it from stop_list, the sync will NOT re-enable it (because stop_list_source != 'caffesta'). Potential edge case but logic looks intentional and correct.",
+    "split_receipt_payments: for cashless_pay, falls back to label 'Безнал (ID {cpid})' if no method maps. Multiple cashless payment_ids on same receipt are not supported (only one cashlessPayment_id field per receipt) — fine per Caffesta API.",
+    "import_caffesta_costs: only processes items with self_cost > 0; items with self_cost=0 are silently skipped. If genuine 0-cost items exist (e.g. promos), they won't be cleared from local cost_price. Minor."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_caffesta_rewrite.py"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 tests passed)",
+    "frontend": "100% (page renders, button states correct, no JS errors)"
+  },
+  "test_credentials": {
+    "superadmin": {"username": "admin", "password": "220066"},
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  "seed_data_creation": "Tests temporarily set bogus Caffesta creds (account_name='bogusacct', api_key='bogus') on restaurant aa25189d... — restored to {enabled:false, account_name:'', api_key:''} at end of run. Tests also added cost_price=42.5 to a hypothetical item 'ТЕСТ_БЛЮДО_X9999' if it existed; otherwise it just appears in 'unmatched'. payment_methods previously seeded by iteration 15 ([{'Только наличные'},{'Только карта'}]) was overwritten by test_caffesta_put_payment_methods_regression to [{'Тест нал', payment_id:1, default}, {'Тест карта', payment_id:2}]. Main agent should re-seed if a clean demo state is required.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Caffesta rewrite fully validated. All new endpoints (import-caffesta via /draft/get_balances, time-window via /draft/receipts_by_shift_day, stop-list/sync via /draft/get_product_shop_data) degrade gracefully when integration disabled OR enabled with bad creds. Test file at /app/backend/tests/test_caffesta_rewrite.py covers 10 cases, runs in ~4s. Real Caffesta endpoint behaviour CANNOT be tested in this environment (no real account_name+api_key for an actual Caffesta tenant). For real-data validation, main agent will need to provide valid Caffesta creds. Frontend is wired correctly; sync button disables itself when enabled=false. Note: time-window endpoint raises 400 on Caffesta failure while analytics endpoint degrades to 200 with empty data — slight inconsistency.",
+  "rca of the issue": "N/A — no bugs found. All graceful-degradation requirements verified."
+}

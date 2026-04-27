@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from auth import check_restaurant_access, get_current_user
 from database import db
 from helpers import get_or_create_settings
-from services.caffesta import get_caffesta_config, _safe_json
+from services.caffesta import get_caffesta_config, caffesta_get_balances
 
 router = APIRouter()
 
@@ -189,28 +189,17 @@ async def import_caffesta_costs(restaurant_id: str, current_user: dict = Depends
     if not config or not config.get("enabled") or not config.get("api_key"):
         raise HTTPException(400, "Caffesta не настроена для этого ресторана")
 
-    # Fetch products + tech_maps
-    headers = {"X-API-KEY": config["api_key"]}
-    account = config["account_name"]
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            resp = await client.get(
-                f"https://{account}.caffesta.com/api/v1/products",
-                headers=headers,
-            )
-            resp.raise_for_status()
-            products = _safe_json(resp) or []
-        except Exception as e:
-            raise HTTPException(502, f"Ошибка Caffesta API: {e}")
+    balances = await caffesta_get_balances(restaurant_id)
+    if not balances.get("ok"):
+        raise HTTPException(502, f"Ошибка Caffesta API: {balances.get('message')}")
 
-    entries = []
-    for p in products:
-        cost = _parse_float(p.get("cost_price") or p.get("tech_map", {}).get("cost_price"))
-        if cost is not None:
-            entries.append({"caffesta_product_id": p.get("id"), "name": p.get("name", ""), "cost": cost})
+    entries = [
+        {"caffesta_product_id": b["product_id"], "cost": b["self_cost"]}
+        for b in balances.get("data", []) if b.get("self_cost", 0) > 0
+    ]
 
     if not entries:
-        return {"matched": 0, "total": 0, "unmatched": [], "message": "В Caffesta нет тех. карт с себестоимостью"}
+        return {"matched": 0, "total": 0, "unmatched": [], "message": "В Caffesta нет товаров с себестоимостью (self_cost=0 у всех)"}
 
     result = await _match_and_update(restaurant_id, entries, source="caffesta")
     await _send_margin_alerts(restaurant_id)
