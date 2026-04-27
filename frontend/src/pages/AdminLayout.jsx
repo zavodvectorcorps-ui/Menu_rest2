@@ -17,6 +17,7 @@ import {
   Building2,
   Bot,
   Coffee,
+  TrendingDown,
   Database,
   Wifi,
   WifiOff,
@@ -44,6 +45,7 @@ const navItems = [
   { path: '/admin/settings', label: 'Настройки', icon: Settings },
   { path: '/admin/telegram-bot', label: 'Telegram-бот', icon: Bot },
   { path: '/admin/caffesta', label: 'Caffesta POS', icon: Coffee },
+  { path: '/admin/price-control', label: 'Контроль цен', icon: TrendingDown },
   { path: '/admin/help', label: 'Справочный центр', icon: HelpCircle },
   { path: '/admin/support', label: 'Поддержка', icon: MessageSquare },
 ];
