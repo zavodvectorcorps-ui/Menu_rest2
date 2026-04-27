@@ -136,6 +136,13 @@ async def update_menu_item(restaurant_id: str, item_id: str, data: MenuItemUpdat
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
     if update_data:
         await db.menu_items.update_one({"id": item_id, "restaurant_id": restaurant_id}, {"$set": update_data})
+    # If price changed, re-evaluate margin alerts for this restaurant
+    if "price" in update_data:
+        try:
+            from routes.cost_control import _send_margin_alerts
+            await _send_margin_alerts(restaurant_id)
+        except Exception:
+            pass
     return await db.menu_items.find_one({"id": item_id}, {"_id": 0})
 
 

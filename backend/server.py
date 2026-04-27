@@ -25,6 +25,7 @@ from routes.ws import router as ws_router
 from routes.faq import router as faq_router
 from routes.splash import router as splash_router
 from routes.cost_control import router as cost_router
+from routes.cost_control import run_margin_check_job
 from routes.caffesta_mapping import router as caffesta_mapping_router
 from routes.digest import router as digest_router
 from services.digest import run_daily_digest_job
@@ -73,8 +74,9 @@ async def startup():
     try:
         scheduler = AsyncIOScheduler(timezone=ZoneInfo("Europe/Minsk"))
         scheduler.add_job(run_daily_digest_job, CronTrigger(hour=10, minute=0), id="daily_digest", replace_existing=True)
+        scheduler.add_job(run_margin_check_job, CronTrigger(hour=10, minute=5), id="margin_check", replace_existing=True)
         scheduler.start()
-        logging.info("Scheduler started (daily digest 10:00 Europe/Minsk)")
+        logging.info("Scheduler started (digest 10:00, margin-check 10:05 Europe/Minsk)")
     except Exception as e:
         logging.exception(f"Scheduler failed to start (continuing without daily digest): {e}")
         scheduler = None

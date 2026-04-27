@@ -130,6 +130,30 @@ export default function PriceControlPage() {
     }
   };
 
+  const runCheckNow = async () => {
+    try {
+      const r = await axios.post(`${API}/restaurants/${currentRestaurantId}/costs/check-alerts?force=true`, {}, authHeaders);
+      if (r.data.sent) {
+        toast.success(`Отправлено: ${r.data.count} позиций с низкой маржой`);
+      } else if (r.data.reason === 'no-changes') {
+        toast.info(`Нечего отправлять (пропущено антиспамом: ${r.data.skipped ?? 0})`);
+      } else {
+        toast.info(`Не отправлено: ${r.data.reason}`);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Ошибка');
+    }
+  };
+
+  const resetAntispam = async () => {
+    try {
+      const r = await axios.post(`${API}/restaurants/${currentRestaurantId}/costs/reset-alerts`, {}, authHeaders);
+      toast.success(`Антиспам сброшен у ${r.data.reset ?? 0} позиций`);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Ошибка');
+    }
+  };
+
   // Filtering
   const categories = Array.from(new Set(data.items.map(i => i.category_name).filter(Boolean))).sort();
   const filtered = data.items.filter(i => {
@@ -307,6 +331,19 @@ export default function PriceControlPage() {
                   <Label>Chat ID</Label>
                   <Input value={settingsForm.margin_alerts_chat_id || ''} onChange={(e) => setSettingsForm({ ...settingsForm, margin_alerts_chat_id: e.target.value })} placeholder="-100123456789" data-testid="alerts-chat-input" />
                   <p className="text-xs text-muted-foreground">Напишите боту любое сообщение, потом получите chat_id через https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</p>
+                </div>
+                <div className="rounded-lg border border-border p-3 space-y-2 bg-muted/30">
+                  <p className="text-xs text-muted-foreground">
+                    Алерт автоматически отправляется: при загрузке Excel/CSV, импорте из Caffesta, ручном редактировании цены/себестоимости, и ежедневно в <b>10:05 (Минск)</b>. Повторный алерт по одной позиции приходит только если цена или себестоимость изменились (антиспам).
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button size="sm" variant="outline" onClick={runCheckNow} data-testid="check-alerts-now">
+                      Проверить и отправить сейчас
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={resetAntispam} data-testid="reset-antispam">
+                      Сбросить антиспам
+                    </Button>
+                  </div>
                 </div>
               </>
             )}

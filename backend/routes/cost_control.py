@@ -300,6 +300,11 @@ async def update_item_cost(
     if not update:
         raise HTTPException(400, "Нечего обновлять")
     await db.menu_items.update_one({"id": item_id, "restaurant_id": restaurant_id}, {"$set": update})
+    # Trigger alert check after manual edit (antispam handles duplicates)
+    try:
+        await _send_margin_alerts(restaurant_id)
+    except Exception:
+        pass
     return {"updated": True}
 
 
@@ -321,15 +326,23 @@ async def update_category_threshold(
 
 
 # ============ Telegram alerts ============
-async def _send_margin_alerts(restaurant_id: str):
-    """Собирает блюда с критичной маржой и шлёт в Telegram если включены алерты."""
+def _margin_signature(price, cost) -> str:
+    """Signature used for antispam: if price+cost haven't changed, don't re-alert."""
+    return f"{round(float(price or 0), 2)}:{round(float(cost or 0), 2)}"
+
+
+async def _send_margin_alerts(restaurant_id: str, force: bool = False) -> dict:
+    """Собирает блюда с критичной маржой и шлёт в Telegram если включены алерты.
+    Антиспам: не шлёт повторно по блюду, если (price, cost_price) не изменились с прошлого алерта.
+    force=True — игнорировать антиспам.
+    """
     settings = await get_or_create_settings(restaurant_id)
     if not settings.get("margin_alerts_enabled"):
-        return
+        return {"sent": False, "reason": "disabled"}
     token = (settings.get("margin_alerts_bot_token") or "").strip()
     chat_id = (settings.get("margin_alerts_chat_id") or "").strip()
     if not token or not chat_id:
-        return
+        return {"sent": False, "reason": "no-credentials"}
 
     restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0, "name": 1})
     rest_name = restaurant.get("name", "Ресторан") if restaurant else "Ресторан"
@@ -342,21 +355,30 @@ async def _send_margin_alerts(restaurant_id: str):
     cat_map = {c["id"]: c for c in categories}
 
     critical = []
+    skipped_antispam = 0
     for item in items:
         category = cat_map.get(item.get("category_id"))
         threshold = _get_effective_threshold(item, category, settings)
         margin, _ = _compute_margin(item.get("price"), item.get("cost_price"))
-        if margin is not None and margin < threshold - 5:
-            critical.append({
-                "name": item["name"],
-                "price": item["price"],
-                "cost": item["cost_price"],
-                "margin": margin,
-                "threshold": threshold,
-            })
+        if margin is None or margin >= threshold - 5:
+            continue
+        # Antispam: skip if signature unchanged
+        sig = _margin_signature(item.get("price"), item.get("cost_price"))
+        if not force and item.get("last_margin_alert_sig") == sig:
+            skipped_antispam += 1
+            continue
+        critical.append({
+            "id": item["id"],
+            "name": item["name"],
+            "price": item["price"],
+            "cost": item["cost_price"],
+            "margin": margin,
+            "threshold": threshold,
+            "sig": sig,
+        })
 
     if not critical:
-        return
+        return {"sent": False, "reason": "no-changes", "skipped": skipped_antispam}
 
     lines = [f"⚠️ <b>{rest_name}</b> — критическое падение маржи у {len(critical)} позиций:\n"]
     for it in critical[:20]:
@@ -370,16 +392,56 @@ async def _send_margin_alerts(restaurant_id: str):
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            await client.post(
+            resp = await client.post(
                 f"https://api.telegram.org/bot{token}/sendMessage",
                 data={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
             )
-    except Exception:
-        pass
+            if resp.status_code >= 400:
+                return {"sent": False, "reason": f"telegram-{resp.status_code}"}
+    except Exception as e:
+        return {"sent": False, "reason": f"exception:{e}"}
+
+    # Update signatures for alerted items (antispam)
+    now = datetime.now(timezone.utc).isoformat()
+    for it in critical:
+        await db.menu_items.update_one(
+            {"id": it["id"]},
+            {"$set": {"last_margin_alert_sig": it["sig"], "last_margin_alert_at": now}},
+        )
+    return {"sent": True, "count": len(critical), "skipped_antispam": skipped_antispam}
+
+
+async def run_margin_check_job():
+    """Daily scheduler job — check all restaurants with alerts enabled."""
+    import logging
+    cursor = db.restaurants.find({}, {"_id": 0, "id": 1, "name": 1})
+    async for rest in cursor:
+        try:
+            settings = await db.settings.find_one({"restaurant_id": rest["id"]}, {"_id": 0})
+            if not settings or not settings.get("margin_alerts_enabled"):
+                continue
+            result = await _send_margin_alerts(rest["id"])
+            logging.info(f"Daily margin check {rest['name']}: {result}")
+        except Exception as e:
+            logging.exception(f"Margin check failed for {rest.get('name')}: {e}")
 
 
 @router.post("/restaurants/{restaurant_id}/costs/check-alerts")
-async def trigger_alerts(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+async def trigger_alerts(
+    restaurant_id: str, force: bool = False,
+    current_user: dict = Depends(get_current_user),
+):
     await check_restaurant_access(current_user, restaurant_id)
-    await _send_margin_alerts(restaurant_id)
-    return {"sent": True}
+    result = await _send_margin_alerts(restaurant_id, force=force)
+    return result
+
+
+@router.post("/restaurants/{restaurant_id}/costs/reset-alerts")
+async def reset_alerts(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+    """Сбросить антиспам-историю — следующая проверка разошлёт алерты по всем критичным блюдам."""
+    await check_restaurant_access(current_user, restaurant_id)
+    result = await db.menu_items.update_many(
+        {"restaurant_id": restaurant_id},
+        {"$unset": {"last_margin_alert_sig": "", "last_margin_alert_at": ""}},
+    )
+    return {"reset": result.modified_count}
