@@ -389,18 +389,18 @@ export default function ClientMenuPage() {
           className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
           data-testid="splash-overlay"
         >
-          <div className="w-full max-w-md bg-card rounded-3xl shadow-2xl overflow-hidden border border-border">
+          <div className="w-full max-w-lg bg-card rounded-3xl shadow-2xl overflow-hidden border border-border max-h-[92vh] flex flex-col">
             {settings.splash_image_url && (
-              <div className="w-full bg-muted">
+              <div className="w-full bg-muted flex items-center justify-center">
                 <img
                   src={settings.splash_image_url}
                   alt="splash"
-                  className="w-full h-auto object-cover max-h-72"
+                  className="w-full h-auto object-contain max-h-[60vh]"
                   data-testid="splash-image"
                 />
               </div>
             )}
-            <div className="p-6 space-y-4 text-center">
+            <div className="p-6 space-y-4 text-center overflow-y-auto">
               {settings.splash_title && (
                 <h2 className="text-2xl font-heading font-bold text-foreground" data-testid="splash-title">
                   {settings.splash_title}
