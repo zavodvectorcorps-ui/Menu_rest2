@@ -31,7 +31,7 @@ from services.digest import run_daily_digest_job
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-import pytz
+from zoneinfo import ZoneInfo
 
 logging.basicConfig(level=logging.INFO)
 
@@ -70,10 +70,14 @@ async def startup():
     logging.info("Starting up...")
     await create_superadmin()
     # Daily digest at 10:00 Minsk time (UTC+3)
-    scheduler = AsyncIOScheduler(timezone=pytz.timezone("Europe/Minsk"))
-    scheduler.add_job(run_daily_digest_job, CronTrigger(hour=10, minute=0), id="daily_digest", replace_existing=True)
-    scheduler.start()
-    logging.info("Scheduler started (daily digest 10:00 Europe/Minsk)")
+    try:
+        scheduler = AsyncIOScheduler(timezone=ZoneInfo("Europe/Minsk"))
+        scheduler.add_job(run_daily_digest_job, CronTrigger(hour=10, minute=0), id="daily_digest", replace_existing=True)
+        scheduler.start()
+        logging.info("Scheduler started (daily digest 10:00 Europe/Minsk)")
+    except Exception as e:
+        logging.exception(f"Scheduler failed to start (continuing without daily digest): {e}")
+        scheduler = None
 
 
 @app.on_event("shutdown")
