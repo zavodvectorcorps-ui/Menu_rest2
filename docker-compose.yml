@@ -63,4 +63,6 @@ services:
 
 volumes:
   mongo_data:
+    name: menu_rest2_mongo_data
+    external: true
   certbot_data:
