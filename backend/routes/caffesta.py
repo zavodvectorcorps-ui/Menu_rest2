@@ -375,10 +375,8 @@ async def caffesta_time_window(
     for r in receipts:
         dt = r.get("created_dt")
         if not dt:
+            # Skip receipts without a reliable timestamp — avoid false-positives on 00:00
             continue
-        # Strip tz for comparison
-        if dt.tzinfo is not None:
-            dt = dt.replace(tzinfo=None)
         if not in_day_type(dt) or not in_time_window(dt):
             continue
 

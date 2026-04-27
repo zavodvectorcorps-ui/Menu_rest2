@@ -407,23 +407,32 @@ async def caffesta_get_all_receipts(restaurant_id: str, start_date: str, end_dat
             flat.extend(res)
 
     # Normalize
+    from zoneinfo import ZoneInfo
+    MINSK_TZ = ZoneInfo("Europe/Minsk")
     normalized = []
     for r in flat:
         created_at = r.get("created_at") or r.get("updated_at") or ""
         dt_obj = None
+        has_real_time = False
         if created_at:
             try:
                 dt_obj = _dt.fromisoformat(created_at.replace("Z", "+00:00"))
+                has_real_time = True
             except ValueError:
                 try:
+                    # Naive string without tz — assume Minsk local
                     dt_obj = _dt.strptime(created_at[:19], "%Y-%m-%dT%H:%M:%S")
+                    dt_obj = dt_obj.replace(tzinfo=MINSK_TZ)
+                    has_real_time = True
                 except ValueError:
                     pass
-        if not dt_obj and r.get("_date"):
-            try:
-                dt_obj = _dt.strptime(r["_date"], "%Y-%m-%d")
-            except ValueError:
-                pass
+        # Convert to Minsk timezone (naive datetime in Minsk local time)
+        if dt_obj and dt_obj.tzinfo is not None:
+            dt_obj = dt_obj.astimezone(MINSK_TZ).replace(tzinfo=None)
+        # If no real time, keep None (do NOT fallback to shift_day midnight —
+        # it would incorrectly match 00:00-02:00 windows)
+        if not has_real_time:
+            dt_obj = None
         normalized.append({
             "id": r.get("id") or r.get("uuid") or "",
             "terminal_id": r.get("_terminal_id") or r.get("terminal_number"),

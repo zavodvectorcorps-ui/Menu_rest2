@@ -49,9 +49,7 @@ def _aggregate_window(receipts, wfrom, wto, payment_methods):
         dt = r.get("created_dt")
         if not dt:
             continue
-        if dt.tzinfo is not None:
-            dt = dt.astimezone(timezone.utc) + timedelta(hours=MINSK_OFFSET_HOURS)
-            dt = dt.replace(tzinfo=None)
+        # dt is already in Minsk local time (naive), thanks to caffesta_get_all_receipts normalisation
         if not _in_window(dt, wfrom, wto):
             continue
         rev = float(r.get("total_sum", 0) or 0)
