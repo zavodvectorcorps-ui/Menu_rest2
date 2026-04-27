@@ -1,4 +1,5 @@
-<analysis>**original_problem_statement**: 
+<analysis><handoff summary>
+**original_problem_statement**: 
 Пользователь хочет создать веб-приложение Личный кабинет ресторана с мультитенантной архитектурой. 
 PRODUCT REQUIREMENTS: 
 1. Мультитенантная архитектура (роли суперадмин, менеджер).
@@ -9,38 +10,42 @@ PRODUCT REQUIREMENTS:
 6. Интеграция с Telegram-ботом (кнопки управления статусами заказов, уведомления).
 7. Интеграция с Caffesta POS (отправка заказов, подтягивание тех. карт и товаров, маппинг блюд, аналитика продаж по официантам).
 8. Подготовка инфраструктуры (Docker, Nginx) для деплоя на собственный внешний VPS-сервер и экспорт базы данных/изображений.
+9. **(NEW)** Контроль цен и маржинальности: загрузка себестоимости через Excel или Caffesta, расчет маржи, настройка пороговых значений (глобально/по категориям) и уведомления в Telegram при критическом падении маржи.
 
-**User's preferred language**: Russian (Русский). **INSTRUCT NEXT AGENT TO RESPOND IN THE USER'S PREFERRED LANGUAGE ONLY.**
+**User's preferred language**: Russian (Русский).
+**INSTRUCT NEXT AGENT TO RESPOND IN THE USER'S PREFERRED LANGUAGE ONLY.**
 
 **what currently exists?** 
-Создано полнофункциональное production-ready приложение (FastAPI, MongoDB, React). Настроены WebSockets, кастомные URL (), Telegram-бот полностью функционален (с исправленным парсингом HTML). Реализована полная двусторонняя интеграция с Caffesta POS (отправка заказов, загрузка товаров и тех. карт в Combobox, аналитика по официантам с безопасным парсингом). Подготовлены файлы для миграции на внешний VPS (, , скрипты деплоя) и созданы эндпоинты выгрузки бэкапа MongoDB и файлового хранилища (, ).
+Создано полнофункциональное production-ready приложение (FastAPI, MongoDB, React), которое успешно задеплоено на VPS пользователя. Настроены WebSockets, кастомные URL, Telegram-бот, полная интеграция с Caffesta POS. В клиентском меню реализован непрерывный скролл, поиск, кастомные рекламные заставки (с кроппером изображений) и модальные окна деталей блюд. Настроена беспрецедентная безопасность инфраструктуры: MongoDB закрыта извне и работает с авторизацией, порты backend/frontend изолированы через Docker network ( вместо ), настроен Nginx с Let's Encrypt SSL, автоматические ежедневные бэкапы БД и файлов копируются в Google Drive через , работает healthcheck-бот через Cron.
 
 **Last working item**: 
-    - **Last item agent was working**: Переработка  для отображения всех блюд единым скроллируемым списком (continuous scroll). Вместо переключения табов категорий, табы теперь должны работать как якорные ссылки, а блюда выводиться списком с разбивкой по категориям.
-    - **Status**: IN PROGRESS
-    - **Agent Testing Done**: N
-    - **Which testing method agent to use?**: Frontend testing agent
-    - **User Testing Done**: N
+    - Last item agent was working: Реализация функционала Контроль цен и маржинальности (Cost Control). Бэкенд-роут  создан и протестирован. Агент только что создал пустой файл фронтенда  для отображения аналитики и интерфейса загрузки Excel-файла с себестоимостью.
+    - Status: IN PROGRESS
+    - Agent Testing Done: Y (Backend tested via bash script), N (Frontend)
+    - Which testing method agent to use?: both (Frontend/Backend testing agent or manual curl/screenshot)
+    - User Testing Done: N
 
 **All Pending/In progress Issue list**: 
-  Issue 1: Сделать все блюда в клиентском меню видимыми при пролистывании вниз.
-     - Attempted fixes: Агент только начал просмотр файла , чтобы понять текущую логику фильтрации ().
+  Issue 1: Завершить UI и интеграцию для контроля маржинальности (PriceControlPage).
+     - Attempted fixes: Создан роут на бэкенде () и добавлены новые настройки порогов маржи в .
      - Next debug checklist: 
-       1. Изменить логику рендера в : вместо  мапить все категории и внутри них мапить блюда.
-       2. Обновить верхний слайдер категорий: клик по категории должен скроллить к соответствующему блоку (якорные ссылки).
-       3. Желательно добавить  (Scrollspy), чтобы при скролле активная категория в верхнем слайдере подсвечивалась автоматически.
-     - Why fix this issue and what will be achieved with the fix?: Улучшение UX по прямой просьбе пользователя — клиентам ресторана удобнее скроллить всё меню вниз, чем переключать вкладки.
+       1. Написать код для  (таблица с блюдами, их себестоимостью, ценой и маржой в %, подсветка строк с низкой маржой).
+       2. Добавить кнопку загрузки Excel (обработка на бэкенде/фронтенде).
+       3. Добавить кнопку импорта себестоимости из Caffesta (если включена).
+       4. Добавить интерфейс настройки порогов (глобальный + по категориям).
+       5. Подключить  в  и .
+     - Why fix this issue and what will be achieved with the fix?: Это прямая задача пользователя для отслеживания рентабельности блюд и предотвращения убытков при повышении закупочных цен.
      - Status: IN PROGRESS
      - Is recurring issue? N
-     - Should Test frontend/backend/both after fix?: Frontend
+     - Should Test frontend/backend/both after fix?: both
      - Blocked on other issue: None
 
 **In progress Task List**: 
-  - Task 1: Переработка  (см. Issue 1).
-     - Where to resume: Файл .
-     - What will be achieved with this?: Непрерывный скролл всех блюд меню.
+  - Task 1: Реализация логики загрузки Excel (/ уже установлены) и генерация Telegram-алертов при падении маржи ниже порога.
+     - Where to resume:  и .
+     - What will be achieved with this?: Полный цикл функционала контроля цен.
      - Status: IN PROGRESS
-     - Should Test frontend/backend/both after fix?: Frontend
+     - Should Test frontend/backend/both after fix?: both
      - Blocked on something: None
 
 **Upcoming and Future Tasks**
@@ -53,105 +58,108 @@ PRODUCT REQUIREMENTS:
     - (P2) Система лояльности.
 
 **Completed work in this session**
-- Реализация кастомных URL (slugs) для клиентского меню () (DONE)
-- Улучшение UI категорий на мобильном (анимация свайпа, двойные стрелки) (DONE)
-- Исправление бага кнопок Telegram-бота: добавлено  для спецсимволов  в названиях блюд (DONE)
-- Интеграция Caffesta POS (отправка заказов, аналитика, маппинг) (DONE)
-- Выпадающий список (Combobox) с автозагрузкой товаров и тех.карт () из Caffesta в редакторе блюд (DONE)
-- Исправление бага 500 и  в статистике Caffesta () (DONE)
-- Создание инфраструктуры для деплоя на внешний VPS: , , Dockerfiles (DONE)
-- Создание эндпоинтов резервного копирования:  и  (DONE)
+- Непрерывный скролл всех блюд меню () (DONE)
+- Поиск по блюдам в клиентском меню (DONE)
+- Компактная шапка категорий на мобильных устройствах (DONE)
+- Docker optimizations: создание  для быстрого деплоя (BuildKit), исправление  (отсутствие , переход на Node 20) (DONE)
+- Раздел Резервные копии () в админке для генерации и скачивания бэкапов (DONE)
+- Кнопки Очистить все для заказов/вызовов с подтверждением (DONE)
+- Восстановление работоспособности FAQ-роута (DONE)
+- Система рекламных заставок () с рандомизацией, модалкой загрузки, встроенным кроппером () и настройкой кнопок (DONE)
+- Модальное окно детализации блюда при клике на карточку в  (DONE)
+- **SECURITY OVERHAUL**: Восстановление после ransomware-атаки Akira. Закрытие портов MongoDB/Backend/Frontend извне ( вместо ), настройка , включение MongoDB Auth (/), настройка Let's Encrypt SSL в Nginx, ежедневные бэкапы через Cron, off-site выгрузка в Google Drive через , Telegram-бот для healthcheck-пингов (DONE).
 
 **Earlier issues found/mentioned but not fixed**
-   - None
+- None
 
 **Known issue recurrence from previous fork**
-  - Recurrence count: 0
-  - Status: RESOLVED
+  - Issue recurrence in previous fork: Ransomware атака на открытую БД MongoDB (порт 27017).
+  - Recurrence count: 1
+  - Status: RESOLVED (Полностью переписан , включена авторизация, порты скрыты в Docker network).
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- Frontend: React, Tailwind CSS, Shadcn UI (, ), IntersectionObserver (needed for next step)
-- Backend: FastAPI, MongoDB (Motor), Pydantic
-- 3rd Party POS: Caffesta API (Headers: )
-- Infra: Docker Compose, Nginx Reverse Proxy, Bash scripting
+- Frontend: React, Tailwind CSS, Shadcn UI, 
+- Backend: FastAPI, MongoDB (Motor), Pydantic, , 
+- 3rd Party: Caffesta API, Telegram API, Google Drive (), Let's Encrypt ()
 
 **key DB schema**
-  - : {restaurant_id, account_name, api_key, pos_id, payment_id, enabled}
-  - : added 
-  - : added 
+  - : {id, restaurant_id, image_url, title, text, primary_button_text, secondary_button_text, secondary_button_link, fit_mode, is_active}
+  - : added , 
+  - : added , 
 
 **changes in tech stack**
-  - Added Docker, Nginx configs, and shell deployment scripts to support independent VPS migration.
+  - Added  and  for Excel processing.
+  - Added  for frontend image cropping.
 
 **All files of reference** 
--  (CURRENT FOCUS - needs continuous scrolling refactor)
--  (Contains the POS logic; note the  helper to prevent 500s)
--  (Caffesta UI settings & analytics)
--  (Contains Combobox integration for Caffesta dish mapping)
--  (Endpoints serving  and )
--  &  (Docs created for the user's VPS migration)
+-  (Created in this session for Margin Analysis logic)
+-  (Newly created file, requires implementation)
+-  (Updated with margin threshold settings)
+-  &  (Need to be updated to include )
 
 **Areas that need refactoring**: 
-- : Needs a structural update. Currently, it relies on a  state that filters  into . This must be changed to render ALL categories and their items, turning the category header into a sticky anchor navigation with scroll tracking (ScrollSpy logic).
+- : The file is currently empty. Needs to be built from scratch following Shadcn UI design patterns used in other admin pages (e.g.,  or ).
 
 **key api endpoints**
 - 
--  (Automatically pushes to Caffesta if configured)
-- 
-- 
-- 
+-  (To be implemented)
+-  (To be implemented)
 
 **Critical Info for New Agent** 
-- The user is preparing to migrate away from the Emergent platform to their own VPS. Do NOT delete or modify the , , or  files unless specifically requested.
-- **Caffesta Integration Alert**: Caffesta API can sometimes return empty responses that break . A custom  parser was added. If making new Caffesta API calls, ALWAYS use  instead of . Also, previously there was a  bug where  called itself - ensure this doesn't come back.
-- **Next step**: User explicitly asked: *давай в меню сделаем что бы все блюда были видны пролистывая вниз, а не только при открытии категории*. Proceed to modify  to show all dishes grouped by categories in a single scrolling view.
+- **DO NOT EXPOSE PORTS**: Never use  in  for the backend, frontend, or mongo. Always use . The user suffered a ransomware attack in this session because the MongoDB port was exposed.
+- **MongoDB Auth**: MongoDB now requires authentication. The credentials are dynamically passed via .
+- User is directly testing features on their production VPS via GitHub push ( -> [0;34m▶[0m  Обновляю код из GitHub (git pull)...). Always ensure code is production-ready and doesn't break the build (Node 20 is required).
+- For ,  and  have been added to the  /  to handle Excel uploads.
 
 **documents and test reports created in this job** 
-  - 
-  - 
-  - 
-  - 
+- None. (Used  to run python unit tests directly).
 
 **Last 10 User Messages and any pending HUMAN messages** 
- - User: Make all menu items visible by scrolling down instead of clicking categories. (PENDING IMPLEMENTATION)
- - User:  URL not found. (RESOLVED - File was too large for browser, guided to use )
- - User: Give detailed instructions on how to migrate the project to VPS. (RESOLVED)
- - User: What if from the preview environment? (RESOLVED - It is the prod environment, dumps are ready)
- - User: Support query about Emergent regional restrictions. (RESOLVED)
- - User: Expecting value: line 1 column 1 in report. (RESOLVED - Caffesta empty response handled)
- - User: Tech cards () are missing from Caffesta product load. (RESOLVED)
- - User: Caffesta stats disappeared completely with unknown error (RESOLVED - Fixed recursion bug in safe json parser)
+ - User: What to do? Add cost control margin analysis with Excel upload and Caffesta sync. (PENDING / IN PROGRESS)
+ - User: Need multiple random splash screens and item detail modals. (RESOLVED)
+ - User: Fix duplicate cron jobs and test healthcheck. (RESOLVED)
+ - User: Chat not found error in Telegram. (RESOLVED - Found correct chat_id)
+ - User: Setup rclone for Google Drive backups. (RESOLVED)
+ - User: Configure MongoDB Auth and secure VPS. (RESOLVED)
+ - User: DB crashed again! Lost data. (RESOLVED - Identified as Akira ransomware. DB restored from backup, port 27017 blocked via ufw/docker).
+ - User: Cropper tool for splash screen images. (RESOLVED)
+ - User: SSL Certificate error. (RESOLVED - Guided user to configure Let's Encrypt via certbot).
 
 **Project Health Check:**
-- Broken: None
-- Mocked: Caffesta (when keys are missing on preview, gracefully returns Caffesta не настроена)
+- Broken: None.
+- Mocked: None.
 
 **3rd Party Integrations** 
- - Telegram Bot API — requires User Bot Token
- - Caffesta POS API — requires User API Key () & Account Name
+ - Telegram Bot API (User Bot Token)
+ - Caffesta POS API (User API Key)
+ - Google Drive (OAuth via  on VPS)
 
 **Testing status**
-  - Testing agent used after significant changes: YES
+  - Testing agent used after significant changes: NO (relied heavily on bash scripts/curl and screenshot tool).
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: None
-  - Known regressions: None
 
 **Credentials to test flow:**
 Admin user:  / 
 
 **What agent forgot to execute**
-Agent was just reading the  file to implement the continuous scroll request but context ended. Pick it up from there immediately.
+The agent just created the empty  and stopped. It needs to actually write the React code for the Price Control dashboard, wire it to  sidebar, and implement the Excel parsing () endpoint in .
 
 **Debugging checklist for current issue**
-    Issue: Client menu needs continuous vertical scroll instead of category tabs.
+    Issue: Implement Price Control / Margin Analysis dashboard.
     Frontend files to check: 
     - 
+    -  (Add navigation link)
+    -  (Add Route)
+    Backend files to check:
+    -  (Implement Excel processing logic using pandas)
     Steps to fix:
-    1. Remove filtering by .
-    2. Map over all , and for each category, map its associated items.
-    3. Add refs to category sections for scrolling.
-    4. Implement an  on the category blocks to update the active tab in the sticky top nav as the user scrolls.
-    5. Test scrolling performance on mobile view via Screenshot tool.</analysis>
+    1. Build UI in  (Data table with Menu items: Name, Price, Cost, Margin %, Status Badge).
+    2. Add Settings modal for Margin Thresholds (Global, Telegram Chat ID).
+    3. Create Excel upload UI and  backend endpoint.
+    4. Implement background task or sync function for Caffesta cost prices.
+    5. Test End-to-End flow.
+</handoff summary></analysis>
