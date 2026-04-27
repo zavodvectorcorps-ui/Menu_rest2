@@ -37,10 +37,17 @@ async def suggest_mapping(
 
     products_res = await caffesta_get_products(restaurant_id)
     if not products_res.get("ok"):
-        raise HTTPException(status_code=400, detail=products_res.get("message", "Ошибка Caffesta"))
+        # Graceful empty response so the UI can render its empty state nicely
+        return {
+            "suggestions": [],
+            "caffesta_count": 0,
+            "menu_count": 0,
+            "matched_count": 0,
+            "error": products_res.get("message", "Caffesta не настроена"),
+        }
     products = products_res.get("data", [])
     if not products:
-        return {"suggestions": [], "caffesta_count": 0, "menu_count": 0}
+        return {"suggestions": [], "caffesta_count": 0, "menu_count": 0, "matched_count": 0}
 
     query = {"restaurant_id": restaurant_id, "is_banner": {"$ne": True}}
     if only_unmapped:

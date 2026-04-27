@@ -35,6 +35,9 @@ export default function CaffestaMappingPage() {
         menu_count: r.data.menu_count || 0,
         matched_count: r.data.matched_count || 0,
       });
+      if (r.data.error) {
+        toast.warning(r.data.error);
+      }
       // Pre-select top candidate (>= 85)
       const pre = {};
       (r.data.suggestions || []).forEach((s) => {
