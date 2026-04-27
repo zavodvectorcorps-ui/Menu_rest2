@@ -38,6 +38,21 @@ export default function CaffestaPage() {
   const [reportPeriod, setReportPeriod] = useState('7');
   const [reportCashier, setReportCashier] = useState('');
 
+  // Digest state
+  const [digestSettings, setDigestSettings] = useState({
+    daily_digest_enabled: false,
+    daily_digest_bot_token: '',
+    daily_digest_chat_id: '',
+    daily_digest_windows: [
+      { name: 'Завтрак', time_from: '08:00', time_to: '12:00' },
+      { name: 'Обед', time_from: '12:00', time_to: '16:00' },
+      { name: 'Вечер', time_from: '18:00', time_to: '23:00' },
+    ],
+  });
+  const [digestPreview, setDigestPreview] = useState('');
+  const [digestLoading, setDigestLoading] = useState(false);
+  const [digestSaving, setDigestSaving] = useState(false);
+
   const fetchConfig = async () => {
     if (!currentRestaurantId) return;
     setLoading(true);
@@ -215,6 +230,83 @@ export default function CaffestaPage() {
     }
   };
 
+  // Digest: load/save settings
+  const fetchDigestSettings = async () => {
+    if (!currentRestaurantId) return;
+    try {
+      const r = await axios.get(`${API}/restaurants/${currentRestaurantId}/settings`, authHeaders);
+      const s = r.data || {};
+      setDigestSettings({
+        daily_digest_enabled: !!s.daily_digest_enabled,
+        daily_digest_bot_token: s.daily_digest_bot_token || '',
+        daily_digest_chat_id: s.daily_digest_chat_id || '',
+        daily_digest_windows: Array.isArray(s.daily_digest_windows) && s.daily_digest_windows.length > 0
+          ? s.daily_digest_windows
+          : digestSettings.daily_digest_windows,
+      });
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => { fetchDigestSettings(); /* eslint-disable-next-line */ }, [currentRestaurantId]);
+
+  const saveDigestSettings = async () => {
+    setDigestSaving(true);
+    try {
+      const windows = (digestSettings.daily_digest_windows || [])
+        .filter((w) => w.name && w.time_from && w.time_to)
+        .slice(0, 4);
+      await axios.put(`${API}/restaurants/${currentRestaurantId}/settings`, {
+        daily_digest_enabled: !!digestSettings.daily_digest_enabled,
+        daily_digest_bot_token: digestSettings.daily_digest_bot_token || '',
+        daily_digest_chat_id: digestSettings.daily_digest_chat_id || '',
+        daily_digest_windows: windows,
+      }, authHeaders);
+      toast.success('Настройки дайджеста сохранены');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Ошибка сохранения');
+    } finally {
+      setDigestSaving(false);
+    }
+  };
+
+  const loadDigestPreview = async () => {
+    setDigestLoading(true);
+    try {
+      const r = await axios.get(`${API}/restaurants/${currentRestaurantId}/digest/preview`, authHeaders);
+      setDigestPreview(r.data?.text || '');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Ошибка предпросмотра');
+    } finally {
+      setDigestLoading(false);
+    }
+  };
+
+  const sendDigestNow = async () => {
+    try {
+      await axios.post(`${API}/restaurants/${currentRestaurantId}/digest/send`, {}, authHeaders);
+      toast.success('Дайджест отправлен в Telegram');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Ошибка отправки');
+    }
+  };
+
+  const addDigestWindow = () => {
+    if ((digestSettings.daily_digest_windows || []).length >= 4) return;
+    setDigestSettings({
+      ...digestSettings,
+      daily_digest_windows: [...(digestSettings.daily_digest_windows || []), { name: '', time_from: '00:00', time_to: '01:00' }],
+    });
+  };
+  const updateDigestWindow = (i, patch) => {
+    const list = [...(digestSettings.daily_digest_windows || [])];
+    list[i] = { ...list[i], ...patch };
+    setDigestSettings({ ...digestSettings, daily_digest_windows: list });
+  };
+  const removeDigestWindow = (i) => {
+    const list = (digestSettings.daily_digest_windows || []).filter((_, idx) => idx !== i);
+    setDigestSettings({ ...digestSettings, daily_digest_windows: list });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -241,6 +333,7 @@ export default function CaffestaPage() {
           <TabsTrigger value="analytics" data-testid="tab-analytics">Аналитика POS</TabsTrigger>
           <TabsTrigger value="time-window" data-testid="tab-time-window">Сравнение по времени</TabsTrigger>
           <TabsTrigger value="report" data-testid="tab-report">Реализация</TabsTrigger>
+          <TabsTrigger value="digest" data-testid="tab-digest">Дайджест 10:00</TabsTrigger>
         </TabsList>
 
         <TabsContent value="settings" className="space-y-4 mt-4">
@@ -850,6 +943,113 @@ export default function CaffestaPage() {
                 </Card>
               )}
             </>
+          )}
+        </TabsContent>
+
+        {/* Daily Digest Tab */}
+        <TabsContent value="digest" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="w-5 h-5" /> Ежедневный Telegram-дайджест
+              </CardTitle>
+              <CardDescription>
+                Каждое утро в 10:00 (Минск) бот присылает итоги вчерашнего дня: выручка, чеки, средний чек,
+                разбивка по временным окнам и топ-3 позиции. Сравнение с аналогичным днём неделю назад.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">Включить отправку</Label>
+                <Switch
+                  checked={!!digestSettings.daily_digest_enabled}
+                  onCheckedChange={(v) => setDigestSettings({ ...digestSettings, daily_digest_enabled: v })}
+                  data-testid="digest-enabled-switch"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Bot Token (опционально)</Label>
+                  <Input
+                    value={digestSettings.daily_digest_bot_token}
+                    onChange={(e) => setDigestSettings({ ...digestSettings, daily_digest_bot_token: e.target.value })}
+                    placeholder="Оставьте пустым — использовать токен из настроек Telegram"
+                    data-testid="digest-token-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Chat ID (опционально)</Label>
+                  <Input
+                    value={digestSettings.daily_digest_chat_id}
+                    onChange={(e) => setDigestSettings({ ...digestSettings, daily_digest_chat_id: e.target.value })}
+                    placeholder="Оставьте пустым — использовать chat_id из Telegram"
+                    data-testid="digest-chat-input"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-4 border-t border-border/50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base">Временные окна (до 4 шт)</Label>
+                    <p className="text-xs text-muted-foreground">По каждому окну — отдельная строка в дайджесте со сравнением.</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addDigestWindow} disabled={(digestSettings.daily_digest_windows || []).length >= 4} data-testid="add-digest-window">
+                    <Plus className="w-4 h-4 mr-1" /> Окно
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {(digestSettings.daily_digest_windows || []).map((w, i) => (
+                    <div key={i} className="flex items-center gap-2" data-testid={`digest-window-${i}`}>
+                      <Input
+                        className="flex-1"
+                        placeholder="Название (напр. Обед)"
+                        value={w.name || ''}
+                        onChange={(e) => updateDigestWindow(i, { name: e.target.value })}
+                      />
+                      <Input className="w-28" type="time" value={w.time_from || ''} onChange={(e) => updateDigestWindow(i, { time_from: e.target.value })} />
+                      <span className="text-muted-foreground">–</span>
+                      <Input className="w-28" type="time" value={w.time_to || ''} onChange={(e) => updateDigestWindow(i, { time_to: e.target.value })} />
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeDigestWindow(i)}>
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 flex-wrap pt-2">
+                <Button onClick={saveDigestSettings} disabled={digestSaving} data-testid="save-digest-settings">
+                  {digestSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                  Сохранить
+                </Button>
+                <Button variant="outline" onClick={loadDigestPreview} disabled={digestLoading} data-testid="digest-preview">
+                  {digestLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
+                  Предпросмотр
+                </Button>
+                <Button variant="outline" onClick={sendDigestNow} data-testid="digest-send-now">
+                  <CalendarDays className="w-4 h-4 mr-2" />
+                  Отправить сейчас
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {digestPreview && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Предпросмотр сообщения</CardTitle>
+                <CardDescription>Так будет выглядеть сообщение в Telegram (HTML-теги будут отрендерены клиентом).</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div
+                  className="p-4 rounded-lg bg-muted/50 font-mono text-sm whitespace-pre-wrap"
+                  data-testid="digest-preview-text"
+                  dangerouslySetInnerHTML={{ __html: digestPreview }}
+                />
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>

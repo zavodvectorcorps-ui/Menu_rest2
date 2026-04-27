@@ -25,6 +25,13 @@ from routes.ws import router as ws_router
 from routes.faq import router as faq_router
 from routes.splash import router as splash_router
 from routes.cost_control import router as cost_router
+from routes.caffesta_mapping import router as caffesta_mapping_router
+from routes.digest import router as digest_router
+from services.digest import run_daily_digest_job
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+import pytz
 
 logging.basicConfig(level=logging.INFO)
 
@@ -40,6 +47,7 @@ for r in [
     auth_router, restaurants_router, menu_router, tables_router,
     orders_router, settings_router, public_router, telegram_router,
     caffesta_router, backup_router, seed_router, ws_router, faq_router, splash_router, cost_router,
+    caffesta_mapping_router, digest_router,
 ]:
     app.include_router(r, prefix="/api")
 
@@ -53,13 +61,28 @@ app.add_middleware(
 )
 
 
+scheduler: AsyncIOScheduler = None
+
+
 @app.on_event("startup")
 async def startup():
+    global scheduler
     logging.info("Starting up...")
     await create_superadmin()
+    # Daily digest at 10:00 Minsk time (UTC+3)
+    scheduler = AsyncIOScheduler(timezone=pytz.timezone("Europe/Minsk"))
+    scheduler.add_job(run_daily_digest_job, CronTrigger(hour=10, minute=0), id="daily_digest", replace_existing=True)
+    scheduler.start()
+    logging.info("Scheduler started (daily digest 10:00 Europe/Minsk)")
 
 
 @app.on_event("shutdown")
 async def shutdown():
+    global scheduler
     logging.info("Shutting down...")
+    if scheduler:
+        try:
+            scheduler.shutdown(wait=False)
+        except Exception:
+            pass
     client.close()

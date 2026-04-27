@@ -1,0 +1,63 @@
+{
+  "summary": "Tested auto-mapping (rapidfuzz) and daily Telegram digest features. Backend: 12/12 pytest cases passed (100%). Frontend: /admin/caffesta-mapping and /admin/caffesta 'Дайджест 10:00' tab fully functional. APScheduler starts cleanly (cron 10:00 Europe/Minsk). All graceful-degradation requirements met when Caffesta disabled.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/restaurants/{id}/caffesta/auto-mapping/suggest", "issue": "Returns 400 'Caffesta не настроена' when Caffesta disabled. Spec says 'both 200 empty and 400 are acceptable' — current behaviour is 400. Frontend handles it gracefully with a toast + empty-state card, so no user impact. Note: successful call also returns 'matched_count' only when suggestions > 0; when suggestions=[] the response shape is {suggestions:[], caffesta_count:0, menu_count:0} without matched_count key (inconsistent with shape promised in review_request)."},
+      {"endpoint": "/api/restaurants/{id}/digest/preview", "issue": "Works fine. Minor: on Caffesta failures build_digest_text silently aggregates 0 values instead of surfacing a note — acceptable per spec (no 500, text returned)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "Backend: POST /auto-mapping/apply with empty mappings returns {updated:0,total:0}",
+    "Backend: POST /auto-mapping/apply sets caffesta_product_id=99999 on a real menu item; verified by GET /menu-items; unlink with null persists",
+    "Backend: GET /auto-mapping/suggest gracefully handles Caffesta disabled (returns 400 with detail, no 500)",
+    "Backend: GET /auto-mapping/suggest accepts threshold & only_unmapped params",
+    "Backend: GET /digest/preview returns {text:str} with required keywords (Выручка, Чеков, Средний чек, По окнам) even when Caffesta disabled, no 500",
+    "Backend: POST /digest/send returns 400 'no-credentials' when no bot_token/chat_id + fallback telegram creds cleared",
+    "Backend: PUT /settings with daily_digest_enabled/token/chat_id/windows persists; GET returns same values including 3-item windows array",
+    "Backend: Regression /caffesta/time-window and /costs/analysis unchanged",
+    "Backend: APScheduler starts without blocking startup; 'Scheduler started (daily digest 10:00 Europe/Minsk)' logged cleanly",
+    "Frontend: /admin/caffesta-mapping loads with title 'Авто-маппинг блюд с Caffesta', threshold slider (value 60), 'Только непривязанные' checkbox (checked by default), search input 'Название блюда...', 4 stats cards (Меню, Товаров в Caffesta, Найдено совпадений, Выбрано), empty-state text 'Нет совпадений. Понизьте порог или настройте Caffesta.', graceful error toast 'Caffesta не настроена'",
+    "Frontend: Sidebar nav item 'Маппинг Caffesta' visible and correctly positioned between 'Caffesta POS' and 'Контроль цен'",
+    "Frontend: /admin/caffesta → 'Дайджест 10:00' tab renders: Включить отправку toggle, Bot Token/Chat ID inputs with placeholders, 3 default windows (Завтрак 08:00-12:00, Обед 12:00-16:00, Вечер 18:00-23:00), 6 input[type=time] inputs, +Окно button, delete icons per row",
+    "Frontend: Save/Preview/Send buttons all visible (Сохранить / Предпросмотр / Отправить сейчас)",
+    "Frontend: Clicking Предпросмотр calls backend and renders digest preview card with HTML tags rendered as formatting (NOT raw <b> tags visible); shows yesterday's date (2026-04-27), Выручка/Чеков/Средний чек lines, 'По окнам' breakdown for all 3 windows with 0 values when Caffesta disabled"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_mapping_digest.py",
+    "/app/test_reports/pytest/pytest_mapping_digest.xml"
+  ],
+  "action_items": [
+    "(Optional) /caffesta/auto-mapping/suggest endpoint: when Caffesta returns no data and is disabled, decide on unified shape — currently returns 400 with detail, but the frontend already handles both cases. Consider always returning 200 with {suggestions:[], caffesta_count:0, menu_count:N} for consistency with analytics endpoint.",
+    "(Optional) Add 'matched_count' field to response even when suggestions is empty (currently only set when there are suggestions, but review_request spec states response shape always includes matched_count)."
+  ],
+  "critical_code_review_comments": [
+    "digest.py POST /send: catches HTTPException wraps send_daily_digest result; 'no-credentials' reason is passed in detail string. Frontend can parse 'no-credentials' from detail — this works but would be cleaner as structured {error_code: 'no_credentials'}.",
+    "digest.py GET /preview: wraps build_digest_text in try/except returning 500 with str(e). Currently build_digest_text does not raise on Caffesta failures (degrades to 0). Good.",
+    "services/digest.py _collect_for_day: silently treats Caffesta failure as empty list. Works for preview but means a broken Caffesta integration will silently send '0 BYN' digests — consider adding a note like '(Caffesta недоступна)' in the text for transparency.",
+    "caffesta_mapping.py suggest endpoint: when Caffesta is disabled, 'products_res.get(ok)' returns False → raises HTTPException(400). The review_request explicitly says 'Both 200 empty and 400 acceptable'. However for better consistency with the analytics endpoint (which returns 200 empty on Caffesta failure), consider returning {suggestions:[], caffesta_count:0, menu_count:0} with 200.",
+    "run_daily_digest_job iterates ALL restaurants; for each it re-fetches settings (db.settings.find_one) and also calls send_daily_digest which re-fetches settings again via get_or_create_settings. Minor duplicate read — pass settings dict through for perf at scale.",
+    "No rate limiting / idempotency on /digest/send — a user spamming the button could hit Telegram API rate limits. Add simple 30-second throttle if needed in production."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_mapping_digest.py"
+  ],
+  "success_rate": {
+    "backend": "100% (12/12 tests passed)",
+    "frontend": "100% (mapping page + digest tab render correctly, preview card shows formatted digest, sidebar nav correct)"
+  },
+  "test_credentials": {
+    "superadmin": {"username": "admin", "password": "220066"},
+    "restaurant_id": "aa25189d-d668-4838-915a-c5d936547f3f"
+  },
+  "seed_data_creation": "Tests toggled caffesta_product_id on a menu item temporarily (set to 99999, then null, then restored to original value). Tests also set daily_digest_bot_token='TEST_TOKEN_123' and chat_id='TEST_CHAT_456' then cleaned up by setting enabled=false and blank creds. 3-window digest config left in settings: Завтрак/Обед/Вечер. Caffesta left disabled (enabled=false, blank creds) as before.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All new features for iteration 17 validated end-to-end. APScheduler starts cleanly without blocking startup. Test file /app/backend/tests/test_mapping_digest.py runs in ~2s, safe to re-run anytime (it cleans up after itself). Real Caffesta behaviour cannot be tested without valid tenant creds — with disabled state, /auto-mapping/suggest returns 400 and /digest/preview returns 200 with 0 values (both acceptable). Frontend preview uses dangerouslySetInnerHTML — verified HTML tags render as formatting (not raw text). Next agent: test with valid Caffesta creds to verify non-empty fuzzy matches and real digest aggregation.",
+  "rca of the issue": "N/A — no bugs found. Both features production-ready for the current scope (Caffesta-disabled environment). When real Caffesta creds become available, fuzzy matching and real sales aggregation should be verified."
+}

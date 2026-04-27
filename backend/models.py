@@ -345,6 +345,11 @@ class Settings(BaseModel):
     margin_alerts_enabled: bool = False
     margin_alerts_bot_token: Optional[str] = ""
     margin_alerts_chat_id: Optional[str] = ""
+    # Daily Telegram digest (Caffesta sales summary)
+    daily_digest_enabled: bool = False
+    daily_digest_bot_token: Optional[str] = ""
+    daily_digest_chat_id: Optional[str] = ""
+    daily_digest_windows: list = []  # [{name, time_from, time_to}] up to 4
 
 class SettingsUpdate(BaseModel):
     online_menu_enabled: Optional[bool] = None
@@ -370,6 +375,10 @@ class SettingsUpdate(BaseModel):
     margin_alerts_enabled: Optional[bool] = None
     margin_alerts_bot_token: Optional[str] = None
     margin_alerts_chat_id: Optional[str] = None
+    daily_digest_enabled: Optional[bool] = None
+    daily_digest_bot_token: Optional[str] = None
+    daily_digest_chat_id: Optional[str] = None
+    daily_digest_windows: Optional[list] = None
 
 class MenuView(BaseModel):
     model_config = ConfigDict(extra="ignore")
