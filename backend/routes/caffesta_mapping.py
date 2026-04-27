@@ -30,9 +30,11 @@ async def suggest_mapping(
     restaurant_id: str,
     threshold: int = 60,
     only_unmapped: bool = True,
+    include_empty: bool = False,
     current_user: dict = Depends(get_current_user),
 ):
-    """Return top-3 Caffesta product candidates for each menu item with score >= threshold."""
+    """Return top-3 Caffesta product candidates for each menu item with score >= threshold.
+    If include_empty=True, also returns menu items without any candidates (for manual mapping)."""
     await check_restaurant_access(current_user, restaurant_id)
 
     products_res = await caffesta_get_products(restaurant_id)
@@ -75,8 +77,18 @@ async def suggest_mapping(
             continue
         # Top-3 matches
         matches = rfprocess.extract(norm, choice_keys, scorer=fuzz.token_sort_ratio, limit=3)
+        # Also try token_set_ratio for items with "дополнительные слова" (e.g. "с сезонными фруктами")
+        matches_set = rfprocess.extract(norm, choice_keys, scorer=fuzz.token_set_ratio, limit=3)
+        # Merge, keeping best score per product
+        seen = {}
+        for m in matches + matches_set:
+            key = m[0]
+            if key not in seen or m[1] > seen[key][1]:
+                seen[key] = m
+        merged = sorted(seen.values(), key=lambda x: x[1], reverse=True)[:3]
+
         candidates = []
-        for match_text, score, _ in matches:
+        for match_text, score, _ in merged:
             if score < threshold:
                 continue
             prod = choices[match_text]
@@ -87,7 +99,7 @@ async def suggest_mapping(
                 "price": prod.get("price"),
                 "score": round(score),
             })
-        if candidates:
+        if candidates or include_empty:
             suggestions.append({
                 "menu_item": {
                     "id": item["id"],

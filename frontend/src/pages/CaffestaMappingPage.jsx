@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Check, X, Loader2, RefreshCw, Link as LinkIcon, Filter } from 'lucide-react';
+import { Check, X, Loader2, RefreshCw, Link as LinkIcon, Filter, Search } from 'lucide-react';
 import { API, useApp } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function CaffestaMappingPage() {
   const { token, currentRestaurantId } = useApp();
@@ -20,13 +21,21 @@ export default function CaffestaMappingPage() {
   const [selected, setSelected] = useState({});   // { menu_item_id: caffesta_product_id }
   const [applying, setApplying] = useState(false);
   const [search, setSearch] = useState('');
+  const [includeEmpty, setIncludeEmpty] = useState(true);
+
+  // Manual product picker state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerForItem, setPickerForItem] = useState(null);
+  const [allProducts, setAllProducts] = useState([]);
+  const [productsLoaded, setProductsLoaded] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
 
   const fetchSuggestions = async () => {
     if (!currentRestaurantId) return;
     setLoading(true);
     try {
       const r = await axios.get(
-        `${API}/restaurants/${currentRestaurantId}/caffesta/auto-mapping/suggest?threshold=${threshold}&only_unmapped=${onlyUnmapped}`,
+        `${API}/restaurants/${currentRestaurantId}/caffesta/auto-mapping/suggest?threshold=${threshold}&only_unmapped=${onlyUnmapped}&include_empty=${includeEmpty}`,
         authHeaders,
       );
       setSuggestions(r.data.suggestions || []);
@@ -67,6 +76,30 @@ export default function CaffestaMappingPage() {
       delete next[itemId];
       return next;
     });
+  };
+
+  const openManualPicker = async (item) => {
+    setPickerForItem(item);
+    setPickerSearch(item.name || '');
+    setPickerOpen(true);
+    if (!productsLoaded) {
+      try {
+        const r = await axios.get(`${API}/restaurants/${currentRestaurantId}/caffesta/products`, authHeaders);
+        setAllProducts(r.data?.data || []);
+        setProductsLoaded(true);
+      } catch (err) {
+        toast.error(err.response?.data?.detail || 'Не удалось загрузить товары Caffesta');
+      }
+    }
+  };
+
+  const pickManual = (product) => {
+    if (!pickerForItem) return;
+    setSelected((s) => ({ ...s, [pickerForItem.id]: product.product_id }));
+    toast.success(`«${pickerForItem.name}» → ${product.title}`);
+    setPickerOpen(false);
+    setPickerForItem(null);
+    setPickerSearch('');
   };
 
   const applyAll = async () => {
@@ -134,6 +167,10 @@ export default function CaffestaMappingPage() {
             <input type="checkbox" id="only-unmapped" checked={onlyUnmapped} onChange={(e) => setOnlyUnmapped(e.target.checked)} data-testid="only-unmapped" />
             <Label htmlFor="only-unmapped" className="cursor-pointer text-sm">Только непривязанные</Label>
           </div>
+          <div className="flex items-center gap-2 pb-1">
+            <input type="checkbox" id="include-empty" checked={includeEmpty} onChange={(e) => setIncludeEmpty(e.target.checked)} data-testid="include-empty" />
+            <Label htmlFor="include-empty" className="cursor-pointer text-sm">Показывать без совпадений</Label>
+          </div>
           <div className="flex-1 min-w-[200px]">
             <Label className="text-xs">Поиск по названию</Label>
             <div className="flex items-center gap-1">
@@ -186,6 +223,9 @@ export default function CaffestaMappingPage() {
                       </td>
                       <td className="p-3">
                         <div className="space-y-1.5">
+                          {s.candidates.length === 0 && (
+                            <p className="text-xs text-muted-foreground italic">Авто-совпадений нет — подберите вручную →</p>
+                          )}
                           {s.candidates.map((c, i) => {
                             const isSel = currentSel === c.product_id;
                             return (
@@ -214,10 +254,19 @@ export default function CaffestaMappingPage() {
                               </button>
                             );
                           })}
+                          {currentSel && !s.candidates.some(c => c.product_id === currentSel) && (
+                            <div className="px-3 py-2 rounded-lg border border-mint-500 bg-mint-500/10 text-sm flex items-center justify-between">
+                              <span>✓ Выбран ID #{currentSel} (ручной)</span>
+                              <button onClick={() => toggle(s.menu_item.id, currentSel)} className="text-xs text-muted-foreground hover:text-foreground">отменить</button>
+                            </div>
+                          )}
                         </div>
                       </td>
-                      <td className="p-3 text-right">
-                        <Button size="sm" variant="ghost" onClick={() => skip(s.menu_item.id)} data-testid={`skip-${s.menu_item.id}`}>
+                      <td className="p-3 text-right space-y-1">
+                        <Button size="sm" variant="outline" onClick={() => openManualPicker(s.menu_item)} data-testid={`manual-${s.menu_item.id}`} className="w-full">
+                          <Search className="w-4 h-4 mr-1" /> Найти вручную
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => skip(s.menu_item.id)} data-testid={`skip-${s.menu_item.id}`} className="w-full">
                           <X className="w-4 h-4 mr-1" /> Пропустить
                         </Button>
                       </td>
@@ -229,6 +278,54 @@ export default function CaffestaMappingPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Manual product picker */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Выберите товар Caffesta для «{pickerForItem?.name}»</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-2 pt-2">
+            <Search className="w-4 h-4 text-muted-foreground" />
+            <Input
+              autoFocus
+              placeholder="Начните вводить название..."
+              value={pickerSearch}
+              onChange={(e) => setPickerSearch(e.target.value)}
+              data-testid="picker-search"
+            />
+          </div>
+          <div className="overflow-y-auto flex-1 -mx-6 px-6 space-y-1">
+            {!productsLoaded ? (
+              <div className="py-8 text-center text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin mx-auto" /></div>
+            ) : (
+              (() => {
+                const q = pickerSearch.trim().toLowerCase();
+                const filtered = allProducts
+                  .filter(p => !q || (p.title || '').toLowerCase().includes(q))
+                  .slice(0, 100);
+                if (filtered.length === 0) {
+                  return <p className="py-6 text-center text-sm text-muted-foreground">Не найдено. Попробуйте другой запрос.</p>;
+                }
+                return filtered.map((p) => (
+                  <button
+                    key={p.product_id}
+                    onClick={() => pickManual(p)}
+                    className="w-full flex items-center justify-between text-left p-3 rounded-lg border border-border hover:border-mint-500 hover:bg-mint-500/5 transition-all"
+                    data-testid={`picker-product-${p.product_id}`}
+                  >
+                    <span className="font-medium truncate">{p.title}</span>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">#{p.product_id} · {p.price} BYN · {p.type}</span>
+                  </button>
+                ));
+              })()
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground pt-2 border-t border-border">
+            Показано до 100 товаров. Уточните поиск, если нужный товар не виден.
+          </p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
