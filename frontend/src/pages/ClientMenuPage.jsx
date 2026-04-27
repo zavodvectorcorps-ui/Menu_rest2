@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import axios from 'axios';
+import ItemDetailsDialog from '@/components/ItemDetailsDialog';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -47,6 +48,10 @@ export default function ClientMenuPage() {
   const [splashDismissed, setSplashDismissed] = useState(() => {
     return sessionStorage.getItem(`splash_${storageKey}`) === '1';
   });
+  // Active splash chosen on first load (random pick from active list)
+  const [activeSplash, setActiveSplash] = useState(null);
+  // Item details modal
+  const [detailsItem, setDetailsItem] = useState(null);
 
   // Category scroll state
   const categoryScrollRef = useRef(null);
@@ -373,9 +378,14 @@ export default function ClientMenuPage() {
 
   const { restaurant, settings, sections, table, call_types } = data;
 
-  const showSplash = settings?.splash_enabled && !splashDismissed && (
-    settings.splash_image_url || settings.splash_title || settings.splash_text
-  );
+  // Select random splash ad once when ads load
+  if (!activeSplash && Array.isArray(data?.splash_ads) && data.splash_ads.length > 0) {
+    const pick = data.splash_ads[Math.floor(Math.random() * data.splash_ads.length)];
+    setActiveSplash(pick);
+  }
+
+  const splash = activeSplash;
+  const showSplash = !splashDismissed && splash && (splash.image_url || splash.title || splash.text);
   const dismissSplash = () => {
     sessionStorage.setItem(`splash_${storageKey}`, '1');
     setSplashDismissed(true);
@@ -390,25 +400,25 @@ export default function ClientMenuPage() {
           data-testid="splash-overlay"
         >
           <div className="w-full max-w-lg bg-card rounded-3xl shadow-2xl overflow-hidden border border-border max-h-[92vh] flex flex-col">
-            {settings.splash_image_url && (
-              <div className={`w-full bg-muted flex items-center justify-center ${settings.splash_fit_mode === 'cover' ? 'aspect-[16/9]' : ''}`}>
+            {splash.image_url && (
+              <div className={`w-full bg-muted flex items-center justify-center ${splash.fit_mode === 'cover' ? 'aspect-[16/9]' : ''}`}>
                 <img
-                  src={settings.splash_image_url}
+                  src={splash.image_url}
                   alt="splash"
-                  className={`w-full ${settings.splash_fit_mode === 'cover' ? 'h-full object-cover' : 'h-auto object-contain max-h-[60vh]'}`}
+                  className={`w-full ${splash.fit_mode === 'cover' ? 'h-full object-cover' : 'h-auto object-contain max-h-[60vh]'}`}
                   data-testid="splash-image"
                 />
               </div>
             )}
             <div className="p-6 space-y-4 text-center overflow-y-auto">
-              {settings.splash_title && (
+              {splash.title && (
                 <h2 className="text-2xl font-heading font-bold text-foreground" data-testid="splash-title">
-                  {settings.splash_title}
+                  {splash.title}
                 </h2>
               )}
-              {settings.splash_text && (
+              {splash.text && (
                 <p className="text-sm text-muted-foreground whitespace-pre-line" data-testid="splash-text">
-                  {settings.splash_text}
+                  {splash.text}
                 </p>
               )}
               <div className="flex flex-col gap-2 pt-2">
@@ -417,17 +427,17 @@ export default function ClientMenuPage() {
                   onClick={dismissSplash}
                   data-testid="splash-continue-btn"
                 >
-                  {settings.splash_button_text || 'Перейти к меню'}
+                  {splash.button_text || 'Перейти к меню'}
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
-                {settings.splash_link_url && settings.splash_link_text && (
+                {splash.link_url && splash.link_text && (
                   <Button
                     variant="outline"
                     className="w-full h-12 rounded-2xl border-mint-500 text-mint-500 hover:bg-mint-50 dark:hover:bg-mint-900/20 font-semibold"
-                    onClick={() => window.open(settings.splash_link_url, '_blank', 'noopener,noreferrer')}
+                    onClick={() => window.open(splash.link_url, '_blank', 'noopener,noreferrer')}
                     data-testid="splash-link-btn"
                   >
-                    {settings.splash_link_text}
+                    {splash.link_text}
                   </Button>
                 )}
               </div>
@@ -752,8 +762,9 @@ export default function ClientMenuPage() {
                         ) : (
                           <div
                             key={item.id}
-                            className={`flex items-center justify-between px-4 py-3 ${index !== catItems.length - 1 ? 'border-b border-border/50' : ''}`}
+                            className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/40 transition-colors ${index !== catItems.length - 1 ? 'border-b border-border/50' : ''}`}
                             data-testid={`menu-item-${item.id}`}
+                            onClick={() => setDetailsItem(item)}
                           >
                             <div className="flex-1 min-w-0 pr-4">
                               <div className="flex items-center gap-2">
@@ -780,7 +791,7 @@ export default function ClientMenuPage() {
                                   size="sm"
                                   variant="ghost"
                                   className="h-8 w-8 rounded-full hover:bg-mint-100 dark:hover:bg-mint-900/30 p-0"
-                                  onClick={() => addToCart(item)}
+                                  onClick={(e) => { e.stopPropagation(); addToCart(item); }}
                                   data-testid={`add-to-cart-${item.id}`}
                                 >
                                   <Plus className="w-4 h-4 text-mint-500" />
@@ -817,8 +828,9 @@ export default function ClientMenuPage() {
                         ) : (
                           <div
                             key={item.id}
-                            className="bg-card rounded-2xl shadow-md overflow-hidden menu-item-card"
+                            className="bg-card rounded-2xl shadow-md overflow-hidden menu-item-card cursor-pointer hover:shadow-lg transition-shadow"
                             data-testid={`menu-item-${item.id}`}
+                            onClick={() => setDetailsItem(item)}
                           >
                             <div className="flex">
                               <div className="w-28 h-28 flex-shrink-0 bg-muted">
@@ -881,7 +893,7 @@ export default function ClientMenuPage() {
                                     <Button
                                       size="sm"
                                       className="h-8 rounded-full bg-mint-500 hover:bg-mint-600 text-white px-3"
-                                      onClick={() => addToCart(item)}
+                                      onClick={(e) => { e.stopPropagation(); addToCart(item); }}
                                       data-testid={`add-to-cart-${item.id}`}
                                     >
                                       <Plus className="w-4 h-4" />
@@ -1093,6 +1105,16 @@ export default function ClientMenuPage() {
       </Dialog>
 
       <Toaster position="top-center" richColors />
+
+      <ItemDetailsDialog
+        open={!!detailsItem}
+        onOpenChange={(o) => { if (!o) setDetailsItem(null); }}
+        item={detailsItem}
+        currency={currency}
+        labelsMap={labelsMap}
+        ordersEnabled={settings?.online_orders_enabled}
+        onAdd={addToCart}
+      />
 
       {/* Footer */}
       <footer className="mt-8 pb-4 flex items-center justify-center gap-2 text-xs text-muted-foreground" data-testid="client-footer">

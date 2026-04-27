@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { useApp, useTheme, API } from '@/App';
@@ -52,6 +52,13 @@ export default function SettingsPage() {
   const [splashUploading, setSplashUploading] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const [rawImageSrc, setRawImageSrc] = useState(null);
+
+  // Splash Ads (multiple)
+  const [splashAds, setSplashAds] = useState([]);
+  const [adDialogOpen, setAdDialogOpen] = useState(false);
+  const [editingAd, setEditingAd] = useState(null);
+  const emptyAd = { title: '', text: '', image_url: '', button_text: 'Перейти к меню', link_text: '', link_url: '', fit_mode: 'contain', is_active: true, sort_order: 0 };
+  const [adForm, setAdForm] = useState(emptyAd);
 
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -124,7 +131,7 @@ export default function SettingsPage() {
         headers: { ...authHeaders.headers, 'Content-Type': 'multipart/form-data' },
       });
       const url = `${BACKEND_URL}${resp.data.url}`;
-      setSettingsForm({ ...settingsForm, splash_image_url: url });
+      setAdForm((prev) => ({ ...prev, image_url: url }));
       toast.success('Изображение загружено');
       setCropOpen(false);
       setRawImageSrc(null);
@@ -132,6 +139,63 @@ export default function SettingsPage() {
       toast.error('Ошибка загрузки');
     } finally {
       setSplashUploading(false);
+    }
+  };
+
+  const fetchSplashAds = async () => {
+    if (!currentRestaurantId) return;
+    try {
+      const r = await axios.get(`${API}/restaurants/${currentRestaurantId}/splash-ads`, authHeaders);
+      setSplashAds(r.data || []);
+    } catch { /* silent */ }
+  };
+
+  useEffect(() => { fetchSplashAds(); /* eslint-disable-next-line */ }, [currentRestaurantId]);
+
+  const openAddAdDialog = () => {
+    setEditingAd(null);
+    setAdForm({ ...emptyAd, sort_order: splashAds.length });
+    setAdDialogOpen(true);
+  };
+
+  const openEditAdDialog = (ad) => {
+    setEditingAd(ad);
+    setAdForm({ ...emptyAd, ...ad });
+    setAdDialogOpen(true);
+  };
+
+  const saveAd = async () => {
+    try {
+      if (editingAd) {
+        await axios.put(`${API}/restaurants/${currentRestaurantId}/splash-ads/${editingAd.id}`, adForm, authHeaders);
+      } else {
+        await axios.post(`${API}/restaurants/${currentRestaurantId}/splash-ads`, adForm, authHeaders);
+      }
+      toast.success('Заставка сохранена');
+      setAdDialogOpen(false);
+      fetchSplashAds();
+    } catch {
+      toast.error('Ошибка сохранения');
+    }
+  };
+
+  const deleteAd = async (ad) => {
+    if (!window.confirm(`Удалить заставку «${ad.title || 'без названия'}»?`)) return;
+    try {
+      await axios.delete(`${API}/restaurants/${currentRestaurantId}/splash-ads/${ad.id}`, authHeaders);
+      toast.success('Удалено');
+      fetchSplashAds();
+    } catch {
+      toast.error('Ошибка удаления');
+    }
+  };
+
+  const toggleAdActive = async (ad) => {
+    try {
+      await axios.put(`${API}/restaurants/${currentRestaurantId}/splash-ads/${ad.id}`, { is_active: !ad.is_active }, authHeaders);
+      fetchSplashAds();
+    } catch {
+      toast.error('Ошибка');
     }
   };
 
@@ -1037,162 +1101,58 @@ export default function SettingsPage() {
         <TabsContent value="splash" className="mt-6">
           <Card className="border-none shadow-md" data-testid="splash-card">
             <CardHeader>
-              <CardTitle className="font-heading">Рекламная заставка</CardTitle>
-              <CardDescription>
-                Показывается при первом открытии меню гостем — анонс акций, приглашение в Instagram и т.д.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between py-3 border-b border-border">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                  <Label className="text-base font-medium">Показывать заставку</Label>
-                  <p className="text-sm text-muted-foreground">Гость увидит её один раз за сессию</p>
+                  <CardTitle className="font-heading">Рекламные заставки</CardTitle>
+                  <CardDescription>
+                    Создайте несколько заставок — гостю при открытии меню будет случайно показана одна из активных.
+                  </CardDescription>
                 </div>
-                <Switch
-                  checked={!!settingsForm.splash_enabled}
-                  onCheckedChange={(checked) => setSettingsForm({ ...settingsForm, splash_enabled: checked })}
-                  data-testid="splash-enabled-switch"
-                />
+                <Button className="rounded-full bg-mint-500 hover:bg-mint-600 text-white gap-2" onClick={openAddAdDialog} data-testid="add-splash-btn">
+                  <Plus className="w-4 h-4" />Добавить
+                </Button>
               </div>
-
-              <div className="space-y-2">
-                <Label>Изображение / баннер</Label>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  {settingsForm.splash_image_url ? (
-                    <div className="relative">
-                      <img
-                        src={settingsForm.splash_image_url}
-                        alt="splash"
-                        className="w-full sm:w-48 h-32 object-cover rounded-xl border border-border"
-                      />
-                      <Button
-                        size="icon"
-                        variant="destructive"
-                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                        onClick={() => setSettingsForm({ ...settingsForm, splash_image_url: '' })}
-                        data-testid="splash-image-remove"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+            </CardHeader>
+            <CardContent>
+              {splashAds.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <Megaphone className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>Заставок пока нет. Нажмите «Добавить», чтобы создать первую.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {splashAds.map((ad) => (
+                    <div key={ad.id} className="flex items-center gap-3 p-3 border border-border rounded-2xl" data-testid={`splash-ad-${ad.id}`}>
+                      <div className="w-20 h-20 rounded-xl bg-muted flex-shrink-0 overflow-hidden flex items-center justify-center">
+                        {ad.image_url ? (
+                          <img src={ad.image_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="w-8 h-8 text-muted-foreground/40" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{ad.title || <span className="text-muted-foreground italic">Без названия</span>}</div>
+                        <div className="text-xs text-muted-foreground line-clamp-2">{ad.text || '—'}</div>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${ad.is_active ? 'bg-mint-100 text-mint-700 dark:bg-mint-900/30 dark:text-mint-300' : 'bg-muted text-muted-foreground'}`}>
+                            {ad.is_active ? 'Активна' : 'Отключена'}
+                          </span>
+                          {ad.link_text && <span className="text-xs text-muted-foreground">↗ {ad.link_text}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Switch checked={ad.is_active} onCheckedChange={() => toggleAdActive(ad)} data-testid={`toggle-splash-${ad.id}`} />
+                        <Button variant="ghost" size="icon" onClick={() => openEditAdDialog(ad)} data-testid={`edit-splash-${ad.id}`}>
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => deleteAd(ad)} data-testid={`delete-splash-${ad.id}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="w-full sm:w-48 h-32 rounded-xl border border-dashed border-border bg-muted/30 flex items-center justify-center text-muted-foreground">
-                      <ImageIcon className="w-8 h-8" />
-                    </div>
-                  )}
-                  <div className="flex flex-col gap-2 flex-1">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      id="splash-image-file"
-                      className="hidden"
-                      onChange={handleSplashImageUpload}
-                      data-testid="splash-image-file"
-                    />
-                    <Button
-                      variant="outline"
-                      className="rounded-full gap-2"
-                      onClick={() => document.getElementById('splash-image-file').click()}
-                      disabled={splashUploading}
-                      data-testid="splash-image-upload-btn"
-                    >
-                      {splashUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadIcon className="w-4 h-4" />}
-                      {splashUploading ? 'Загрузка...' : 'Загрузить изображение'}
-                    </Button>
-                    <Input
-                      placeholder="или вставьте ссылку https://..."
-                      value={settingsForm.splash_image_url || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, splash_image_url: e.target.value })}
-                      data-testid="splash-image-url-input"
-                    />
-                  </div>
+                  ))}
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Заголовок</Label>
-                  <Input
-                    placeholder="Например: Подарок при заказе кальяна"
-                    value={settingsForm.splash_title || ''}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, splash_title: e.target.value })}
-                    data-testid="splash-title-input"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Текст кнопки</Label>
-                  <Input
-                    placeholder="Перейти к меню"
-                    value={settingsForm.splash_button_text || ''}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, splash_button_text: e.target.value })}
-                    data-testid="splash-button-text-input"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Описание</Label>
-                <Textarea
-                  rows={3}
-                  placeholder="Расскажите про акцию или пригласите подписаться в Instagram"
-                  value={settingsForm.splash_text || ''}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, splash_text: e.target.value })}
-                  data-testid="splash-text-input"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Режим отображения изображения</Label>
-                <select
-                  value={settingsForm.splash_fit_mode || 'contain'}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, splash_fit_mode: e.target.value })}
-                  className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm"
-                  data-testid="splash-fit-mode-select"
-                >
-                  <option value="contain">Целиком (без обрезки)</option>
-                  <option value="cover">Заполнить (с обрезкой по краям)</option>
-                </select>
-                <p className="text-xs text-muted-foreground">
-                  «Целиком» — картинка показывается полностью в её пропорциях. «Заполнить» — растягивается на всю площадь, лишние края обрезаются.
-                </p>
-              </div>
-
-              <div className="border-t border-border pt-4">
-                <Label className="text-base font-medium mb-3 block">Дополнительная кнопка</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Текст кнопки</Label>
-                    <Input
-                      placeholder="Например: Подписаться в Instagram"
-                      value={settingsForm.splash_link_text || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, splash_link_text: e.target.value })}
-                      data-testid="splash-link-text-input"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm text-muted-foreground">Ссылка</Label>
-                    <Input
-                      placeholder="https://instagram.com/myata.sport"
-                      value={settingsForm.splash_link_url || ''}
-                      onChange={(e) => setSettingsForm({ ...settingsForm, splash_link_url: e.target.value })}
-                      data-testid="splash-link-url-input"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Если оба поля заполнены — под основной кнопкой появится вторая кнопка, которая ведёт по ссылке.
-                </p>
-              </div>
-
-              <Button
-                className="w-full bg-mint-500 hover:bg-mint-600 rounded-full"
-                onClick={handleSaveSettings}
-                disabled={saving}
-                data-testid="save-splash-btn"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {saving ? 'Сохранение...' : 'Сохранить заставку'}
-              </Button>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1488,6 +1448,89 @@ export default function SettingsPage() {
         onCropDone={handleCroppedImageUpload}
         busy={splashUploading}
       />
+
+      <Dialog open={adDialogOpen} onOpenChange={setAdDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="splash-ad-dialog">
+          <DialogHeader>
+            <DialogTitle className="font-heading">{editingAd ? 'Редактирование заставки' : 'Новая заставка'}</DialogTitle>
+            <DialogDescription>
+              Заполните поля. Гость случайно увидит одну из активных заставок при открытии меню.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Изображение / баннер</Label>
+              <div className="flex flex-col sm:flex-row gap-3">
+                {adForm.image_url ? (
+                  <div className="relative">
+                    <img src={adForm.image_url} alt="splash" className="w-full sm:w-48 h-32 object-cover rounded-xl border border-border" />
+                    <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => setAdForm({ ...adForm, image_url: '' })} data-testid="ad-image-remove">
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="w-full sm:w-48 h-32 rounded-xl border border-dashed border-border bg-muted/30 flex items-center justify-center text-muted-foreground">
+                    <ImageIcon className="w-8 h-8" />
+                  </div>
+                )}
+                <div className="flex flex-col gap-2 flex-1">
+                  <input type="file" accept="image/*" id="ad-image-file" className="hidden" onChange={handleSplashImageUpload} />
+                  <Button variant="outline" className="rounded-full gap-2" onClick={() => document.getElementById('ad-image-file').click()} disabled={splashUploading} data-testid="ad-image-upload-btn">
+                    {splashUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadIcon className="w-4 h-4" />}
+                    {splashUploading ? 'Загрузка...' : 'Загрузить и обрезать'}
+                  </Button>
+                  <Input placeholder="или вставьте ссылку https://..." value={adForm.image_url || ''} onChange={(e) => setAdForm({ ...adForm, image_url: e.target.value })} />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Заголовок</Label>
+                <Input value={adForm.title || ''} onChange={(e) => setAdForm({ ...adForm, title: e.target.value })} placeholder="Например: Подарок при заказе кальяна" data-testid="ad-title-input" />
+              </div>
+              <div className="space-y-2">
+                <Label>Текст основной кнопки</Label>
+                <Input value={adForm.button_text || ''} onChange={(e) => setAdForm({ ...adForm, button_text: e.target.value })} placeholder="Перейти к меню" data-testid="ad-button-input" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Описание</Label>
+              <Textarea rows={3} value={adForm.text || ''} onChange={(e) => setAdForm({ ...adForm, text: e.target.value })} placeholder="Расскажите про акцию..." data-testid="ad-text-input" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Режим отображения</Label>
+              <select value={adForm.fit_mode || 'contain'} onChange={(e) => setAdForm({ ...adForm, fit_mode: e.target.value })} className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm" data-testid="ad-fit-mode-select">
+                <option value="contain">Целиком (без обрезки)</option>
+                <option value="cover">Заполнить (с обрезкой)</option>
+              </select>
+            </div>
+
+            <div className="border-t border-border pt-4">
+              <Label className="text-sm font-medium mb-2 block">Дополнительная кнопка (необязательно)</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input value={adForm.link_text || ''} onChange={(e) => setAdForm({ ...adForm, link_text: e.target.value })} placeholder="Подписаться в Instagram" data-testid="ad-link-text-input" />
+                <Input value={adForm.link_url || ''} onChange={(e) => setAdForm({ ...adForm, link_url: e.target.value })} placeholder="https://..." data-testid="ad-link-url-input" />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-border pt-4">
+              <Label className="font-medium">Активна (показывать гостям)</Label>
+              <Switch checked={adForm.is_active} onCheckedChange={(v) => setAdForm({ ...adForm, is_active: v })} data-testid="ad-active-switch" />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdDialogOpen(false)}>Отмена</Button>
+            <Button className="bg-mint-500 hover:bg-mint-600 text-white gap-2" onClick={saveAd} data-testid="save-splash-ad-btn">
+              <Save className="w-4 h-4" />Сохранить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

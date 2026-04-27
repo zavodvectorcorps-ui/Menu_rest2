@@ -30,6 +30,7 @@ async def get_public_menu(table_code: str):
     categories = await db.categories.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(1000)
     items = await db.menu_items.find({"restaurant_id": restaurant_id, "is_available": True}, {"_id": 0}).sort("sort_order", 1).to_list(5000)
     labels = await db.labels.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("sort_order", 1).to_list(500)
+    splash_ads = await db.splash_ads.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(50)
 
     view = MenuView(restaurant_id=restaurant_id, table_code=table_code)
     doc = view.model_dump()
@@ -44,7 +45,8 @@ async def get_public_menu(table_code: str):
         "call_types": call_types,
         "categories": [serialize_doc(c) for c in categories],
         "items": [serialize_doc(i) for i in items],
-        "labels": labels
+        "labels": labels,
+        "splash_ads": [serialize_doc(s) for s in splash_ads],
     }
 
 
@@ -65,6 +67,7 @@ async def get_public_menu_by_slug(slug: str, table_number: int):
     categories = await db.categories.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(1000)
     items = await db.menu_items.find({"restaurant_id": restaurant_id, "is_available": True}, {"_id": 0}).sort("sort_order", 1).to_list(5000)
     labels = await db.labels.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("sort_order", 1).to_list(500)
+    splash_ads = await db.splash_ads.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(50)
 
     view = MenuView(restaurant_id=restaurant_id, table_code=table.get('code'))
     doc = view.model_dump()
@@ -79,7 +82,8 @@ async def get_public_menu_by_slug(slug: str, table_number: int):
         "call_types": call_types,
         "categories": [serialize_doc(c) for c in categories],
         "items": [serialize_doc(i) for i in items],
-        "labels": labels
+        "labels": labels,
+        "splash_ads": [serialize_doc(s) for s in splash_ads],
     }
 
 
