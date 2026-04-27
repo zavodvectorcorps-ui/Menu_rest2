@@ -330,8 +330,11 @@ async def caffesta_time_window(
     Uses v1.1/draft/receipts_by_shift_day which provides real per-receipt timestamps."""
     await check_restaurant_access(current_user, restaurant_id)
 
+    if days < 1 or days > 120:
+        raise HTTPException(400, "Период должен быть от 1 до 120 дней")
+
     end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start_date = (datetime.now(timezone.utc) - timedelta(days=max(1, min(days, 120)))).strftime("%Y-%m-%d")
+    start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
     try:
         from_min = _hhmm_to_minutes(time_from)
