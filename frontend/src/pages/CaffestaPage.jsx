@@ -642,11 +642,17 @@ export default function CaffestaPage() {
                 <CardContent className="space-y-4">
                   {/* Presets */}
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" className="rounded-full" onClick={() => applyPreset({ days: '30', day_type: 'weekday', time_from: '00:00', time_to: '02:00' })} data-testid="preset-weekday-night">
-                      <CalendarDays className="w-3.5 h-3.5 mr-1" /> Будни 00:00–02:00
+                    <Button size="sm" variant="outline" className="rounded-full" onClick={() => applyPreset({ days: '30', day_type: 'mon_thu', time_from: '00:00', time_to: '02:00' })} data-testid="preset-monthu-night">
+                      <CalendarDays className="w-3.5 h-3.5 mr-1" /> Пн–Чт 00:00–02:00
                     </Button>
-                    <Button size="sm" variant="outline" className="rounded-full" onClick={() => applyPreset({ days: '30', day_type: 'weekend', time_from: '03:00', time_to: '06:00' })} data-testid="preset-weekend-night">
-                      <CalendarDays className="w-3.5 h-3.5 mr-1" /> Выходные 03:00–06:00
+                    <Button size="sm" variant="outline" className="rounded-full" onClick={() => applyPreset({ days: '30', day_type: 'fri', time_from: '20:00', time_to: '02:00' })} data-testid="preset-fri-night">
+                      <CalendarDays className="w-3.5 h-3.5 mr-1" /> Пятница 20:00–02:00
+                    </Button>
+                    <Button size="sm" variant="outline" className="rounded-full" onClick={() => applyPreset({ days: '30', day_type: 'sat', time_from: '03:00', time_to: '06:00' })} data-testid="preset-sat-night">
+                      <CalendarDays className="w-3.5 h-3.5 mr-1" /> Суббота 03:00–06:00
+                    </Button>
+                    <Button size="sm" variant="outline" className="rounded-full" onClick={() => applyPreset({ days: '30', day_type: 'sun', time_from: '12:00', time_to: '15:00' })} data-testid="preset-sun-lunch">
+                      <CalendarDays className="w-3.5 h-3.5 mr-1" /> Воскресенье 12:00–15:00
                     </Button>
                     <Button size="sm" variant="outline" className="rounded-full" onClick={() => applyPreset({ days: '30', day_type: 'weekend', time_from: '12:00', time_to: '15:00' })} data-testid="preset-weekend-lunch">
                       <CalendarDays className="w-3.5 h-3.5 mr-1" /> Выходные 12:00–15:00
@@ -676,6 +682,10 @@ export default function CaffestaPage() {
                           <SelectItem value="all">Все дни</SelectItem>
                           <SelectItem value="weekday">Будни (Пн–Пт)</SelectItem>
                           <SelectItem value="weekend">Выходные (Сб, Вс)</SelectItem>
+                          <SelectItem value="mon_thu">Пн–Чт</SelectItem>
+                          <SelectItem value="fri">Пятница</SelectItem>
+                          <SelectItem value="sat">Суббота</SelectItem>
+                          <SelectItem value="sun">Воскресенье</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

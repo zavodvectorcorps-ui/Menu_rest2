@@ -321,7 +321,7 @@ def _hhmm_to_minutes(s: str) -> int:
 async def caffesta_time_window(
     restaurant_id: str,
     days: int = 30,
-    day_type: str = "all",          # all | weekday | weekend
+    day_type: str = "all",          # all | weekday | weekend | mon_thu | fri | sat | sun
     time_from: str = "00:00",       # HH:MM
     time_to: str = "23:59",         # HH:MM (if < from, treats as wrap-around past midnight)
     current_user: dict = Depends(get_current_user),
@@ -349,11 +349,19 @@ async def caffesta_time_window(
         return m >= from_min or m <= to_min
 
     def in_day_type(dt: datetime) -> bool:
-        wd = dt.weekday()
+        wd = dt.weekday()  # 0=Mon..6=Sun
         if day_type == "weekday":
             return wd < 5
         if day_type == "weekend":
             return wd >= 5
+        if day_type == "mon_thu":
+            return wd <= 3
+        if day_type == "fri":
+            return wd == 4
+        if day_type == "sat":
+            return wd == 5
+        if day_type == "sun":
+            return wd == 6
         return True
 
     res = await caffesta_get_all_receipts(restaurant_id, start_date, end_date)
