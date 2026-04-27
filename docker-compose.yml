@@ -7,8 +7,8 @@ services:
       - mongo_data:/data/db
     environment:
       MONGO_INITDB_DATABASE: restaurant_app
-    ports:
-      - "27017:27017"
+    # NO 'ports:' section — mongo доступен ТОЛЬКО внутри docker network (backend),
+    # снаружи сервера порт 27017 НЕ виден. Защита от ransomware-атак.
 
   # FastAPI Backend
   backend:
