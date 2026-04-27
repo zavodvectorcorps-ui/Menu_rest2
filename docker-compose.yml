@@ -3,10 +3,13 @@ services:
   mongo:
     image: mongo:7
     restart: always
+    command: ["mongod", "--auth", "--bind_ip_all"]
     volumes:
       - mongo_data:/data/db
     environment:
       MONGO_INITDB_DATABASE: restaurant_app
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS:-CHANGE_ME}
     # NO 'ports:' section — mongo доступен ТОЛЬКО внутри docker network (backend),
     # снаружи сервера порт 27017 НЕ виден. Защита от ransomware-атак.
 
@@ -17,7 +20,7 @@ services:
     expose:
       - "8001"
     environment:
-      MONGO_URL: mongodb://mongo:27017
+      MONGO_URL: ${MONGO_URL:-mongodb://mongo:27017}
       DB_NAME: restaurant_app
       JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_GENERATE_RANDOM_SECRET}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
