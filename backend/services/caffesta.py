@@ -409,12 +409,13 @@ async def caffesta_get_all_receipts(restaurant_id: str, start_date: str, end_dat
     # Normalize
     from zoneinfo import ZoneInfo
     MINSK_TZ = ZoneInfo("Europe/Minsk")
+    UTC_TZ = ZoneInfo("UTC")
 
     def _parse_caffesta_dt(s):
-        """Try multiple Caffesta datetime formats. Returns aware/naive datetime in Minsk local time, or None."""
+        """Parse Caffesta datetime. Caffesta returns naive timestamps in UTC.
+        Returns naive datetime in Minsk local time, or None."""
         if not s:
             return None
-        # Strip Z; Python fromisoformat supports both space and T separators (3.11+)
         cleaned = s.strip().replace("Z", "+00:00")
         try:
             dt = _dt.fromisoformat(cleaned)
@@ -431,9 +432,10 @@ async def caffesta_get_all_receipts(restaurant_id: str, start_date: str, end_dat
                     continue
         if dt is None:
             return None
-        # Add tz: naive → assume Minsk; aware → convert to Minsk
+        # Caffesta returns NAIVE timestamps in UTC (verified by user comparing UI vs API).
+        # Naive → assume UTC; tz-aware → keep as is. Then convert to Minsk local.
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=MINSK_TZ)
+            dt = dt.replace(tzinfo=UTC_TZ)
         return dt.astimezone(MINSK_TZ).replace(tzinfo=None)
 
     normalized = []
