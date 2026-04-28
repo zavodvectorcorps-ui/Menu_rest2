@@ -502,9 +502,11 @@ async def caffesta_time_window(
 async def debug_raw_receipts(
     restaurant_id: str,
     date: Optional[str] = None,
+    full: bool = False,
     current_user: dict = Depends(get_current_user),
 ):
-    """Return first 3 raw receipts with order_dishes from Caffesta for inspection."""
+    """Return raw receipts with order_dishes from Caffesta for inspection.
+    full=true → returns ALL receipts of the day (compact view); otherwise first 3 in detail."""
     from services.caffesta import (
         get_caffesta_config as _g,
         caffesta_get_terminals as _t,
@@ -519,6 +521,27 @@ async def debug_raw_receipts(
     terminals = await _t(restaurant_id, date, date)
     if not terminals and cfg.get("pos_id"):
         terminals = [int(cfg["pos_id"])]
+
+    if full:
+        all_receipts = []
+        for tid in terminals:
+            raw = await _fd(cfg["account_name"], cfg["api_key"], tid, date)
+            for r in raw:
+                all_receipts.append({
+                    "tid": tid,
+                    "id": (r.get("id") or "")[:13],
+                    "created": r.get("created_at"),
+                    "updated": r.get("updated_at"),
+                    "type": r.get("type"),
+                    "income": r.get("income"),
+                    "total": r.get("total_sum"),
+                    "discount": r.get("discount_sum"),
+                    "terminal_number": r.get("terminal_number"),
+                })
+        # Sort by created_at
+        all_receipts.sort(key=lambda x: x.get("created") or "")
+        return {"date": date, "terminals": terminals, "count": len(all_receipts), "receipts": all_receipts}
+
     samples = []
     for tid in terminals[:3]:
         raw = await _fd(cfg["account_name"], cfg["api_key"], tid, date)
