@@ -521,6 +521,50 @@ async def caffesta_time_window(
 
 # ============ STOP LIST SYNC ============
 
+@router.get("/restaurants/{restaurant_id}/caffesta/debug/orders-history-probe")
+async def debug_orders_history_probe(
+    restaurant_id: str,
+    date: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Probe several plausible endpoints for Caffesta 'История счетов'.
+    Returns response status + first bytes for each path so we can identify the correct one."""
+    import httpx
+    from services.caffesta import get_caffesta_config, _base_url, _headers
+    await check_restaurant_access(current_user, restaurant_id)
+    cfg = await get_caffesta_config(restaurant_id)
+    if not cfg or not cfg.get("enabled"):
+        raise HTTPException(400, "Caffesta не настроена")
+    if not date:
+        date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    base = _base_url(cfg["account_name"])
+    headers = _headers(cfg["api_key"])
+    candidates = [
+        f"{base}/v1.0/orders_history?start={date}&end={date}",
+        f"{base}/v1.0/orders_history/list?start={date}&end={date}",
+        f"{base}/v1.0/draft/orders_history?start={date}&end={date}",
+        f"{base}/v1.0/draft/orders_history/list?start={date}&end={date}",
+        f"{base}/v1.0/order_history?start={date}&end={date}",
+        f"{base}/v1.0/draft/order_history?start={date}&end={date}",
+        f"{base}/v1.1/draft/orders_history?start={date}&end={date}",
+        f"{base}/v1.1/draft/orders_history/list?start={date}&end={date}",
+        f"{base}/v1.0/draft/orders_history_by_shift_day/2/{date}",
+        f"{base}/v1.1/draft/orders_history_by_shift_day/2/{date}",
+        f"{base}/v1.0/admin/orders_history?start={date}&end={date}",
+    ]
+    results = []
+    async with httpx.AsyncClient(timeout=15) as client:
+        for url in candidates:
+            try:
+                r = await client.get(url, headers=headers)
+                body = r.text[:300] if r.text else ""
+                results.append({"url": url, "status": r.status_code, "body_head": body})
+            except Exception as e:
+                results.append({"url": url, "error": str(e)[:200]})
+    return {"date": date, "probes": results}
+
+
 @router.get("/restaurants/{restaurant_id}/caffesta/debug/raw-shift-day")
 async def debug_raw_shift_day(
     restaurant_id: str,
