@@ -409,35 +409,62 @@ async def caffesta_get_all_receipts(restaurant_id: str, start_date: str, end_dat
     # Normalize
     from zoneinfo import ZoneInfo
     MINSK_TZ = ZoneInfo("Europe/Minsk")
-    normalized = []
-    for r in flat:
-        created_at = r.get("created_at") or r.get("updated_at") or ""
-        dt_obj = None
-        has_real_time = False
-        if created_at:
-            try:
-                dt_obj = _dt.fromisoformat(created_at.replace("Z", "+00:00"))
-                has_real_time = True
-            except ValueError:
+
+    def _parse_caffesta_dt(s):
+        """Try multiple Caffesta datetime formats. Returns aware/naive datetime in Minsk local time, or None."""
+        if not s:
+            return None
+        # Strip Z; Python fromisoformat supports both space and T separators (3.11+)
+        cleaned = s.strip().replace("Z", "+00:00")
+        try:
+            dt = _dt.fromisoformat(cleaned)
+        except (ValueError, TypeError):
+            dt = None
+        if dt is None:
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S",
+                        "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M",
+                        "%Y-%m-%d"):
                 try:
-                    # Naive string without tz — assume Minsk local
-                    dt_obj = _dt.strptime(created_at[:19], "%Y-%m-%dT%H:%M:%S")
-                    dt_obj = dt_obj.replace(tzinfo=MINSK_TZ)
-                    has_real_time = True
+                    dt = _dt.strptime(s.strip()[:len("2025-01-01 00:00:00")], fmt)
+                    break
                 except ValueError:
-                    pass
-        # Convert to Minsk timezone (naive datetime in Minsk local time)
-        if dt_obj and dt_obj.tzinfo is not None:
-            dt_obj = dt_obj.astimezone(MINSK_TZ).replace(tzinfo=None)
-        # If no real time, keep None (do NOT fallback to shift_day midnight —
-        # it would incorrectly match 00:00-02:00 windows)
-        if not has_real_time:
-            dt_obj = None
+                    continue
+        if dt is None:
+            return None
+        # Add tz: naive → assume Minsk; aware → convert to Minsk
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=MINSK_TZ)
+        return dt.astimezone(MINSK_TZ).replace(tzinfo=None)
+
+    normalized = []
+    skipped_no_time = 0
+    for r in flat:
+        # Prefer created_at, fall back to updated_at (for open/draft receipts)
+        dt_obj = _parse_caffesta_dt(r.get("created_at"))
+        if not dt_obj:
+            dt_obj = _parse_caffesta_dt(r.get("updated_at"))
+
+        # Whether we have an actual time-of-day (not just a date)
+        has_time = dt_obj is not None and (dt_obj.hour > 0 or dt_obj.minute > 0 or dt_obj.second > 0 or
+                                            (r.get("created_at") and "T" in r["created_at"] or
+                                             r.get("created_at") and ":" in r.get("created_at", "")))
+        if not has_time:
+            # If only date came (00:00:00 from a pure date string), treat as no-time
+            ca = (r.get("created_at") or "").strip()
+            if ca and ":" not in ca:
+                dt_obj = None
+                skipped_no_time += 1
+
+        # Permissive income filter: exclude only explicit cancellations
+        income_raw = r.get("income")
+        is_cancel = (income_raw == 0) or (str(r.get("type", "")).lower() in ("cancel", "void", "return"))
+
         normalized.append({
             "id": r.get("id") or r.get("uuid") or "",
             "terminal_id": r.get("_terminal_id") or r.get("terminal_number"),
             "type": r.get("type", ""),
-            "income": r.get("income", 1),
+            "income": income_raw if income_raw is not None else 1,
+            "is_cancel": is_cancel,
             "total_sum": float(r.get("total_sum", 0) or 0),
             "discount_sum": float(r.get("discount_sum", 0) or 0),
             "cash_pay": float(r.get("cash_pay", 0) or 0),
@@ -445,14 +472,23 @@ async def caffesta_get_all_receipts(restaurant_id: str, start_date: str, end_dat
             "cashless_pay": float(r.get("cashless_pay", 0) or 0),
             "cashlessPayment_id": r.get("cashlessPayment_id"),
             "back_pay": float(r.get("back_pay", 0) or 0),
-            "created_at": created_at,
+            "created_at": r.get("created_at") or r.get("updated_at") or "",
             "created_dt": dt_obj,
             "order_dishes": r.get("order_dishes", []) or [],
             "count_clients": r.get("count_clients", 0),
         })
-    # Keep only actual sale receipts (income=1). Exclude cancellations.
-    normalized = [n for n in normalized if n.get("income") == 1]
-    return {"ok": True, "data": normalized}
+    # Exclude only explicit cancellations/voids; keep open receipts (income=null/0 means draft).
+    filtered = [n for n in normalized if not n.get("is_cancel")]
+    logger.info(
+        f"Caffesta receipts: total={len(flat)}, kept={len(filtered)}, "
+        f"skipped_no_time={skipped_no_time}, cancelled={len(normalized) - len(filtered)}"
+    )
+    return {"ok": True, "data": filtered, "diagnostics": {
+        "fetched": len(flat),
+        "kept": len(filtered),
+        "skipped_no_time": skipped_no_time,
+        "cancelled": len(normalized) - len(filtered),
+    }}
 
 
 def split_receipt_payments(receipt: dict, payment_methods: list) -> list:
