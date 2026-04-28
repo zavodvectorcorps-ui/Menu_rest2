@@ -200,6 +200,27 @@ async def build_digest_text(restaurant_id: str) -> str:
         for i, t in enumerate(y_full["top"], 1):
             lines.append(f"  {i}. {t['name']} — {t['qty']} шт, {t['revenue']:.0f} BYN")
 
+    # Last 5 receipt actions (reorders / closes) for full picture
+    last_actions = []
+    for r in y_receipts:
+        opened = r.get("created_dt")
+        last = r.get("updated_dt") or opened
+        if not opened or not last:
+            continue
+        delta_min = max(0, int((last - opened).total_seconds() // 60))
+        if delta_min < 1:
+            continue
+        last_actions.append((opened, last, delta_min, float(r.get("total_sum", 0) or 0)))
+    last_actions.sort(key=lambda x: x[1], reverse=True)
+    if last_actions:
+        lines.append("")
+        lines.append("🕒 <b>Последние действия по чекам:</b>")
+        for opened, last, dur, total in last_actions[:5]:
+            lines.append(
+                f"  • откр. {opened.strftime('%H:%M')} → действие {last.strftime('%H:%M')}"
+                f" ({dur} мин), {total:.0f} BYN"
+            )
+
     return "\n".join(lines)
 
 

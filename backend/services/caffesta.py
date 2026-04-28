@@ -476,6 +476,7 @@ async def caffesta_get_all_receipts(restaurant_id: str, start_date: str, end_dat
             "back_pay": float(r.get("back_pay", 0) or 0),
             "created_at": r.get("created_at") or r.get("updated_at") or "",
             "created_dt": dt_obj,
+            "updated_dt": _parse_caffesta_dt(r.get("updated_at")),
             "order_dishes": r.get("order_dishes", []) or [],
             "count_clients": r.get("count_clients", 0),
         })
