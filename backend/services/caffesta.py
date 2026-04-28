@@ -635,6 +635,48 @@ async def caffesta_get_product_shop_data(restaurant_id: str) -> dict:
 
 # ============ HTML scraping: /admin/orders_history/list ("В работе") ============
 
+async def caffesta_fetch_open_orders_multi(
+    restaurant_id: str,
+    dates: list,
+    activity: str = None,
+) -> dict:
+    """Fetch scraped orders for several specific dates in parallel.
+    Each call uses date_from=date_to=date so we can RELIABLY set row date even
+    if the HTML table doesn't include a date column (Caffesta loggedAt filter
+    is honoured server-side, returns rows that fall on that date)."""
+    import asyncio
+    if not dates:
+        return {"ok": True, "data": [], "reason": None}
+    sem = asyncio.Semaphore(4)
+
+    async def _one(d):
+        async with sem:
+            return d, await caffesta_fetch_open_orders(
+                restaurant_id, date_from=d, date_to=d, activity=activity,
+            )
+
+    results = await asyncio.gather(*[_one(d) for d in dates], return_exceptions=True)
+    merged = []
+    last_reason = None
+    any_ok = False
+    for r in results:
+        if isinstance(r, Exception):
+            continue
+        d, res = r
+        if not res.get("ok"):
+            last_reason = res.get("reason") or last_reason
+            continue
+        any_ok = True
+        for row in res.get("data") or []:
+            row["date"] = d  # force, override HTML guess
+            merged.append(row)
+    return {
+        "ok": any_ok,
+        "reason": None if any_ok else (last_reason or "no_data"),
+        "data": merged,
+    }
+
+
 async def caffesta_fetch_open_orders(
     restaurant_id: str,
     date_from: str = None,

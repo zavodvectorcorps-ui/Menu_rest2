@@ -13,6 +13,7 @@ from services.caffesta import (
     caffesta_get_sales_shift_day, get_caffesta_config, is_caffesta_enabled,
     caffesta_get_all_receipts, split_receipt_payments,
     caffesta_get_product_shop_data, caffesta_fetch_open_orders,
+    caffesta_fetch_open_orders_multi,
 )
 
 router = APIRouter()
@@ -519,32 +520,56 @@ async def caffesta_time_window(
     avg_duration_min = None
     open_count = 0
     try:
-        scrape = await caffesta_fetch_open_orders(
-            restaurant_id, date_from=start_date, date_to=end_date,
-            activity="process" if period_includes_today and start_date == end_date else None,
-        )
+        # Build the list of dates we actually want to scrape:
+        # - day_type=all → single range request (or many if too wide)
+        # - specific weekday → enumerate matching dates within period
+        from datetime import datetime as _dt, timedelta as _td
+        d_from = _dt.strptime(start_date, "%Y-%m-%d").date()
+        d_to = _dt.strptime(end_date, "%Y-%m-%d").date()
+        matching_dates = []
+        cur = d_from
+        while cur <= d_to:
+            cur_dt = _dt.combine(cur, _dt.min.time())
+            if in_day_type(cur_dt):
+                matching_dates.append(cur.strftime("%Y-%m-%d"))
+            cur += _td(days=1)
+        # Cap the number of HTTP calls
+        matching_dates = matching_dates[-14:]
+
+        # Single-request optimisation when "all days" + small period (≤ 1 day)
+        scrape = None
+        if day_type == "all" and len(matching_dates) <= 1:
+            single = matching_dates[0] if matching_dates else end_date
+            scrape = await caffesta_fetch_open_orders(
+                restaurant_id, date_from=single, date_to=single,
+                activity="process" if (single == today_minsk) else None,
+            )
+            # Override row date to the single date for reliability
+            if scrape.get("ok"):
+                for row in scrape.get("data") or []:
+                    row["date"] = single
+        else:
+            activity_param = "process" if (matching_dates == [today_minsk]) else None
+            scrape = await caffesta_fetch_open_orders_multi(
+                restaurant_id, matching_dates, activity=activity_param,
+            )
         open_orders_meta = {
             "ok": scrape.get("ok"),
             "reason": scrape.get("reason"),
-            "live": period_includes_today,
+            "live": period_includes_today and day_type == "all",
+            "scraped_dates": matching_dates,
         }
         if scrape.get("ok") and scrape.get("data"):
-            from datetime import datetime as _dt
             scraped_actions = []
             durations = []
             for o in scrape["data"]:
                 la = o.get("last_action_at") or o.get("opened_at")
                 if not la:
                     continue
-                row_date = o.get("date") or (today_minsk if period_includes_today else end_date)
-                # Filter by day-of-week of THIS row (historical filter)
-                try:
-                    row_dt = _dt.strptime(row_date, "%Y-%m-%d")
-                    if not in_day_type(row_dt):
-                        continue
-                except (ValueError, TypeError):
-                    pass
-                # Filter by time-of-day window (HH:MM)
+                row_date = o.get("date")
+                if not row_date:
+                    continue
+                # time-of-day filter
                 try:
                     la_min = _hhmm_to_minutes(la[:5])
                     if not in_time_window(_dt(2000, 1, 1, la_min // 60, la_min % 60)):
@@ -571,7 +596,6 @@ async def caffesta_time_window(
                     "table": o.get("table"),
                 })
             if scraped_actions:
-                # Newest action first
                 scraped_actions.sort(key=lambda x: x["last_action_at"], reverse=True)
                 last_actions = scraped_actions[:5]
                 open_count = len(scraped_actions)
