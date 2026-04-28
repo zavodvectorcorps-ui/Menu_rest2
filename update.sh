@@ -123,6 +123,11 @@ log "Очистка неиспользуемых образов..."
 docker image prune -f >/dev/null
 ok "Очистка завершена"
 
+# -------- Step 5b. Cleanup Docker build cache (avoid disk bloat) --------
+log "Очистка Docker build cache (оставляю до 2 GB)..."
+docker builder prune -f --keep-storage 2GB >/dev/null
+ok "Build cache очищен"
+
 # -------- Step 6. Health check --------
 sleep 3
 log "Статус контейнеров:"
