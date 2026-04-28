@@ -482,28 +482,6 @@ async def caffesta_time_window(
         key=lambda x: x["date"],
     )
 
-    # Last 5 actions on receipts (period-wide, regardless of window/day filter).
-    # We use receipt.updated_at as proxy for "last action". Skip receipts where
-    # updated_at == created_at (no activity beyond opening).
-    last_actions = []
-    for r in receipts:
-        opened = r.get("created_dt")
-        last = r.get("updated_dt") or opened
-        if not opened or not last:
-            continue
-        delta_min = max(0, int((last - opened).total_seconds() // 60))
-        if delta_min < 1:
-            continue
-        last_actions.append({
-            "id": str(r.get("id", ""))[:12],
-            "opened_at": opened.strftime("%Y-%m-%d %H:%M"),
-            "last_action_at": last.strftime("%Y-%m-%d %H:%M"),
-            "duration_min": delta_min,
-            "total": round(float(r.get("total_sum", 0) or 0), 2),
-        })
-    last_actions.sort(key=lambda x: x["last_action_at"], reverse=True)
-    last_actions = last_actions[:5]
-
     return {
         "filter": {
             "days": days,
@@ -524,7 +502,6 @@ async def caffesta_time_window(
         "top_products": top_products,
         "by_day": by_day_list,
         "samples": samples,
-        "last_actions": last_actions,
     }
 
 

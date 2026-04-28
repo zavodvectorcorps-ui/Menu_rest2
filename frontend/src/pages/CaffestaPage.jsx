@@ -797,32 +797,6 @@ export default function CaffestaPage() {
                     </Card>
                   )}
 
-                  {twData.last_actions?.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2"><Clock className="w-4 h-4" /> Последние действия по чекам</CardTitle>
-                        <CardDescription>Чеки, в которых были дозаказы или закрытие после открытия (топ-5 за период)</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {twData.last_actions.map((a, i) => (
-                            <div key={i} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0 text-sm">
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <span className="text-xs text-muted-foreground font-mono">#{a.id}</span>
-                                <span className="text-muted-foreground">откр.</span>
-                                <span className="font-medium">{a.opened_at.slice(11, 16)}</span>
-                                <span className="text-muted-foreground">→ действие</span>
-                                <span className="font-medium">{a.last_action_at.slice(11, 16)}</span>
-                                <span className="text-xs text-muted-foreground">({a.duration_min} мин)</span>
-                              </div>
-                              <span className="font-semibold whitespace-nowrap">{a.total} BYN</span>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
                   {twData.totals.receipts === 0 && (
                     <Card><CardContent className="py-8 text-center text-muted-foreground">За указанный период и время продаж не найдено.</CardContent></Card>
                   )}
