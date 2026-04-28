@@ -73,10 +73,10 @@ async def startup():
     # Daily digest at 10:00 Minsk time (UTC+3)
     try:
         scheduler = AsyncIOScheduler(timezone=ZoneInfo("Europe/Minsk"))
-        scheduler.add_job(run_daily_digest_job, CronTrigger(hour=10, minute=0), id="daily_digest", replace_existing=True)
-        scheduler.add_job(run_margin_check_job, CronTrigger(hour=10, minute=5), id="margin_check", replace_existing=True)
+        scheduler.add_job(run_daily_digest_job, CronTrigger(hour=8, minute=0), id="daily_digest", replace_existing=True)
+        scheduler.add_job(run_margin_check_job, CronTrigger(hour=8, minute=5), id="margin_check", replace_existing=True)
         scheduler.start()
-        logging.info("Scheduler started (digest 10:00, margin-check 10:05 Europe/Minsk)")
+        logging.info("Scheduler started (digest 08:00, margin-check 08:05 Europe/Minsk)")
     except Exception as e:
         logging.exception(f"Scheduler failed to start (continuing without daily digest): {e}")
         scheduler = None

@@ -333,7 +333,7 @@ export default function CaffestaPage() {
           <TabsTrigger value="analytics" data-testid="tab-analytics">Аналитика POS</TabsTrigger>
           <TabsTrigger value="time-window" data-testid="tab-time-window">Сравнение по времени</TabsTrigger>
           <TabsTrigger value="report" data-testid="tab-report">Реализация</TabsTrigger>
-          <TabsTrigger value="digest" data-testid="tab-digest">Дайджест 10:00</TabsTrigger>
+          <TabsTrigger value="digest" data-testid="tab-digest">Дайджест 08:00</TabsTrigger>
         </TabsList>
 
         <TabsContent value="settings" className="space-y-4 mt-4">
@@ -964,7 +964,7 @@ export default function CaffestaPage() {
                 <Clock className="w-5 h-5" /> Ежедневный Telegram-дайджест
               </CardTitle>
               <CardDescription>
-                Каждое утро в 10:00 (Минск) бот присылает итоги вчерашнего дня: выручка, чеки, средний чек,
+                Каждое утро в 08:00 (Минск) бот присылает итоги вчерашнего дня: выручка, чеки, средний чек,
                 разбивка по временным окнам и топ-3 позиции. Сравнение с аналогичным днём неделю назад.
               </CardDescription>
             </CardHeader>

@@ -334,7 +334,7 @@ export default function PriceControlPage() {
                 </div>
                 <div className="rounded-lg border border-border p-3 space-y-2 bg-muted/30">
                   <p className="text-xs text-muted-foreground">
-                    Алерт автоматически отправляется: при загрузке Excel/CSV, импорте из Caffesta, ручном редактировании цены/себестоимости, и ежедневно в <b>10:05 (Минск)</b>. Повторный алерт по одной позиции приходит только если цена или себестоимость изменились (антиспам).
+                    Алерт автоматически отправляется: при загрузке Excel/CSV, импорте из Caffesta, ручном редактировании цены/себестоимости, и ежедневно в <b>08:05 (Минск)</b>. Повторный алерт по одной позиции приходит только если цена или себестоимость изменились (антиспам).
                   </p>
                   <div className="flex gap-2 flex-wrap">
                     <Button size="sm" variant="outline" onClick={runCheckNow} data-testid="check-alerts-now">
