@@ -4,8 +4,8 @@
 | Компонент | Размер | Ссылка для скачивания |
 |-----------|--------|----------------------|
 | Исходный код | — | GitHub (уже есть) |
-| База данных (17 коллекций) | 86 KB | `https://margin-control-4.preview.emergentagent.com/api/db-backup/download` |
-| Картинки блюд (1019 шт) | 89 MB | `https://margin-control-4.preview.emergentagent.com/api/uploads-backup/download` |
+| База данных (17 коллекций) | 86 KB | `https://cafe-dash-pro-1.preview.emergentagent.com/api/db-backup/download` |
+| Картинки блюд (1019 шт) | 89 MB | `https://cafe-dash-pro-1.preview.emergentagent.com/api/uploads-backup/download` |
 
 ---
 
@@ -50,10 +50,10 @@ mkdir -p /opt/restaurant && cd /opt/restaurant
 git clone https://github.com/ВАШ_USER/ВАШ_REPO.git .
 
 # 2.2 Скачать дамп базы данных
-curl -o db_backup.tar.gz https://margin-control-4.preview.emergentagent.com/api/db-backup/download
+curl -o db_backup.tar.gz https://cafe-dash-pro-1.preview.emergentagent.com/api/db-backup/download
 
 # 2.3 Скачать картинки блюд
-curl -o uploads_backup.tar.gz https://margin-control-4.preview.emergentagent.com/api/uploads-backup/download
+curl -o uploads_backup.tar.gz https://cafe-dash-pro-1.preview.emergentagent.com/api/uploads-backup/download
 
 # Проверить размеры (БД ~86KB, картинки ~89MB)
 ls -lh db_backup.tar.gz uploads_backup.tar.gz
