@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plug, PlugZap, Save, TestTube, DollarSign, ShoppingCart, TrendingUp, Award, Users, FileText, Filter, Plus, Trash2, Star, Clock, CalendarDays, Ban } from 'lucide-react';
+import { Loader2, Plug, PlugZap, Save, TestTube, DollarSign, ShoppingCart, TrendingUp, Award, Users, FileText, Filter, Plus, Trash2, Star, Clock, CalendarDays, Ban, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 import { API, useApp } from '@/App';
 import axios from 'axios';
@@ -716,7 +716,7 @@ export default function CaffestaPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <SummaryCard title="Выручка" value={`${twData.totals.revenue} BYN`} icon={DollarSign} color="bg-green-500" />
                     <SummaryCard title="Чеков" value={twData.totals.receipts} icon={FileText} color="bg-blue-500" />
-                    <SummaryCard title="Позиций" value={twData.totals.items} icon={ShoppingCart} color="bg-amber-500" />
+                    <SummaryCard title="Скидки за период" value={`${Math.abs(twData.totals.discount || 0).toFixed(2)} BYN`} icon={Percent} color="bg-rose-500" />
                     <SummaryCard title="Средний чек" value={`${twData.totals.avg_check} BYN`} icon={TrendingUp} color="bg-purple-500" />
                   </div>
 
