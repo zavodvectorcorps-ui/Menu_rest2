@@ -19,6 +19,7 @@ import {
   Coffee,
   Link as LinkIcon,
   TrendingDown,
+  Activity,
   Database,
   Wifi,
   WifiOff,
@@ -48,6 +49,7 @@ const navItems = [
   { path: '/admin/caffesta', label: 'Caffesta POS', icon: Coffee },
   { path: '/admin/caffesta-mapping', label: 'Маппинг Caffesta', icon: LinkIcon },
   { path: '/admin/price-control', label: 'Контроль цен', icon: TrendingDown },
+  { path: '/admin/factual-margin', label: 'Факт. маржа', icon: Activity },
   { path: '/admin/help', label: 'Справочный центр', icon: HelpCircle },
   { path: '/admin/support', label: 'Поддержка', icon: MessageSquare },
 ];

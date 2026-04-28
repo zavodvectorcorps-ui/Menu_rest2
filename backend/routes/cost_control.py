@@ -8,7 +8,7 @@
 import csv
 import io
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 import httpx
@@ -445,3 +445,105 @@ async def reset_alerts(restaurant_id: str, current_user: dict = Depends(get_curr
         {"$unset": {"last_margin_alert_sig": "", "last_margin_alert_at": ""}},
     )
     return {"reset": result.modified_count}
+
+
+# ============ FACTUAL MARGIN FROM RECEIPTS ============
+
+@router.get("/restaurants/{restaurant_id}/costs/factual-margin")
+async def factual_margin(
+    restaurant_id: str,
+    days: int = 30,
+    current_user: dict = Depends(get_current_user),
+):
+    """Compute FACTUAL margin by aggregating Caffesta receipts (uses self_cost_sum from each dish row).
+    Returns per-product stats sorted by margin_pct ascending (lowest first)."""
+    await check_restaurant_access(current_user, restaurant_id)
+    if days < 1 or days > 120:
+        raise HTTPException(400, "Период должен быть от 1 до 120 дней")
+
+    from services.caffesta import caffesta_get_all_receipts, caffesta_get_products
+
+    end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    res = await caffesta_get_all_receipts(restaurant_id, start_date, end_date)
+    if not res.get("ok"):
+        raise HTTPException(status_code=400, detail=res.get("message", "Ошибка Caffesta"))
+    receipts = res.get("data", [])
+
+    # product_id -> title
+    product_map = {}
+    prods = await caffesta_get_products(restaurant_id)
+    if prods.get("ok"):
+        for p in prods.get("data", []):
+            try:
+                product_map[int(p["product_id"])] = {"title": p.get("title") or "", "price": p.get("price")}
+            except (ValueError, TypeError, KeyError):
+                continue
+
+    # Aggregate per product_id
+    agg = {}  # pid -> {qty, revenue, cost}
+    for r in receipts:
+        if r.get("income") != 1:
+            continue
+        for od in (r.get("order_dishes") or []):
+            dish = od.get("dish") or {}
+            try:
+                pid = int(dish.get("id") or 0)
+            except (ValueError, TypeError):
+                pid = 0
+            if not pid:
+                continue
+            try:
+                qty = float(od.get("count") or 1)
+                rev = float(od.get("total_sum") or 0)
+                cost = float(od.get("self_cost_sum") or 0)
+            except (ValueError, TypeError):
+                continue
+            agg.setdefault(pid, {"pid": pid, "qty": 0, "revenue": 0.0, "cost": 0.0})
+            agg[pid]["qty"] += qty
+            agg[pid]["revenue"] += rev
+            agg[pid]["cost"] += cost
+
+    # Build items with margin
+    items = []
+    total_rev = 0.0
+    total_cost = 0.0
+    for pid, a in agg.items():
+        pinfo = product_map.get(pid) or {}
+        rev = a["revenue"]
+        cost = a["cost"]
+        margin_abs = rev - cost
+        margin_pct = round((margin_abs / rev * 100), 1) if rev > 0 else None
+        items.append({
+            "product_id": pid,
+            "title": pinfo.get("title") or f"ID #{pid}",
+            "catalog_price": pinfo.get("price"),
+            "qty": round(a["qty"], 2),
+            "revenue": round(rev, 2),
+            "cost": round(cost, 2),
+            "margin_abs": round(margin_abs, 2),
+            "margin_pct": margin_pct,
+            "avg_price": round(rev / a["qty"], 2) if a["qty"] else None,
+            "avg_cost": round(cost / a["qty"], 2) if a["qty"] else None,
+        })
+        total_rev += rev
+        total_cost += cost
+
+    # Sort: lowest margin% first (worst at top); items with None margin at end
+    items.sort(key=lambda x: (x["margin_pct"] is None, x["margin_pct"] if x["margin_pct"] is not None else 999))
+
+    total_margin_abs = total_rev - total_cost
+    total_margin_pct = round((total_margin_abs / total_rev * 100), 1) if total_rev > 0 else 0
+
+    return {
+        "period": {"start": start_date, "end": end_date, "days": days},
+        "summary": {
+            "products_count": len(items),
+            "total_revenue": round(total_rev, 2),
+            "total_cost": round(total_cost, 2),
+            "total_margin_abs": round(total_margin_abs, 2),
+            "total_margin_pct": total_margin_pct,
+        },
+        "items": items,
+    }
