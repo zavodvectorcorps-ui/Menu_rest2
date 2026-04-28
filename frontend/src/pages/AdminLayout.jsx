@@ -41,18 +41,24 @@ const navItems = [
   { path: '/admin/profile', label: 'Профиль', icon: User },
   { path: '/admin/menu', label: 'Меню', icon: UtensilsCrossed },
   { path: '/admin/orders', label: 'Заказы', icon: ShoppingBag },
-  { path: '/admin/analytics', label: 'Аналитика', icon: BarChart3 },
+  // Analytics group rendered separately (collapsible)
   { path: '/admin/settings', label: 'Настройки', icon: Settings },
   { path: '/admin/help', label: 'Справочный центр', icon: HelpCircle },
+];
+
+const analyticsItems = [
+  { path: '/admin/analytics', label: 'Сводка', icon: BarChart3, exact: true },
+  { path: '/admin/factual-margin', label: 'Факт. маржа', icon: Activity },
+  { path: '/admin/price-control', label: 'Контроль цен', icon: TrendingDown },
+  { path: '/admin/caffesta?tab=analytics', label: 'Аналитика POS', icon: Coffee, matchPath: '/admin/caffesta', matchTab: 'analytics' },
+  { path: '/admin/caffesta?tab=time-window', label: 'Сравнение по времени', icon: Activity, matchPath: '/admin/caffesta', matchTab: 'time-window' },
+  { path: '/admin/caffesta?tab=report', label: 'Реализация', icon: BarChart3, matchPath: '/admin/caffesta', matchTab: 'report' },
 ];
 
 const systemItems = [
   { path: '/admin/telegram-bot', label: 'Telegram-бот', icon: Bot },
   { path: '/admin/caffesta', label: 'Caffesta POS', icon: Coffee },
   { path: '/admin/caffesta-mapping', label: 'Маппинг Caffesta', icon: LinkIcon },
-  { path: '/admin/price-control', label: 'Контроль цен', icon: TrendingDown },
-  { path: '/admin/factual-margin', label: 'Факт. маржа', icon: Activity },
-  // Backup is rendered separately — superadmin only
 ];
 
 export default function AdminLayout() {
@@ -135,9 +141,20 @@ export default function AdminLayout() {
 
   const currentRestaurant = restaurants.find(r => r.id === currentRestaurantId) || restaurant;
 
+  // Analytics group: open by default if active route is one of analytics items
+  const analyticsPaths = ['/admin/analytics', '/admin/factual-margin', '/admin/price-control'];
+  const currentTab = new URLSearchParams(location.search).get('tab');
+  const analyticsActive =
+    analyticsPaths.includes(location.pathname) ||
+    (location.pathname === '/admin/caffesta' && ['analytics', 'time-window', 'report'].includes(currentTab));
+  const [analyticsOpen, setAnalyticsOpen] = useState(analyticsActive);
+  useEffect(() => { if (analyticsActive) setAnalyticsOpen(true); }, [analyticsActive]);
+
   // System group: open by default if active route is one of system items
   const systemPaths = [...systemItems.map(i => i.path), '/admin/backup'];
-  const systemActive = systemPaths.includes(location.pathname);
+  const systemActive =
+    systemPaths.includes(location.pathname) &&
+    !(location.pathname === '/admin/caffesta' && ['analytics', 'time-window', 'report'].includes(currentTab));
   const [systemOpen, setSystemOpen] = useState(systemActive);
   useEffect(() => { if (systemActive) setSystemOpen(true); }, [systemActive]);
   const isAdministrator = user?.role === 'administrator';
@@ -228,8 +245,8 @@ export default function AdminLayout() {
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
-            
-            return (
+
+            const navLink = (
               <NavLink
                 key={item.path}
                 to={item.path}
@@ -252,6 +269,68 @@ export default function AdminLayout() {
                 {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
               </NavLink>
             );
+
+            // Insert Analytics collapsible group right before "Настройки"
+            if (item.path === '/admin/settings') {
+              return (
+                <div key="analytics-wrap">
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setAnalyticsOpen(o => !o)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+                        analyticsActive
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                      data-testid="nav-analytics-toggle"
+                      aria-expanded={analyticsOpen}
+                    >
+                      <BarChart3 className="w-5 h-5" />
+                      <span className="font-medium">Аналитика</span>
+                      <ChevronDown className={cn("w-4 h-4 ml-auto transition-transform", analyticsOpen ? "rotate-180" : "")} />
+                    </button>
+                    {analyticsOpen && (
+                      <div className="mt-1 ml-3 pl-3 border-l border-border space-y-1">
+                        {analyticsItems.map((ai) => {
+                          const AIcon = ai.icon;
+                          let aActive;
+                          if (ai.matchPath) {
+                            aActive = location.pathname === ai.matchPath && currentTab === ai.matchTab;
+                          } else if (ai.exact) {
+                            aActive = location.pathname === ai.path && !currentTab;
+                          } else {
+                            aActive = location.pathname === ai.path;
+                          }
+                          return (
+                            <NavLink
+                              key={ai.path}
+                              to={ai.path}
+                              onClick={() => setSidebarOpen(false)}
+                              className={cn(
+                                "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm",
+                                aActive
+                                  ? "bg-mint-500 text-white shadow-md shadow-mint-500/20"
+                                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                              )}
+                              data-testid={`nav-analytics-${ai.label.toLowerCase().replace(/[^a-z]/g, '-')}`}
+                            >
+                              <AIcon className="w-4 h-4" />
+                              <span className="font-medium">{ai.label}</span>
+                              {aActive && <ChevronRight className="w-4 h-4 ml-auto" />}
+                            </NavLink>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  {navLink}
+                </div>
+              );
+            }
+
+            return navLink;
           })}
 
           {/* System section (collapsible) */}

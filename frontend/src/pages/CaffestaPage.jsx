@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,21 @@ import axios from 'axios';
 
 export default function CaffestaPage() {
   const { token, currentRestaurantId } = useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const validTabs = ['settings', 'analytics', 'time-window', 'report', 'digest'];
+  const initialTab = validTabs.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'settings';
+  const [activeTab, setActiveTab] = useState(initialTab);
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (validTabs.includes(t) && t !== activeTab) setActiveTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+  const handleTabChange = (v) => {
+    setActiveTab(v);
+    const next = new URLSearchParams(searchParams);
+    if (v === 'settings') next.delete('tab'); else next.set('tab', v);
+    setSearchParams(next, { replace: true });
+  };
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
   const [loading, setLoading] = useState(true);
@@ -327,7 +343,7 @@ export default function CaffestaPage() {
         </Badge>
       </div>
 
-      <Tabs defaultValue="settings">
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList data-testid="caffesta-tabs">
           <TabsTrigger value="settings" data-testid="tab-settings">Настройки</TabsTrigger>
           <TabsTrigger value="analytics" data-testid="tab-analytics">Аналитика POS</TabsTrigger>
