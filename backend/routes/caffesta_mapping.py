@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from rapidfuzz import fuzz, process as rfprocess
 
-from auth import check_restaurant_access, get_current_user
+from auth import check_restaurant_access, get_current_user, ensure_can_write_system
 from database import db
 from services.caffesta import caffesta_get_products
 
@@ -131,6 +131,7 @@ async def apply_mapping(
     restaurant_id: str,
     payload: MappingApplyRequest,
     current_user: dict = Depends(get_current_user),
+    _: dict = Depends(ensure_can_write_system),
 ):
     """Batch-apply caffesta_product_id to menu items."""
     await check_restaurant_access(current_user, restaurant_id)

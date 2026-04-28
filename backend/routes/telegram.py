@@ -7,7 +7,7 @@ from pathlib import Path
 
 from database import db
 from models import TelegramBotUpdate
-from auth import get_current_user, check_restaurant_access
+from auth import get_current_user, check_restaurant_access, ensure_can_write_system
 from services.telegram import TELEGRAM_API, send_telegram_message
 
 router = APIRouter()
@@ -47,7 +47,7 @@ async def get_telegram_bot(restaurant_id: str, current_user: dict = Depends(get_
 
 
 @router.put("/restaurants/{restaurant_id}/telegram-bot")
-async def update_telegram_bot(restaurant_id: str, data: TelegramBotUpdate, current_user: dict = Depends(get_current_user)):
+async def update_telegram_bot(restaurant_id: str, data: TelegramBotUpdate, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
     await check_restaurant_access(current_user, restaurant_id)
     bot_token = data.telegram_bot_token.strip()
     webhook_url = ""
@@ -107,7 +107,7 @@ async def update_telegram_bot(restaurant_id: str, data: TelegramBotUpdate, curre
 
 
 @router.delete("/restaurants/{restaurant_id}/telegram-bot")
-async def disconnect_telegram_bot(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+async def disconnect_telegram_bot(restaurant_id: str, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
     await check_restaurant_access(current_user, restaurant_id)
 
     settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
@@ -129,7 +129,7 @@ async def disconnect_telegram_bot(restaurant_id: str, current_user: dict = Depen
 
 
 @router.delete("/restaurants/{restaurant_id}/telegram-bot/subscribers/{chat_id}")
-async def remove_telegram_subscriber(restaurant_id: str, chat_id: str, current_user: dict = Depends(get_current_user)):
+async def remove_telegram_subscriber(restaurant_id: str, chat_id: str, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
     await check_restaurant_access(current_user, restaurant_id)
     await db.telegram_subscribers.delete_one({"restaurant_id": restaurant_id, "chat_id": chat_id})
     return {"message": "Подписчик удалён"}

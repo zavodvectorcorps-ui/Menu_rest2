@@ -49,6 +49,18 @@ async def require_superadmin(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Требуются права суперадмина")
     return current_user
 
+
+async def ensure_can_write_system(current_user: dict = Depends(get_current_user)):
+    """Block administrators from modifying 'Системные' sections.
+    Superadmin and manager can still write (manager already restricted by restaurant access).
+    """
+    if current_user.get("role") == UserRole.ADMINISTRATOR:
+        raise HTTPException(
+            status_code=403,
+            detail="Раздел «Системные» доступен администратору только для чтения. Обратитесь к суперадмину.",
+        )
+    return current_user
+
 async def check_restaurant_access(user: dict, restaurant_id: str):
     if user.get("role") == UserRole.SUPERADMIN:
         return True

@@ -262,15 +262,12 @@ export default function ProfilePage() {
             <div className="flex-1">
               <h3 className="font-heading font-semibold">Нужна помощь?</h3>
               <p className="text-sm text-muted-foreground">
-                Посетите справочный центр или свяжитесь с поддержкой
+                Посетите справочный центр
               </p>
             </div>
             <div className="flex gap-2">
               <Link to="/admin/help">
                 <Button variant="outline">Справка</Button>
-              </Link>
-              <Link to="/admin/support">
-                <Button className="bg-mint-500 hover:bg-mint-600">Поддержка</Button>
               </Link>
             </div>
           </div>

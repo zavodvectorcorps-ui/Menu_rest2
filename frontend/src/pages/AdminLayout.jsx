@@ -6,7 +6,6 @@ import {
   ShoppingBag, 
   Settings, 
   HelpCircle, 
-  MessageSquare,
   Menu,
   X,
   ChevronRight,
@@ -21,8 +20,7 @@ import {
   TrendingDown,
   Activity,
   Database,
-  Wifi,
-  WifiOff,
+  Wrench,
   Volume2,
   VolumeX
 } from 'lucide-react';
@@ -45,13 +43,16 @@ const navItems = [
   { path: '/admin/orders', label: 'Заказы', icon: ShoppingBag },
   { path: '/admin/analytics', label: 'Аналитика', icon: BarChart3 },
   { path: '/admin/settings', label: 'Настройки', icon: Settings },
+  { path: '/admin/help', label: 'Справочный центр', icon: HelpCircle },
+];
+
+const systemItems = [
   { path: '/admin/telegram-bot', label: 'Telegram-бот', icon: Bot },
   { path: '/admin/caffesta', label: 'Caffesta POS', icon: Coffee },
   { path: '/admin/caffesta-mapping', label: 'Маппинг Caffesta', icon: LinkIcon },
   { path: '/admin/price-control', label: 'Контроль цен', icon: TrendingDown },
   { path: '/admin/factual-margin', label: 'Факт. маржа', icon: Activity },
-  { path: '/admin/help', label: 'Справочный центр', icon: HelpCircle },
-  { path: '/admin/support', label: 'Поддержка', icon: MessageSquare },
+  // Backup is rendered separately — superadmin only
 ];
 
 export default function AdminLayout() {
@@ -133,6 +134,13 @@ export default function AdminLayout() {
   };
 
   const currentRestaurant = restaurants.find(r => r.id === currentRestaurantId) || restaurant;
+
+  // System group: open by default if active route is one of system items
+  const systemPaths = [...systemItems.map(i => i.path), '/admin/backup'];
+  const systemActive = systemPaths.includes(location.pathname);
+  const [systemOpen, setSystemOpen] = useState(systemActive);
+  useEffect(() => { if (systemActive) setSystemOpen(true); }, [systemActive]);
+  const isAdministrator = user?.role === 'administrator';
 
   return (
     <div className="min-h-screen bg-background flex" data-testid="admin-layout">
@@ -246,6 +254,80 @@ export default function AdminLayout() {
             );
           })}
 
+          {/* System section (collapsible) */}
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setSystemOpen(o => !o)}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+                systemActive
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              data-testid="nav-system-toggle"
+              aria-expanded={systemOpen}
+            >
+              <Wrench className="w-5 h-5" />
+              <span className="font-medium">Системные</span>
+              {isAdministrator && (
+                <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wide">
+                  R/O
+                </span>
+              )}
+              <ChevronDown
+                className={cn(
+                  "w-4 h-4 ml-auto transition-transform",
+                  systemOpen ? "rotate-180" : ""
+                )}
+              />
+            </button>
+            {systemOpen && (
+              <div className="mt-1 ml-3 pl-3 border-l border-border space-y-1">
+                {systemItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setSidebarOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm",
+                        isActive
+                          ? "bg-mint-500 text-white shadow-md shadow-mint-500/20"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                      data-testid={`nav-${item.path.split('/').pop()}`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="font-medium">{item.label}</span>
+                      {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
+                    </NavLink>
+                  );
+                })}
+                {/* Backup link inside Системные — superadmin only */}
+                {user?.role === 'superadmin' && (
+                  <NavLink
+                    to="/admin/backup"
+                    onClick={() => setSidebarOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm",
+                      location.pathname === '/admin/backup'
+                        ? "bg-mint-500 text-white shadow-md shadow-mint-500/20"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                    data-testid="nav-backup"
+                  >
+                    <Database className="w-4 h-4" />
+                    <span className="font-medium">Резервные копии</span>
+                    {location.pathname === '/admin/backup' && <ChevronRight className="w-4 h-4 ml-auto" />}
+                  </NavLink>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Users link (superadmin only) */}
           {user?.role === 'superadmin' && (
             <NavLink
@@ -262,25 +344,6 @@ export default function AdminLayout() {
               <Users className="w-5 h-5" />
               <span className="font-medium">Пользователи</span>
               {location.pathname === '/admin/users' && <ChevronRight className="w-4 h-4 ml-auto" />}
-            </NavLink>
-          )}
-
-          {/* Backup link (superadmin only) */}
-          {user?.role === 'superadmin' && (
-            <NavLink
-              to="/admin/backup"
-              onClick={() => setSidebarOpen(false)}
-              className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
-                location.pathname === '/admin/backup'
-                  ? "bg-mint-500 text-white shadow-lg shadow-mint-500/30"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-              data-testid="nav-backup"
-            >
-              <Database className="w-5 h-5" />
-              <span className="font-medium">Резервные копии</span>
-              {location.pathname === '/admin/backup' && <ChevronRight className="w-4 h-4 ml-auto" />}
             </NavLink>
           )}
         </nav>
@@ -304,7 +367,7 @@ export default function AdminLayout() {
             <div className="flex-1 min-w-0">
               <p className="font-medium truncate">{user?.username}</p>
               <p className="text-xs text-muted-foreground">
-                {user?.role === 'superadmin' ? 'Суперадмин' : 'Менеджер'}
+                {user?.role === 'superadmin' ? 'Суперадмин' : user?.role === 'administrator' ? 'Администратор' : 'Менеджер'}
               </p>
             </div>
           </div>

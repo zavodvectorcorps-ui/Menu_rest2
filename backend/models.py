@@ -9,6 +9,7 @@ import uuid
 
 class UserRole(str, Enum):
     SUPERADMIN = "superadmin"
+    ADMINISTRATOR = "administrator"
     MANAGER = "manager"
 
 class OrderStatus(str, Enum):

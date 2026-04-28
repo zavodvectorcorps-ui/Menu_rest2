@@ -6,7 +6,7 @@ from typing import List
 from datetime import datetime, timedelta, timezone
 
 from database import db
-from auth import get_current_user, check_restaurant_access
+from auth import get_current_user, check_restaurant_access, ensure_can_write_system
 from services.caffesta import (
     caffesta_test_connection, caffesta_get_sales, caffesta_get_sales_totals,
     caffesta_get_products, caffesta_send_order, caffesta_get_order_status,
@@ -48,7 +48,7 @@ async def get_caffesta_settings(restaurant_id: str, current_user: dict = Depends
 
 
 @router.put("/restaurants/{restaurant_id}/caffesta")
-async def update_caffesta_settings(restaurant_id: str, data: CaffestaConfigUpdate, current_user: dict = Depends(get_current_user)):
+async def update_caffesta_settings(restaurant_id: str, data: CaffestaConfigUpdate, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
     await check_restaurant_access(current_user, restaurant_id)
     payload = data.model_dump(exclude_none=True)
     # Serialize payment_methods if present
@@ -605,7 +605,7 @@ async def debug_raw_receipts(
 
 
 @router.post("/restaurants/{restaurant_id}/caffesta/stop-list/sync")
-async def sync_stop_list(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+async def sync_stop_list(restaurant_id: str, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
     """Fetch stop-list status from Caffesta (get_product_shop_data) and update menu items' availability."""
     await check_restaurant_access(current_user, restaurant_id)
     res = await caffesta_get_product_shop_data(restaurant_id)

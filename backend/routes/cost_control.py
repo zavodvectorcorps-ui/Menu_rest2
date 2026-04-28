@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from openpyxl import load_workbook
 from pydantic import BaseModel
 
-from auth import check_restaurant_access, get_current_user
+from auth import check_restaurant_access, get_current_user, ensure_can_write_system
 from database import db
 from helpers import get_or_create_settings
 from services.caffesta import get_caffesta_config, caffesta_get_balances
@@ -155,6 +155,7 @@ async def upload_costs(
     restaurant_id: str,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
+    _: dict = Depends(ensure_can_write_system),
 ):
     await check_restaurant_access(current_user, restaurant_id)
     content = await file.read()
@@ -183,7 +184,7 @@ async def upload_costs(
 
 
 @router.post("/restaurants/{restaurant_id}/costs/import-caffesta")
-async def import_caffesta_costs(restaurant_id: str, current_user: dict = Depends(get_current_user)):
+async def import_caffesta_costs(restaurant_id: str, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
     await check_restaurant_access(current_user, restaurant_id)
     config = await get_caffesta_config(restaurant_id)
     if not config or not config.get("enabled") or not config.get("api_key"):
@@ -288,6 +289,7 @@ class CostUpdate(BaseModel):
 async def update_item_cost(
     restaurant_id: str, item_id: str, payload: CostUpdate,
     current_user: dict = Depends(get_current_user),
+    _: dict = Depends(ensure_can_write_system),
 ):
     await check_restaurant_access(current_user, restaurant_id)
     update = {}
@@ -316,6 +318,7 @@ class CategoryThreshold(BaseModel):
 async def update_category_threshold(
     restaurant_id: str, category_id: str, payload: CategoryThreshold,
     current_user: dict = Depends(get_current_user),
+    _: dict = Depends(ensure_can_write_system),
 ):
     await check_restaurant_access(current_user, restaurant_id)
     await db.categories.update_one(

@@ -173,8 +173,8 @@ export default function UsersPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={user.role === 'superadmin' ? 'default' : 'secondary'}>
-                      {user.role === 'superadmin' ? 'Суперадмин' : 'Менеджер'}
+                    <Badge variant={user.role === 'superadmin' ? 'default' : user.role === 'administrator' ? 'outline' : 'secondary'}>
+                      {user.role === 'superadmin' ? 'Суперадмин' : user.role === 'administrator' ? 'Администратор' : 'Менеджер'}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -267,11 +267,12 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="superadmin">Суперадмин (доступ ко всем ресторанам)</SelectItem>
+                  <SelectItem value="administrator">Администратор (полный доступ, кроме раздела «Системные» — только чтение)</SelectItem>
                   <SelectItem value="manager">Менеджер (доступ только к выбранным)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {form.role === 'manager' && (
+            {(form.role === 'manager' || form.role === 'administrator') && (
               <div className="space-y-2">
                 <Label>Доступ к ресторанам</Label>
                 <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-3">

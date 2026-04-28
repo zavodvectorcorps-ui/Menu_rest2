@@ -12,7 +12,6 @@ import MenuPage from "@/pages/MenuPage";
 import OrdersPage from "@/pages/OrdersPage";
 import SettingsPage from "@/pages/SettingsPage";
 import HelpCenterPage from "@/pages/HelpCenterPage";
-import SupportPage from "@/pages/SupportPage";
 import ClientMenuPage from "@/pages/ClientMenuPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import UsersPage from "@/pages/UsersPage";
@@ -271,7 +270,6 @@ function App() {
                 <Route path="users" element={user?.role === 'superadmin' ? <UsersPage /> : <Navigate to="/admin/profile" replace />} />
                 <Route path="backup" element={user?.role === 'superadmin' ? <BackupPage /> : <Navigate to="/admin/profile" replace />} />
                 <Route path="help" element={<HelpCenterPage />} />
-                <Route path="support" element={<SupportPage />} />
               </Route>
               
               {/* Client Menu Route (Public) */}
