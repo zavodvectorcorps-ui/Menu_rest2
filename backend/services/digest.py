@@ -175,6 +175,20 @@ async def build_digest_text(restaurant_id: str) -> str:
         pay_parts = ", ".join(f"{k}: {v:.0f}" for k, v in y_full["payments"].items())
         lines.append(f"💳 Оплата: {pay_parts}")
 
+    # First/Last receipt of the shift
+    receipts_with_dt = [r for r in y_receipts if r.get("created_dt")]
+    if receipts_with_dt:
+        first = min(receipts_with_dt, key=lambda r: r["created_dt"])
+        last = max(receipts_with_dt, key=lambda r: r["created_dt"])
+        lines.append(
+            f"🟢 Первый чек: <b>{first['created_dt'].strftime('%H:%M')}</b> "
+            f"({float(first.get('total_sum', 0) or 0):.0f} BYN)"
+        )
+        lines.append(
+            f"🔴 Последний чек: <b>{last['created_dt'].strftime('%H:%M')}</b> "
+            f"({float(last.get('total_sum', 0) or 0):.0f} BYN)"
+        )
+
     # Windows breakdown
     lines.append("")
     lines.append("📊 <b>По окнам:</b>")

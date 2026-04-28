@@ -404,6 +404,10 @@ async def caffesta_time_window(
     by_day = {}
     payment_breakdown = {}
     samples = []
+    first_receipt_dt = None
+    first_receipt_total = 0.0
+    last_receipt_dt = None
+    last_receipt_total = 0.0
 
     for r in receipts:
         dt = r.get("created_dt")
@@ -412,6 +416,15 @@ async def caffesta_time_window(
             continue
         if not in_day_type(dt) or not in_time_window(dt):
             continue
+
+        # Track first/last in filtered window
+        rev_for_min_max = float(r.get("total_sum", 0) or 0)
+        if first_receipt_dt is None or dt < first_receipt_dt:
+            first_receipt_dt = dt
+            first_receipt_total = rev_for_min_max
+        if last_receipt_dt is None or dt > last_receipt_dt:
+            last_receipt_dt = dt
+            last_receipt_total = rev_for_min_max
 
         rev = float(r.get("total_sum", 0) or 0)
         disc = float(r.get("discount_sum", 0) or 0)
@@ -497,6 +510,10 @@ async def caffesta_time_window(
             "items": sum(p["qty"] for p in products.values()),
             "discount": round(total_discount, 2),
             "avg_check": round(total_revenue / max(total_receipts, 1), 2),
+            "first_receipt_at": first_receipt_dt.strftime("%Y-%m-%d %H:%M") if first_receipt_dt else None,
+            "first_receipt_total": round(first_receipt_total, 2) if first_receipt_dt else None,
+            "last_receipt_at": last_receipt_dt.strftime("%Y-%m-%d %H:%M") if last_receipt_dt else None,
+            "last_receipt_total": round(last_receipt_total, 2) if last_receipt_dt else None,
         },
         "payments": payments_list,
         "top_products": top_products,

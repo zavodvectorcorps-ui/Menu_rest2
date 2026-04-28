@@ -724,6 +724,39 @@ export default function CaffestaPage() {
                     <SummaryCard title="Средний чек" value={`${twData.totals.avg_check} BYN`} icon={TrendingUp} color="bg-purple-500" />
                   </div>
 
+                  {(twData.totals.first_receipt_at || twData.totals.last_receipt_at) && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2"><Clock className="w-4 h-4" /> Первый и последний чек</CardTitle>
+                        <CardDescription>Самый ранний и самый поздний чек в выбранном периоде</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          {twData.totals.first_receipt_at && (
+                            <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2" data-testid="tw-first-receipt">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+                                <span className="text-muted-foreground">Первый чек</span>
+                                <span className="font-medium">{twData.totals.first_receipt_at}</span>
+                              </div>
+                              <span className="font-semibold whitespace-nowrap">{twData.totals.first_receipt_total} BYN</span>
+                            </div>
+                          )}
+                          {twData.totals.last_receipt_at && (
+                            <div className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2" data-testid="tw-last-receipt">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-block w-2 h-2 rounded-full bg-rose-500" />
+                                <span className="text-muted-foreground">Последний чек</span>
+                                <span className="font-medium">{twData.totals.last_receipt_at}</span>
+                              </div>
+                              <span className="font-semibold whitespace-nowrap">{twData.totals.last_receipt_total} BYN</span>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {twData.payments?.length > 0 && (
                     <Card>
                       <CardHeader><CardTitle className="text-base">Оплата по типам</CardTitle></CardHeader>
