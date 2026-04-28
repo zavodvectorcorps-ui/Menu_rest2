@@ -540,26 +540,34 @@ async def debug_orders_history_probe(
 
     base = _base_url(cfg["account_name"])
     headers = _headers(cfg["api_key"])
+    # Filter fragment: activity=process means "В работе"
+    f_qs = f"?filter%5Bactivity%5D%5Bvalue%5D%5B%5D=process&filter%5BloggedAt%5D%5Bvalue%5D%5Bstart%5D={date}&filter%5BloggedAt%5D%5Bvalue%5D%5Bend%5D={date}&filter%5B_per_page%5D=200&filter%5B_sort_by%5D=loggedAt&filter%5B_sort_order%5D=DESC"
+    # Some Caffesta endpoints accept .json suffix to get JSON instead of HTML
     candidates = [
-        f"{base}/v1.0/orders_history?start={date}&end={date}",
-        f"{base}/v1.0/orders_history/list?start={date}&end={date}",
-        f"{base}/v1.0/draft/orders_history?start={date}&end={date}",
-        f"{base}/v1.0/draft/orders_history/list?start={date}&end={date}",
-        f"{base}/v1.0/order_history?start={date}&end={date}",
-        f"{base}/v1.0/draft/order_history?start={date}&end={date}",
-        f"{base}/v1.1/draft/orders_history?start={date}&end={date}",
-        f"{base}/v1.1/draft/orders_history/list?start={date}&end={date}",
-        f"{base}/v1.0/draft/orders_history_by_shift_day/2/{date}",
-        f"{base}/v1.1/draft/orders_history_by_shift_day/2/{date}",
-        f"{base}/v1.0/admin/orders_history?start={date}&end={date}",
+        f"{base}/v1.0/orders_history/list{f_qs}",
+        f"{base}/v1.0/orders_history{f_qs}",
+        f"{base}/v1.0/draft/orders_history/list{f_qs}",
+        # HTML admin URL with .json
+        f"https://{cfg['account_name']}.caffesta.com/admin/orders_history/list.json{f_qs}",
+        f"https://{cfg['account_name']}.caffesta.com/admin/orders_history.json{f_qs}",
+        # Possible plain admin URL with API key
+        f"https://{cfg['account_name']}.caffesta.com/admin/orders_history/list{f_qs}",
+        # Try without /a prefix
+        f"https://{cfg['account_name']}.caffesta.com/v1.0/orders_history/list{f_qs}",
+        # Try POST-style endpoints (we'll send GET but Caffesta might return method-not-allowed which gives info)
+        f"{base}/v1.0/log_action_list{f_qs}",
+        f"{base}/v1.0/draft/log_action_list{f_qs}",
+        f"{base}/v1.0/admin/orders_history/list{f_qs}",
+        f"{base}/v1.0/order_action_history{f_qs}",
+        f"{base}/v1.0/draft/order_action_history{f_qs}",
     ]
     results = []
     async with httpx.AsyncClient(timeout=15) as client:
         for url in candidates:
             try:
-                r = await client.get(url, headers=headers)
-                body = r.text[:300] if r.text else ""
-                results.append({"url": url, "status": r.status_code, "body_head": body})
+                r = await client.get(url, headers={**headers, "Accept": "application/json"})
+                body = r.text[:400] if r.text else ""
+                results.append({"url": url, "status": r.status_code, "body_head": body, "ct": r.headers.get("content-type", "")})
             except Exception as e:
                 results.append({"url": url, "error": str(e)[:200]})
     return {"date": date, "probes": results}
