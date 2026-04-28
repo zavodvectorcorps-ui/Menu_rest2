@@ -60,14 +60,15 @@ def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
             payments.setdefault(p["name"], 0.0)
             payments[p["name"]] += p["amount"]
         for od in (r.get("order_dishes") or []):
-            dish = od.get("dish") or od
-            # Try to resolve product name: direct fields → product_map by id → ref_code → placeholder
+            dish = od.get("dish") or {}
+            # Try to resolve product name: direct fields → product_map by dish.id → ref_code → placeholder
             pname = (
                 dish.get("title") or dish.get("name") or dish.get("product_title")
             )
             if not pname and product_map:
+                # Caffesta returns dish.id as the product_id
                 pid = (
-                    dish.get("product_id") or dish.get("productId")
+                    dish.get("id") or dish.get("product_id") or dish.get("productId")
                     or od.get("product_id") or od.get("productId")
                 )
                 if pid:
@@ -75,10 +76,11 @@ def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
                         pname = product_map.get(int(pid))
                     except (ValueError, TypeError):
                         pass
-            pname = pname or dish.get("ref_code") or od.get("ref_code") or "Без названия"
+            pname = pname or dish.get("ref_code") or od.get("ref_code") or f"ID #{dish.get('id', '?')}"
             try:
                 qty = float(od.get("count") or od.get("qty") or 1)
-                psum = float(od.get("total_sum") or (od.get("price", 0) or 0) * qty)
+                # total_sum is the actual charged amount (after discount); total or price*count is before
+                psum = float(od.get("total_sum") or od.get("total") or (od.get("price", 0) or 0) * qty)
             except (ValueError, TypeError):
                 qty, psum = 1, 0
             products.setdefault(pname, {"qty": 0, "rev": 0.0})

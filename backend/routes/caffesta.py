@@ -425,13 +425,13 @@ async def caffesta_time_window(
 
         # Top products from order_dishes
         for od in (r.get("order_dishes") or []):
-            dish = od.get("dish") or od
+            dish = od.get("dish") or {}
             pname = (
                 dish.get("title") or dish.get("name") or dish.get("product_title")
             )
             if not pname:
                 pid = (
-                    dish.get("product_id") or dish.get("productId")
+                    dish.get("id") or dish.get("product_id") or dish.get("productId")
                     or od.get("product_id") or od.get("productId")
                 )
                 if pid:
@@ -439,13 +439,13 @@ async def caffesta_time_window(
                         pname = product_map.get(int(pid))
                     except (ValueError, TypeError):
                         pass
-            pname = pname or dish.get("ref_code") or od.get("ref_code") or "Без названия"
+            pname = pname or dish.get("ref_code") or od.get("ref_code") or f"ID #{dish.get('id', '?')}"
             try:
                 qty = float(od.get("count") or od.get("qty") or od.get("qnt") or 1)
             except (ValueError, TypeError):
                 qty = 1
             try:
-                psum = float(od.get("total_sum") or od.get("sum") or (od.get("price", 0) or 0) * qty)
+                psum = float(od.get("total_sum") or od.get("sum") or od.get("total") or (od.get("price", 0) or 0) * qty)
             except (ValueError, TypeError):
                 psum = 0
             products.setdefault(pname, {"name": pname, "qty": 0, "revenue": 0.0})
