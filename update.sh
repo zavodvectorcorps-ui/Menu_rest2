@@ -47,9 +47,13 @@ START_TIME=$(date +%s)
 
 # -------- Step 1. Pull latest code --------
 if [ "$PULL" = true ]; then
-    log "Обновляю код из GitHub (git pull)..."
+    log "Синхронизирую код с GitHub (git fetch + reset)..."
     BEFORE=$(git rev-parse HEAD)
-    git pull --ff-only
+    git fetch origin
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    # Hard reset to origin — устойчиво к force push'у из Emergent.
+    # Локальные правки в трекаемых файлах будут перезаписаны (.env защищён через .gitignore).
+    git reset --hard "origin/${BRANCH}"
     AFTER=$(git rev-parse HEAD)
     if [ "$BEFORE" = "$AFTER" ]; then
         ok "Код уже актуален ($(git rev-parse --short HEAD))"
@@ -57,7 +61,7 @@ if [ "$PULL" = true ]; then
         ok "Обновлено: $(git rev-parse --short $BEFORE) → $(git rev-parse --short $AFTER)"
     fi
 else
-    warn "Пропущен git pull (--no-pull)"
+    warn "Пропущен git sync (--no-pull)"
     BEFORE=""
     AFTER=""
 fi
