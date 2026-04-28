@@ -157,7 +157,6 @@ export default function AdminLayout() {
     !(location.pathname === '/admin/caffesta' && ['analytics', 'time-window', 'report'].includes(currentTab));
   const [systemOpen, setSystemOpen] = useState(systemActive);
   useEffect(() => { if (systemActive) setSystemOpen(true); }, [systemActive]);
-  const isAdministrator = user?.role === 'administrator';
 
   return (
     <div className="min-h-screen bg-background flex" data-testid="admin-layout">
@@ -333,7 +332,8 @@ export default function AdminLayout() {
             return navLink;
           })}
 
-          {/* System section (collapsible) */}
+          {/* System section (collapsible) — superadmin only */}
+          {user?.role === 'superadmin' && (
           <div className="pt-2">
             <button
               type="button"
@@ -349,11 +349,6 @@ export default function AdminLayout() {
             >
               <Wrench className="w-5 h-5" />
               <span className="font-medium">Системные</span>
-              {isAdministrator && (
-                <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wide">
-                  R/O
-                </span>
-              )}
               <ChevronDown
                 className={cn(
                   "w-4 h-4 ml-auto transition-transform",
@@ -406,6 +401,7 @@ export default function AdminLayout() {
               </div>
             )}
           </div>
+          )}
 
           {/* Users link (superadmin only) */}
           {user?.role === 'superadmin' && (
