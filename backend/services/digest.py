@@ -117,8 +117,17 @@ async def build_digest_text(restaurant_id: str) -> str:
     y_full = _aggregate_window(y_receipts, 0, 23 * 60 + 59, payment_methods)
     w_full = _aggregate_window(w_receipts, 0, 23 * 60 + 59, payment_methods)
 
+    # Diagnostics: how many receipts fell on the next calendar day (shift overflow past midnight)
+    overflow_count = 0
+    overflow_revenue = 0.0
+    for r in y_receipts:
+        dt = r.get("created_dt")
+        if dt and dt.strftime("%Y-%m-%d") != y_date:
+            overflow_count += 1
+            overflow_revenue += float(r.get("total_sum", 0) or 0)
+
     lines = [
-        f"🗓️ <b>{rest_name}</b> — итоги {y_date}",
+        f"🗓️ <b>{rest_name}</b> — смена {y_date}",
         "",
         f"💰 Выручка: <b>{y_full['revenue']:.2f} BYN</b>"
         f"{_delta_str(y_full['revenue'], w_full['revenue'])} (неделю назад: {w_full['revenue']:.2f})",
@@ -126,6 +135,12 @@ async def build_digest_text(restaurant_id: str) -> str:
         f"{_delta_str(y_full['count'], w_full['count'])} (вчера-7: {w_full['count']})",
         f"🎯 Средний чек: <b>{y_full['avg_check']:.2f}</b>",
     ]
+
+    if overflow_count > 0:
+        lines.append(
+            f"🌙 После полуночи (хвост смены): <b>{overflow_count}</b> чеков, "
+            f"<b>{overflow_revenue:.2f} BYN</b>"
+        )
 
     if y_full["payments"]:
         pay_parts = ", ".join(f"{k}: {v:.0f}" for k, v in y_full["payments"].items())
