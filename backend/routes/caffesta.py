@@ -372,6 +372,20 @@ async def caffesta_time_window(
     config = await get_caffesta_config(restaurant_id) or {}
     payment_methods = config.get("payment_methods", [])
 
+    # Build product_id -> title map from Caffesta products catalog
+    product_map = {}
+    try:
+        from services.caffesta import caffesta_get_products
+        prods = await caffesta_get_products(restaurant_id)
+        if prods.get("ok"):
+            for p in prods.get("data", []):
+                try:
+                    product_map[int(p["product_id"])] = p.get("title") or ""
+                except (ValueError, TypeError, KeyError):
+                    continue
+    except Exception:
+        pass
+
     total_revenue = 0.0
     total_discount = 0.0
     total_receipts = 0
@@ -412,8 +426,18 @@ async def caffesta_time_window(
             dish = od.get("dish") or od
             pname = (
                 dish.get("title") or dish.get("name") or dish.get("product_title")
-                or dish.get("ref_code") or "—"
             )
+            if not pname:
+                pid = (
+                    dish.get("product_id") or dish.get("productId")
+                    or od.get("product_id") or od.get("productId")
+                )
+                if pid:
+                    try:
+                        pname = product_map.get(int(pid))
+                    except (ValueError, TypeError):
+                        pass
+            pname = pname or dish.get("ref_code") or od.get("ref_code") or "Без названия"
             try:
                 qty = float(od.get("count") or od.get("qty") or od.get("qnt") or 1)
             except (ValueError, TypeError):

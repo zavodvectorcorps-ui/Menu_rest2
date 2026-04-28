@@ -10,7 +10,7 @@ import httpx
 
 from database import db
 from helpers import get_or_create_settings
-from services.caffesta import caffesta_get_all_receipts, split_receipt_payments
+from services.caffesta import caffesta_get_all_receipts, split_receipt_payments, caffesta_get_products
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ async def _collect_for_day(restaurant_id: str, day_date: str):
     return res.get("data", []) if res.get("ok") else []
 
 
-def _aggregate_window(receipts, wfrom, wto, payment_methods):
+def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
     revenue = 0.0
     count = 0
     discount = 0.0
@@ -61,7 +61,21 @@ def _aggregate_window(receipts, wfrom, wto, payment_methods):
             payments[p["name"]] += p["amount"]
         for od in (r.get("order_dishes") or []):
             dish = od.get("dish") or od
-            pname = (dish.get("title") or dish.get("name") or dish.get("ref_code") or "—")
+            # Try to resolve product name: direct fields → product_map by id → ref_code → placeholder
+            pname = (
+                dish.get("title") or dish.get("name") or dish.get("product_title")
+            )
+            if not pname and product_map:
+                pid = (
+                    dish.get("product_id") or dish.get("productId")
+                    or od.get("product_id") or od.get("productId")
+                )
+                if pid:
+                    try:
+                        pname = product_map.get(int(pid))
+                    except (ValueError, TypeError):
+                        pass
+            pname = pname or dish.get("ref_code") or od.get("ref_code") or "Без названия"
             try:
                 qty = float(od.get("count") or od.get("qty") or 1)
                 psum = float(od.get("total_sum") or (od.get("price", 0) or 0) * qty)
@@ -111,11 +125,24 @@ async def build_digest_text(restaurant_id: str) -> str:
     config = await db.caffesta_config.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
     payment_methods = (config or {}).get("payment_methods", [])
 
+    # Fetch Caffesta product map once (product_id -> title) to resolve "—" in top-3
+    product_map = {}
+    try:
+        prods = await caffesta_get_products(restaurant_id)
+        if prods.get("ok"):
+            for p in prods.get("data", []):
+                try:
+                    product_map[int(p["product_id"])] = p.get("title") or ""
+                except (ValueError, TypeError, KeyError):
+                    continue
+    except Exception:
+        pass
+
     restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0, "name": 1})
     rest_name = restaurant.get("name", "Ресторан") if restaurant else "Ресторан"
 
-    y_full = _aggregate_window(y_receipts, 0, 23 * 60 + 59, payment_methods)
-    w_full = _aggregate_window(w_receipts, 0, 23 * 60 + 59, payment_methods)
+    y_full = _aggregate_window(y_receipts, 0, 23 * 60 + 59, payment_methods, product_map)
+    w_full = _aggregate_window(w_receipts, 0, 23 * 60 + 59, payment_methods, product_map)
 
     # Diagnostics: how many receipts fell on the next calendar day (shift overflow past midnight)
     overflow_count = 0
@@ -156,8 +183,8 @@ async def build_digest_text(restaurant_id: str) -> str:
         except Exception:
             continue
         wname = w.get("name") or f"{w['time_from']}–{w['time_to']}"
-        y_w = _aggregate_window(y_receipts, wfrom, wto, payment_methods)
-        w_w = _aggregate_window(w_receipts, wfrom, wto, payment_methods)
+        y_w = _aggregate_window(y_receipts, wfrom, wto, payment_methods, product_map)
+        w_w = _aggregate_window(w_receipts, wfrom, wto, payment_methods, product_map)
         lines.append(
             f"• <b>{wname}</b> ({w['time_from']}–{w['time_to']}): "
             f"{y_w['revenue']:.0f} BYN / {y_w['count']} чек."
