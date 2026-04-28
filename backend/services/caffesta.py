@@ -744,7 +744,10 @@ async def caffesta_fetch_open_orders(
     out = []
     re_time = _re.compile(r"\b(\d{1,2}:\d{2}(?::\d{2})?)\b")
     re_date = _re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
-    re_money = _re.compile(r"(\d+[.,]?\d*)\s*(?:BYN|руб|р|₽)?", _re.IGNORECASE)
+    # Money: prefer values with decimal part (e.g. 1039.80, 26,50). Allow optional currency.
+    re_money_decimal = _re.compile(r"(\d{1,6}[.,]\d{1,2})\s*(?:BYN|руб|р\.?|₽)?", _re.IGNORECASE)
+    # Plain integers — used only when there is no decimal candidate
+    re_money_int = _re.compile(r"\b(\d{1,5})\s*(?:BYN|руб|₽)\b", _re.IGNORECASE)
 
     for tr in best_rows:
         cells = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
@@ -760,17 +763,6 @@ async def caffesta_fetch_open_orders(
             last_action = times[-1]
             if len(times) >= 2:
                 opened_at = times[0]
-        # Try total (largest plausible number > 0)
-        nums = []
-        for c in cells:
-            for m in re_money.finditer(c):
-                try:
-                    val = float(m.group(1).replace(",", "."))
-                    if val > 0:
-                        nums.append(val)
-                except (ValueError, TypeError):
-                    continue
-        total = max(nums) if nums else None
 
         # Try to find table number / order id in cells
         order_id = None
@@ -782,6 +774,27 @@ async def caffesta_fetch_open_orders(
             mtab = _re.search(r"стол[^\d]*(\d+)", c, _re.IGNORECASE)
             if mtab:
                 table_no = mtab.group(1)
+
+        # Money detection — exclude order_id/table_no false-positives
+        nums = []
+        for c in cells:
+            for m in re_money_decimal.finditer(c):
+                try:
+                    val = float(m.group(1).replace(",", "."))
+                    if 0 < val < 1_000_000:
+                        nums.append(val)
+                except (ValueError, TypeError):
+                    continue
+        if not nums:
+            for c in cells:
+                for m in re_money_int.finditer(c):
+                    try:
+                        val = float(m.group(1))
+                        if 0 < val < 100_000 and (not order_id or m.group(1) != order_id):
+                            nums.append(val)
+                    except (ValueError, TypeError):
+                        continue
+        total = max(nums) if nums else None
 
         date_part = dates[-1] if dates else None
         out.append({

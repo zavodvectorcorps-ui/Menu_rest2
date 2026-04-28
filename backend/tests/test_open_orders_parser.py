@@ -85,6 +85,31 @@ async def test_redirect_to_login():
     assert res["reason"] == "session_expired"
 
 
+@pytest.mark.asyncio
+async def test_parser_does_not_confuse_id_with_amount():
+    """Regression: order id '#116497' must NOT be parsed as 116497 BYN amount.
+    The real amount has decimal part."""
+    html = """
+    <html><body><table>
+    <tr><td>#116497</td><td>21:35</td><td>21:35</td><td>87.50 BYN</td></tr>
+    <tr><td>#116499</td><td>21:33</td><td>21:33</td><td>156,20 BYN</td></tr>
+    </table></body></html>
+    """
+    fake_resp = MagicMock(status_code=200, text=html)
+    fake_cfg = {"account_name": "demo", "admin_session_cookie": "X"}
+    with patch("services.caffesta.get_caffesta_config", new=AsyncMock(return_value=fake_cfg)), \
+         patch("httpx.AsyncClient") as MockClient:
+        MockClient.return_value.__aenter__.return_value.get = AsyncMock(return_value=fake_resp)
+        res = await caffesta_fetch_open_orders("rid")
+    assert res["ok"] is True
+    totals = [r["total"] for r in res["data"]]
+    # Must be the real money values, not the order id 116497
+    assert 87.5 in totals
+    assert 156.2 in totals
+    assert 116497 not in totals
+    assert 116499 not in totals
+
+
 if __name__ == "__main__":
     asyncio.run(test_parser_extracts_rows())
     asyncio.run(test_parser_session_expired())

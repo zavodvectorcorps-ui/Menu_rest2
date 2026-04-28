@@ -703,6 +703,10 @@ export default function CaffestaPage() {
                           <SelectItem value="weekday">Будни (Пн–Пт)</SelectItem>
                           <SelectItem value="weekend">Выходные (Сб, Вс)</SelectItem>
                           <SelectItem value="mon_thu">Пн–Чт</SelectItem>
+                          <SelectItem value="mon">Понедельник</SelectItem>
+                          <SelectItem value="tue">Вторник</SelectItem>
+                          <SelectItem value="wed">Среда</SelectItem>
+                          <SelectItem value="thu">Четверг</SelectItem>
                           <SelectItem value="fri">Пятница</SelectItem>
                           <SelectItem value="sat">Суббота</SelectItem>
                           <SelectItem value="sun">Воскресенье</SelectItem>
@@ -826,6 +830,12 @@ export default function CaffestaPage() {
                             : 'Чеки, в которых были дозаказы или закрытие после открытия (топ-5 за период)'}
                           {twData.open_orders_meta?.reason === 'session_expired' && (
                             <span className="block text-amber-500 mt-1">⚠️ PHPSESSID истёк — обновите cookie в Настройках, чтобы видеть точное время дозаказов.</span>
+                          )}
+                          {twData.open_orders_meta?.reason === 'out_of_period' && (
+                            <span className="block text-muted-foreground mt-1 text-xs">«В работе» доступно только когда период включает сегодня — показаны действия по чекам из выборки.</span>
+                          )}
+                          {twData.open_orders_meta?.reason === 'day_mismatch' && (
+                            <span className="block text-muted-foreground mt-1 text-xs">Сегодняшний день не подходит под фильтр дней — показаны действия по чекам из выборки.</span>
                           )}
                         </CardDescription>
                       </CardHeader>
