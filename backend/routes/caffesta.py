@@ -1,6 +1,8 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import List
 from datetime import datetime, timedelta, timezone
 
 from database import db
@@ -495,6 +497,39 @@ async def caffesta_time_window(
 
 
 # ============ STOP LIST SYNC ============
+
+@router.get("/restaurants/{restaurant_id}/caffesta/debug/raw-receipts")
+async def debug_raw_receipts(
+    restaurant_id: str,
+    date: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return first 3 raw receipts with order_dishes from Caffesta for inspection."""
+    from services.caffesta import (
+        get_caffesta_config as _g,
+        caffesta_get_terminals as _t,
+        caffesta_get_receipts_for_day as _fd,
+    )
+    await check_restaurant_access(current_user, restaurant_id)
+    cfg = await _g(restaurant_id)
+    if not cfg or not cfg.get("enabled"):
+        raise HTTPException(400, "Caffesta не настроена")
+    if not date:
+        date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    terminals = await _t(restaurant_id, date, date)
+    if not terminals and cfg.get("pos_id"):
+        terminals = [int(cfg["pos_id"])]
+    samples = []
+    for tid in terminals[:3]:
+        raw = await _fd(cfg["account_name"], cfg["api_key"], tid, date)
+        for r in raw[:3]:
+            samples.append({"terminal_id": tid, "receipt": r})
+            if len(samples) >= 3:
+                break
+        if len(samples) >= 3:
+            break
+    return {"date": date, "terminals": terminals, "samples": samples}
+
 
 @router.post("/restaurants/{restaurant_id}/caffesta/stop-list/sync")
 async def sync_stop_list(restaurant_id: str, current_user: dict = Depends(get_current_user)):
