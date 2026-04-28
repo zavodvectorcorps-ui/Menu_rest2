@@ -12,7 +12,7 @@ from services.caffesta import (
     caffesta_get_products, caffesta_send_order, caffesta_get_order_status,
     caffesta_get_sales_shift_day, get_caffesta_config, is_caffesta_enabled,
     caffesta_get_all_receipts, split_receipt_payments,
-    caffesta_get_product_shop_data,
+    caffesta_get_product_shop_data, caffesta_fetch_open_orders,
 )
 
 router = APIRouter()
@@ -31,6 +31,7 @@ class CaffestaConfigUpdate(BaseModel):
     payment_id: Optional[int] = None  # legacy/default payment id
     payment_methods: Optional[List[PaymentMethod]] = None
     enabled: Optional[bool] = None
+    admin_session_cookie: Optional[str] = None  # PHPSESSID for HTML scraping of /admin/orders_history
 
 
 # ============ CONFIG ============
@@ -40,9 +41,10 @@ async def get_caffesta_settings(restaurant_id: str, current_user: dict = Depends
     await check_restaurant_access(current_user, restaurant_id)
     config = await get_caffesta_config(restaurant_id)
     if not config:
-        return {"restaurant_id": restaurant_id, "account_name": "", "api_key": "", "pos_id": None, "payment_id": 1, "payment_methods": [], "enabled": False, "connected": False}
+        return {"restaurant_id": restaurant_id, "account_name": "", "api_key": "", "pos_id": None, "payment_id": 1, "payment_methods": [], "enabled": False, "connected": False, "admin_session_cookie": ""}
     config.pop("_id", None)
     config.setdefault("payment_methods", [])
+    config.setdefault("admin_session_cookie", "")
     return config
 
 
@@ -495,6 +497,45 @@ async def caffesta_time_window(
     last_actions.sort(key=lambda x: x["last_action_at"], reverse=True)
     last_actions = last_actions[:5]
 
+    # Try to enrich with REAL "В работе" orders scraped from Caffesta admin
+    # (when PHPSESSID is configured). Falls back silently if scraper not available.
+    open_orders_meta = {"ok": False, "reason": "no_cookie"}
+    try:
+        scrape = await caffesta_fetch_open_orders(
+            restaurant_id, date_from=start_date, date_to=end_date,
+        )
+        open_orders_meta = {"ok": scrape.get("ok"), "reason": scrape.get("reason")}
+        if scrape.get("ok") and scrape.get("data"):
+            scraped_actions = []
+            for o in scrape["data"][:10]:
+                la = o.get("last_action_at") or o.get("opened_at")
+                if not la:
+                    continue
+                d = o.get("date") or end_date
+                # Build duration from opened_at if both present (HH:MM only)
+                dur = None
+                if o.get("opened_at") and o.get("last_action_at") and o["opened_at"] != o["last_action_at"]:
+                    try:
+                        from datetime import datetime as _dt
+                        oo = _dt.strptime(o["opened_at"][:5], "%H:%M")
+                        ll = _dt.strptime(o["last_action_at"][:5], "%H:%M")
+                        delta = (ll - oo).total_seconds() // 60
+                        dur = int(delta) if delta > 0 else None
+                    except (ValueError, TypeError):
+                        dur = None
+                scraped_actions.append({
+                    "id": (o.get("id") or "—")[:12],
+                    "opened_at": f"{d} {o.get('opened_at') or la}",
+                    "last_action_at": f"{d} {la}",
+                    "duration_min": dur or 0,
+                    "total": float(o.get("total") or 0),
+                    "table": o.get("table"),
+                })
+            scraped_actions.sort(key=lambda x: x["last_action_at"], reverse=True)
+            last_actions = scraped_actions[:5]
+    except Exception:
+        pass
+
     return {
         "filter": {
             "days": days,
@@ -516,6 +557,7 @@ async def caffesta_time_window(
         "by_day": by_day_list,
         "samples": samples,
         "last_actions": last_actions,
+        "open_orders_meta": open_orders_meta,
     }
 
 
@@ -651,6 +693,42 @@ async def debug_raw_receipts(
         if len(samples) >= 3:
             break
     return {"date": date, "terminals": terminals, "samples": samples}
+
+
+@router.get("/restaurants/{restaurant_id}/caffesta/open-orders")
+async def get_caffesta_open_orders(
+    restaurant_id: str,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Last open orders ('В работе') scraped from Caffesta admin panel using PHPSESSID.
+    Returns {ok, reason, data:[...]}. Caller is expected to gracefully handle ok=false."""
+    await check_restaurant_access(current_user, restaurant_id)
+    if not date_from:
+        date_from = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    if not date_to:
+        date_to = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    res = await caffesta_fetch_open_orders(restaurant_id, date_from, date_to)
+    return res
+
+
+@router.get("/restaurants/{restaurant_id}/caffesta/debug/orders-history-scrape")
+async def debug_orders_history_scrape(
+    restaurant_id: str,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Debug: returns first 4000 chars of HTML + parsed result.
+    Use this to validate the parser against the actual HTML layout."""
+    await check_restaurant_access(current_user, restaurant_id)
+    if not date_from:
+        date_from = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    if not date_to:
+        date_to = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    res = await caffesta_fetch_open_orders(restaurant_id, date_from, date_to, debug=True)
+    return res
 
 
 @router.post("/restaurants/{restaurant_id}/caffesta/stop-list/sync")

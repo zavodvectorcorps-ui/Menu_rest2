@@ -19,7 +19,7 @@ export default function CaffestaPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [config, setConfig] = useState({ account_name: '', api_key: '', pos_id: '', payment_id: '1', payment_methods: [], enabled: false });
+  const [config, setConfig] = useState({ account_name: '', api_key: '', pos_id: '', payment_id: '1', payment_methods: [], enabled: false, admin_session_cookie: '' });
   const [connected, setConnected] = useState(false);
 
   // Analytics state
@@ -65,6 +65,7 @@ export default function CaffestaPage() {
         payment_id: resp.data.payment_id ? String(resp.data.payment_id) : '1',
         payment_methods: Array.isArray(resp.data.payment_methods) ? resp.data.payment_methods : [],
         enabled: resp.data.enabled || false,
+        admin_session_cookie: resp.data.admin_session_cookie || '',
       });
       setConnected(!!resp.data.connected);
     } catch {
@@ -96,6 +97,7 @@ export default function CaffestaPage() {
         payment_id: config.payment_id ? parseInt(config.payment_id) : 1,
         payment_methods: cleanMethods,
         enabled: config.enabled,
+        admin_session_cookie: (config.admin_session_cookie || '').trim(),
       };
       await axios.put(`${API}/restaurants/${currentRestaurantId}/caffesta`, payload, authHeaders);
       toast.success('Настройки сохранены');
@@ -459,6 +461,24 @@ export default function CaffestaPage() {
                 </div>
               </div>
 
+              <div className="pt-2 border-t border-border/50 space-y-2">
+                <Label htmlFor="admin-session-cookie" className="text-sm font-medium">PHPSESSID (cookie админки Caffesta)</Label>
+                <Input
+                  id="admin-session-cookie"
+                  type="password"
+                  placeholder="например: abcd1234ef5678..."
+                  value={config.admin_session_cookie || ''}
+                  onChange={(e) => setConfig({ ...config, admin_session_cookie: e.target.value })}
+                  data-testid="caffesta-session-cookie-input"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Опционально. Используется только для отображения <b>точного времени последних дозаказов</b> ("В работе"). API Caffesta не отдаёт это время.
+                  Чтобы получить cookie: войдите в админку Caffesta в браузере → DevTools (F12) → Application/Cookies → скопируйте значение <code>PHPSESSID</code>.
+                  Если cookie истечёт — приложение продолжит работать в обычном режиме.
+                </p>
+              </div>
+
               <div className="flex gap-3 pt-2 flex-wrap">
                 <Button onClick={saveConfig} disabled={saving} data-testid="caffesta-save-btn">
                   {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
@@ -796,8 +816,18 @@ export default function CaffestaPage() {
                   {twData.last_actions?.length > 0 && (
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2"><Clock className="w-4 h-4" /> Последние действия по чекам</CardTitle>
-                        <CardDescription>Чеки, в которых были дозаказы или закрытие после открытия (топ-5 за период)</CardDescription>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          {twData.open_orders_meta?.ok ? 'Последние дозаказы (В работе)' : 'Последние действия по чекам'}
+                        </CardTitle>
+                        <CardDescription>
+                          {twData.open_orders_meta?.ok
+                            ? 'Реальное время дозаказов из админки Caffesta (PHPSESSID)'
+                            : 'Чеки, в которых были дозаказы или закрытие после открытия (топ-5 за период)'}
+                          {twData.open_orders_meta?.reason === 'session_expired' && (
+                            <span className="block text-amber-500 mt-1">⚠️ PHPSESSID истёк — обновите cookie в Настройках, чтобы видеть точное время дозаказов.</span>
+                          )}
+                        </CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
@@ -809,7 +839,8 @@ export default function CaffestaPage() {
                                 <span className="font-medium">{a.opened_at.slice(11, 16)}</span>
                                 <span className="text-muted-foreground">→ действие</span>
                                 <span className="font-medium">{a.last_action_at.slice(11, 16)}</span>
-                                <span className="text-xs text-muted-foreground">({a.duration_min} мин)</span>
+                                {a.duration_min > 0 && <span className="text-xs text-muted-foreground">({a.duration_min} мин)</span>}
+                                {a.table && <span className="text-xs text-muted-foreground">стол {a.table}</span>}
                               </div>
                               <span className="font-semibold whitespace-nowrap">{a.total} BYN</span>
                             </div>

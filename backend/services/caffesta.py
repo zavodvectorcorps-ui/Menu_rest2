@@ -631,3 +631,173 @@ async def caffesta_get_product_shop_data(restaurant_id: str) -> dict:
     except Exception as e:
         logger.error(f"Caffesta shop data failed: {e}")
         return {"ok": False, "message": str(e)}
+
+
+# ============ HTML scraping: /admin/orders_history/list ("В работе") ============
+
+async def caffesta_fetch_open_orders(
+    restaurant_id: str,
+    date_from: str = None,
+    date_to: str = None,
+    debug: bool = False,
+) -> dict:
+    """
+    Scrape Caffesta admin page `/admin/orders_history/list?filter[activity][value][]=process`
+    using PHPSESSID cookie stored in `admin_session_cookie`. Returns last "open" orders
+    (status "В работе") with timestamps of the last action.
+
+    Returns:
+      {
+        "ok": bool,
+        "reason": "no_cookie" | "session_expired" | "http_<code>" | "no_table" | None,
+        "data": [
+          {"opened_at": "HH:MM" | "YYYY-MM-DD HH:MM",
+           "last_action_at": "...", "total": float|None,
+           "table": "...", "id": "...", "raw": "..."}
+        ],
+        "raw_head": <first 4000 chars of HTML when debug=True>,
+      }
+    """
+    import re as _re
+    cfg = await get_caffesta_config(restaurant_id)
+    if not cfg:
+        return {"ok": False, "reason": "no_config", "data": []}
+    cookie = (cfg.get("admin_session_cookie") or "").strip()
+    if not cookie:
+        return {"ok": False, "reason": "no_cookie", "data": []}
+    account = cfg.get("account_name") or ""
+    if not account:
+        return {"ok": False, "reason": "no_account", "data": []}
+
+    base_url = f"https://{account}.caffesta.com/admin/orders_history/list"
+    params = {
+        "filter[activity][value][]": "process",
+        "filter[_per_page]": "200",
+        "filter[_sort_by]": "loggedAt",
+        "filter[_sort_order]": "DESC",
+    }
+    if date_from:
+        params["filter[loggedAt][value][start]"] = date_from
+    if date_to:
+        params["filter[loggedAt][value][end]"] = date_to
+
+    cookies = {"PHPSESSID": cookie}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; CaffestaCabinet/1.0)",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "ru-RU,ru;q=0.9",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=False) as client:
+            resp = await client.get(base_url, params=params, cookies=cookies, headers=headers)
+    except Exception as e:
+        logger.warning(f"Caffesta open-orders fetch error: {e}")
+        return {"ok": False, "reason": f"net_error:{e}", "data": []}
+
+    if resp.status_code in (301, 302, 303, 307, 308):
+        return {"ok": False, "reason": "session_expired", "data": []}
+    if resp.status_code == 401 or resp.status_code == 403:
+        return {"ok": False, "reason": "session_expired", "data": []}
+    if resp.status_code != 200:
+        return {"ok": False, "reason": f"http_{resp.status_code}", "data": []}
+
+    html = resp.text or ""
+    low = html.lower()
+    # Heuristic: login page contains password input and no orders table content
+    if ("type=\"password\"" in low or "type='password'" in low) and "orders_history" not in low[:8000]:
+        return {"ok": False, "reason": "session_expired", "data": []}
+
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return {"ok": False, "reason": "bs4_missing", "data": []}
+
+    try:
+        soup = BeautifulSoup(html, "lxml")
+    except Exception:
+        soup = BeautifulSoup(html, "html.parser")
+
+    # Find data table — pick table with the most rows that contain time-like patterns
+    candidate_tables = soup.find_all("table")
+    best_rows = []
+    for tbl in candidate_tables:
+        trs = tbl.find_all("tr")
+        if len(trs) < 2:
+            continue
+        time_rows = []
+        for tr in trs:
+            text = tr.get_text(" ", strip=True)
+            if _re.search(r"\b\d{1,2}:\d{2}\b", text):
+                time_rows.append(tr)
+        if len(time_rows) > len(best_rows):
+            best_rows = time_rows
+
+    if not best_rows:
+        return {
+            "ok": False,
+            "reason": "no_table",
+            "data": [],
+            "raw_head": html[:4000] if debug else None,
+        }
+
+    out = []
+    re_time = _re.compile(r"\b(\d{1,2}:\d{2}(?::\d{2})?)\b")
+    re_date = _re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
+    re_money = _re.compile(r"(\d+[.,]?\d*)\s*(?:BYN|руб|р|₽)?", _re.IGNORECASE)
+
+    for tr in best_rows:
+        cells = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
+        if not cells:
+            continue
+        full_text = " | ".join(cells)
+        times = re_time.findall(full_text)
+        dates = re_date.findall(full_text)
+        last_action = None
+        opened_at = None
+        if times:
+            # Convention: usually last column has loggedAt (the most recent action)
+            last_action = times[-1]
+            if len(times) >= 2:
+                opened_at = times[0]
+        # Try total (largest plausible number > 0)
+        nums = []
+        for c in cells:
+            for m in re_money.finditer(c):
+                try:
+                    val = float(m.group(1).replace(",", "."))
+                    if val > 0:
+                        nums.append(val)
+                except (ValueError, TypeError):
+                    continue
+        total = max(nums) if nums else None
+
+        # Try to find table number / order id in cells
+        order_id = None
+        table_no = None
+        for c in cells:
+            mid = _re.match(r"^#?\s*(\d{3,})\s*$", c)
+            if mid and not order_id:
+                order_id = mid.group(1)
+            mtab = _re.search(r"стол[^\d]*(\d+)", c, _re.IGNORECASE)
+            if mtab:
+                table_no = mtab.group(1)
+
+        date_part = dates[-1] if dates else None
+        out.append({
+            "id": order_id,
+            "table": table_no,
+            "opened_at": opened_at,
+            "last_action_at": last_action,
+            "date": date_part,
+            "total": total,
+            "raw": full_text[:300],
+        })
+
+    return {
+        "ok": True,
+        "reason": None,
+        "data": out,
+        "raw_head": html[:4000] if debug else None,
+    }
+
