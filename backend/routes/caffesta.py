@@ -12,8 +12,7 @@ from services.caffesta import (
     caffesta_get_products, caffesta_send_order, caffesta_get_order_status,
     caffesta_get_sales_shift_day, get_caffesta_config, is_caffesta_enabled,
     caffesta_get_all_receipts, split_receipt_payments,
-    caffesta_get_product_shop_data, caffesta_fetch_open_orders,
-    caffesta_fetch_open_orders_multi,
+    caffesta_get_product_shop_data,
 )
 
 router = APIRouter()
@@ -32,7 +31,6 @@ class CaffestaConfigUpdate(BaseModel):
     payment_id: Optional[int] = None  # legacy/default payment id
     payment_methods: Optional[List[PaymentMethod]] = None
     enabled: Optional[bool] = None
-    admin_session_cookie: Optional[str] = None  # PHPSESSID for HTML scraping of /admin/orders_history
 
 
 # ============ CONFIG ============
@@ -42,10 +40,10 @@ async def get_caffesta_settings(restaurant_id: str, current_user: dict = Depends
     await check_restaurant_access(current_user, restaurant_id)
     config = await get_caffesta_config(restaurant_id)
     if not config:
-        return {"restaurant_id": restaurant_id, "account_name": "", "api_key": "", "pos_id": None, "payment_id": 1, "payment_methods": [], "enabled": False, "connected": False, "admin_session_cookie": ""}
+        return {"restaurant_id": restaurant_id, "account_name": "", "api_key": "", "pos_id": None, "payment_id": 1, "payment_methods": [], "enabled": False, "connected": False}
     config.pop("_id", None)
+    config.pop("admin_session_cookie", None)
     config.setdefault("payment_methods", [])
-    config.setdefault("admin_session_cookie", "")
     return config
 
 
@@ -506,104 +504,6 @@ async def caffesta_time_window(
     last_actions.sort(key=lambda x: x["last_action_at"], reverse=True)
     last_actions = last_actions[:5]
 
-    # Try to enrich with REAL "В работе" (last actions on receipts) scraped from
-    # Caffesta admin. Works for BOTH live (today) and historical (past) periods.
-    #
-    # Strategy:
-    #   - period includes today  → request activity=process (only currently open) + ALL
-    #     (without activity filter) to get yesterday/today actions.
-    #   - period in the past     → request without activity filter (all closed receipts);
-    #     we still get loggedAt = last action on each receipt that day.
-    open_orders_meta = {"ok": False, "reason": "no_cookie"}
-    today_minsk = (datetime.now(timezone.utc) + timedelta(hours=3)).date().strftime("%Y-%m-%d")
-    period_includes_today = start_date <= today_minsk <= end_date
-    avg_duration_min = None
-    open_count = 0
-    try:
-        # Build the list of dates we actually want to scrape:
-        # - day_type=all → single range request (or many if too wide)
-        # - specific weekday → enumerate matching dates within period
-        from datetime import datetime as _dt, timedelta as _td
-        d_from = _dt.strptime(start_date, "%Y-%m-%d").date()
-        d_to = _dt.strptime(end_date, "%Y-%m-%d").date()
-        matching_dates = []
-        cur = d_from
-        while cur <= d_to:
-            cur_dt = _dt.combine(cur, _dt.min.time())
-            if in_day_type(cur_dt):
-                matching_dates.append(cur.strftime("%Y-%m-%d"))
-            cur += _td(days=1)
-        # Cap the number of HTTP calls
-        matching_dates = matching_dates[-14:]
-
-        # Single-request optimisation when "all days" + small period (≤ 1 day)
-        scrape = None
-        if day_type == "all" and len(matching_dates) <= 1:
-            single = matching_dates[0] if matching_dates else end_date
-            scrape = await caffesta_fetch_open_orders(
-                restaurant_id, date_from=single, date_to=single,
-                activity="process" if (single == today_minsk) else None,
-            )
-            # Override row date to the single date for reliability
-            if scrape.get("ok"):
-                for row in scrape.get("data") or []:
-                    row["date"] = single
-        else:
-            activity_param = "process" if (matching_dates == [today_minsk]) else None
-            scrape = await caffesta_fetch_open_orders_multi(
-                restaurant_id, matching_dates, activity=activity_param,
-            )
-        open_orders_meta = {
-            "ok": scrape.get("ok"),
-            "reason": scrape.get("reason"),
-            "live": period_includes_today and day_type == "all",
-            "scraped_dates": matching_dates,
-        }
-        if scrape.get("ok") and scrape.get("data"):
-            scraped_actions = []
-            durations = []
-            for o in scrape["data"]:
-                la = o.get("last_action_at") or o.get("opened_at")
-                if not la:
-                    continue
-                row_date = o.get("date")
-                if not row_date:
-                    continue
-                # time-of-day filter
-                try:
-                    la_min = _hhmm_to_minutes(la[:5])
-                    if not in_time_window(_dt(2000, 1, 1, la_min // 60, la_min % 60)):
-                        continue
-                except Exception:
-                    pass
-                dur = None
-                if o.get("opened_at") and o.get("last_action_at") and o["opened_at"] != o["last_action_at"]:
-                    try:
-                        oo = _dt.strptime(o["opened_at"][:5], "%H:%M")
-                        ll = _dt.strptime(o["last_action_at"][:5], "%H:%M")
-                        delta = (ll - oo).total_seconds() // 60
-                        dur = int(delta) if delta > 0 else None
-                    except (ValueError, TypeError):
-                        dur = None
-                if dur:
-                    durations.append(dur)
-                scraped_actions.append({
-                    "id": (o.get("id") or "—")[:12],
-                    "opened_at": f"{row_date} {o.get('opened_at') or la}",
-                    "last_action_at": f"{row_date} {la}",
-                    "duration_min": dur or 0,
-                    "total": float(o.get("total") or 0),
-                    "table": o.get("table"),
-                })
-            if scraped_actions:
-                scraped_actions.sort(key=lambda x: x["last_action_at"], reverse=True)
-                last_actions = scraped_actions[:5]
-                open_count = len(scraped_actions)
-                if durations:
-                    avg_duration_min = round(sum(durations) / len(durations), 1)
-    except Exception:
-        pass
-
     return {
         "filter": {
             "days": days,
@@ -625,65 +525,10 @@ async def caffesta_time_window(
         "by_day": by_day_list,
         "samples": samples,
         "last_actions": last_actions,
-        "open_orders_meta": open_orders_meta,
-        "avg_open_duration_min": avg_duration_min,
-        "open_orders_count": open_count,
     }
 
 
 # ============ STOP LIST SYNC ============
-
-@router.get("/restaurants/{restaurant_id}/caffesta/debug/orders-history-probe")
-async def debug_orders_history_probe(
-    restaurant_id: str,
-    date: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Probe several plausible endpoints for Caffesta 'История счетов'.
-    Returns response status + first bytes for each path so we can identify the correct one."""
-    import httpx
-    from services.caffesta import get_caffesta_config, _base_url, _headers
-    await check_restaurant_access(current_user, restaurant_id)
-    cfg = await get_caffesta_config(restaurant_id)
-    if not cfg or not cfg.get("enabled"):
-        raise HTTPException(400, "Caffesta не настроена")
-    if not date:
-        date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    base = _base_url(cfg["account_name"])
-    headers = _headers(cfg["api_key"])
-    # Filter fragment: activity=process means "В работе"
-    f_qs = f"?filter%5Bactivity%5D%5Bvalue%5D%5B%5D=process&filter%5BloggedAt%5D%5Bvalue%5D%5Bstart%5D={date}&filter%5BloggedAt%5D%5Bvalue%5D%5Bend%5D={date}&filter%5B_per_page%5D=200&filter%5B_sort_by%5D=loggedAt&filter%5B_sort_order%5D=DESC"
-    # Some Caffesta endpoints accept .json suffix to get JSON instead of HTML
-    candidates = [
-        f"{base}/v1.0/orders_history/list{f_qs}",
-        f"{base}/v1.0/orders_history{f_qs}",
-        f"{base}/v1.0/draft/orders_history/list{f_qs}",
-        # HTML admin URL with .json
-        f"https://{cfg['account_name']}.caffesta.com/admin/orders_history/list.json{f_qs}",
-        f"https://{cfg['account_name']}.caffesta.com/admin/orders_history.json{f_qs}",
-        # Possible plain admin URL with API key
-        f"https://{cfg['account_name']}.caffesta.com/admin/orders_history/list{f_qs}",
-        # Try without /a prefix
-        f"https://{cfg['account_name']}.caffesta.com/v1.0/orders_history/list{f_qs}",
-        # Try POST-style endpoints (we'll send GET but Caffesta might return method-not-allowed which gives info)
-        f"{base}/v1.0/log_action_list{f_qs}",
-        f"{base}/v1.0/draft/log_action_list{f_qs}",
-        f"{base}/v1.0/admin/orders_history/list{f_qs}",
-        f"{base}/v1.0/order_action_history{f_qs}",
-        f"{base}/v1.0/draft/order_action_history{f_qs}",
-    ]
-    results = []
-    async with httpx.AsyncClient(timeout=15) as client:
-        for url in candidates:
-            try:
-                r = await client.get(url, headers={**headers, "Accept": "application/json"})
-                body = r.text[:400] if r.text else ""
-                results.append({"url": url, "status": r.status_code, "body_head": body, "ct": r.headers.get("content-type", "")})
-            except Exception as e:
-                results.append({"url": url, "error": str(e)[:200]})
-    return {"date": date, "probes": results}
-
 
 @router.get("/restaurants/{restaurant_id}/caffesta/debug/raw-shift-day")
 async def debug_raw_shift_day(
@@ -763,42 +608,6 @@ async def debug_raw_receipts(
         if len(samples) >= 3:
             break
     return {"date": date, "terminals": terminals, "samples": samples}
-
-
-@router.get("/restaurants/{restaurant_id}/caffesta/open-orders")
-async def get_caffesta_open_orders(
-    restaurant_id: str,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Last open orders ('В работе') scraped from Caffesta admin panel using PHPSESSID.
-    Returns {ok, reason, data:[...]}. Caller is expected to gracefully handle ok=false."""
-    await check_restaurant_access(current_user, restaurant_id)
-    if not date_from:
-        date_from = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-    if not date_to:
-        date_to = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    res = await caffesta_fetch_open_orders(restaurant_id, date_from, date_to)
-    return res
-
-
-@router.get("/restaurants/{restaurant_id}/caffesta/debug/orders-history-scrape")
-async def debug_orders_history_scrape(
-    restaurant_id: str,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
-):
-    """Debug: returns first 4000 chars of HTML + parsed result.
-    Use this to validate the parser against the actual HTML layout."""
-    await check_restaurant_access(current_user, restaurant_id)
-    if not date_from:
-        date_from = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-    if not date_to:
-        date_to = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    res = await caffesta_fetch_open_orders(restaurant_id, date_from, date_to, debug=True)
-    return res
 
 
 @router.post("/restaurants/{restaurant_id}/caffesta/stop-list/sync")

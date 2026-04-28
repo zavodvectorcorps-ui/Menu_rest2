@@ -10,7 +10,7 @@ import httpx
 
 from database import db
 from helpers import get_or_create_settings
-from services.caffesta import caffesta_get_all_receipts, split_receipt_payments, caffesta_get_products, caffesta_fetch_open_orders
+from services.caffesta import caffesta_get_all_receipts, split_receipt_payments, caffesta_get_products
 
 logger = logging.getLogger(__name__)
 
@@ -220,26 +220,6 @@ async def build_digest_text(restaurant_id: str) -> str:
                 f"  • откр. {opened.strftime('%H:%M')} → действие {last.strftime('%H:%M')}"
                 f" ({dur} мин), {total:.0f} BYN"
             )
-
-    # Real "В работе" (scraped from admin if PHPSESSID set). Replaces above section
-    # with more accurate data when available.
-    try:
-        scrape = await caffesta_fetch_open_orders(
-            restaurant_id, date_from=y_date, date_to=y_date,
-        )
-        if scrape.get("ok") and scrape.get("data"):
-            lines.append("")
-            lines.append("🟢 <b>Последние дозаказы (В работе):</b>")
-            for o in scrape["data"][:5]:
-                la = o.get("last_action_at") or o.get("opened_at") or "—"
-                tbl = f" стол {o['table']}" if o.get("table") else ""
-                tot = f", {o['total']:.0f} BYN" if o.get("total") else ""
-                lines.append(f"  • {la}{tbl}{tot}")
-        elif scrape.get("reason") == "session_expired":
-            lines.append("")
-            lines.append("⚠️ <i>Caffesta admin cookie (PHPSESSID) истёк — обновите его в настройках, чтобы видеть точное время дозаказов.</i>")
-    except Exception as e:
-        logger.warning(f"Digest open-orders scrape failed: {e}")
 
     return "\n".join(lines)
 
