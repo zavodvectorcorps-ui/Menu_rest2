@@ -498,6 +498,30 @@ async def caffesta_time_window(
 
 # ============ STOP LIST SYNC ============
 
+@router.get("/restaurants/{restaurant_id}/caffesta/debug/raw-shift-day")
+async def debug_raw_shift_day(
+    restaurant_id: str,
+    date: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Debug: первые 5 строк из export_sales_shift_day за указанную дату."""
+    from services.caffesta import caffesta_get_sales_shift_day
+    await check_restaurant_access(current_user, restaurant_id)
+    if not date:
+        date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    res = await caffesta_get_sales_shift_day(restaurant_id, date, date)
+    if not res.get("ok"):
+        raise HTTPException(400, res.get("message", "Ошибка"))
+    rows = res.get("data", [])
+    keys = sorted(set().union(*(r.keys() for r in rows[:5]))) if rows else []
+    return {
+        "date": date,
+        "total_rows": len(rows),
+        "fields": keys,
+        "first_5_rows": rows[:5],
+    }
+
+
 @router.get("/restaurants/{restaurant_id}/caffesta/debug/raw-receipts")
 async def debug_raw_receipts(
     restaurant_id: str,
