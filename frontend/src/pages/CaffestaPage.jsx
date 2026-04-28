@@ -822,20 +822,26 @@ export default function CaffestaPage() {
                       <CardHeader>
                         <CardTitle className="text-base flex items-center gap-2">
                           <Clock className="w-4 h-4" />
-                          {twData.open_orders_meta?.ok ? 'Последние дозаказы (В работе)' : 'Последние действия по чекам'}
+                          {twData.open_orders_meta?.ok
+                            ? (twData.open_orders_meta.live
+                                ? 'Последние дозаказы (В работе сейчас)'
+                                : 'Последние действия по чекам за период')
+                            : 'Последние действия по чекам'}
                         </CardTitle>
                         <CardDescription>
                           {twData.open_orders_meta?.ok
-                            ? 'Реальное время дозаказов из админки Caffesta (PHPSESSID)'
+                            ? (twData.open_orders_meta.live
+                                ? 'Реальное время дозаказов из админки Caffesta (PHPSESSID)'
+                                : 'История из админки Caffesta — последние действия (закрытия / дозаказы) на чеках за выбранный период')
                             : 'Чеки, в которых были дозаказы или закрытие после открытия (топ-5 за период)'}
                           {twData.open_orders_meta?.reason === 'session_expired' && (
                             <span className="block text-amber-500 mt-1">⚠️ PHPSESSID истёк — обновите cookie в Настройках, чтобы видеть точное время дозаказов.</span>
                           )}
-                          {twData.open_orders_meta?.reason === 'out_of_period' && (
-                            <span className="block text-muted-foreground mt-1 text-xs">«В работе» доступно только когда период включает сегодня — показаны действия по чекам из выборки.</span>
-                          )}
-                          {twData.open_orders_meta?.reason === 'day_mismatch' && (
-                            <span className="block text-muted-foreground mt-1 text-xs">Сегодняшний день не подходит под фильтр дней — показаны действия по чекам из выборки.</span>
+                          {twData.avg_open_duration_min > 0 && (
+                            <span className="block mt-1 text-xs">
+                              ⏱️ Средняя длительность чека: <b>{twData.avg_open_duration_min} мин</b>
+                              {twData.open_orders_count > 0 && <span className="text-muted-foreground"> · всего совпало: {twData.open_orders_count}</span>}
+                            </span>
                           )}
                         </CardDescription>
                       </CardHeader>
@@ -843,8 +849,11 @@ export default function CaffestaPage() {
                         <div className="space-y-2">
                           {twData.last_actions.map((a, i) => (
                             <div key={i} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0 text-sm">
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
                                 <span className="text-xs text-muted-foreground font-mono">#{a.id}</span>
+                                {a.opened_at?.length >= 16 && twData.open_orders_meta?.ok && !twData.open_orders_meta.live && (
+                                  <span className="text-xs text-muted-foreground">{a.opened_at.slice(0, 10)}</span>
+                                )}
                                 <span className="text-muted-foreground">откр.</span>
                                 <span className="font-medium">{a.opened_at.slice(11, 16)}</span>
                                 <span className="text-muted-foreground">→ действие</span>

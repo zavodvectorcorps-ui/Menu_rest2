@@ -505,64 +505,80 @@ async def caffesta_time_window(
     last_actions.sort(key=lambda x: x["last_action_at"], reverse=True)
     last_actions = last_actions[:5]
 
-    # Try to enrich with REAL "В работе" orders scraped from Caffesta admin
-    # (when PHPSESSID is configured AND the filter window includes TODAY).
-    # "В работе" is a live status — irrelevant for past-only periods (e.g. last Friday).
+    # Try to enrich with REAL "В работе" (last actions on receipts) scraped from
+    # Caffesta admin. Works for BOTH live (today) and historical (past) periods.
+    #
+    # Strategy:
+    #   - period includes today  → request activity=process (only currently open) + ALL
+    #     (without activity filter) to get yesterday/today actions.
+    #   - period in the past     → request without activity filter (all closed receipts);
+    #     we still get loggedAt = last action on each receipt that day.
     open_orders_meta = {"ok": False, "reason": "no_cookie"}
     today_minsk = (datetime.now(timezone.utc) + timedelta(hours=3)).date().strftime("%Y-%m-%d")
     period_includes_today = start_date <= today_minsk <= end_date
-    if not period_includes_today:
-        open_orders_meta = {"ok": False, "reason": "out_of_period"}
-    else:
-        try:
-            scrape = await caffesta_fetch_open_orders(
-                restaurant_id, date_from=start_date, date_to=end_date,
-            )
-            open_orders_meta = {"ok": scrape.get("ok"), "reason": scrape.get("reason")}
-            if scrape.get("ok") and scrape.get("data"):
-                # Filter scraped rows by current day_type/time_window (live data is "today",
-                # so weekday filter usually applies to today only).
-                from datetime import datetime as _dt
-                today_dt = _dt.strptime(today_minsk, "%Y-%m-%d")
-                if not in_day_type(today_dt):
-                    # Today doesn't match the day_type filter — hide live data
-                    open_orders_meta = {"ok": False, "reason": "day_mismatch"}
-                else:
-                    scraped_actions = []
-                    for o in scrape["data"][:10]:
-                        la = o.get("last_action_at") or o.get("opened_at")
-                        if not la:
-                            continue
-                        # Filter by time-of-day window (HH:MM string)
-                        try:
-                            la_min = _hhmm_to_minutes(la[:5])
-                            if not in_time_window(_dt(2000, 1, 1, la_min // 60, la_min % 60)):
-                                continue
-                        except Exception:
-                            pass
-                        d = o.get("date") or today_minsk
+    avg_duration_min = None
+    open_count = 0
+    try:
+        scrape = await caffesta_fetch_open_orders(
+            restaurant_id, date_from=start_date, date_to=end_date,
+            activity="process" if period_includes_today and start_date == end_date else None,
+        )
+        open_orders_meta = {
+            "ok": scrape.get("ok"),
+            "reason": scrape.get("reason"),
+            "live": period_includes_today,
+        }
+        if scrape.get("ok") and scrape.get("data"):
+            from datetime import datetime as _dt
+            scraped_actions = []
+            durations = []
+            for o in scrape["data"]:
+                la = o.get("last_action_at") or o.get("opened_at")
+                if not la:
+                    continue
+                row_date = o.get("date") or (today_minsk if period_includes_today else end_date)
+                # Filter by day-of-week of THIS row (historical filter)
+                try:
+                    row_dt = _dt.strptime(row_date, "%Y-%m-%d")
+                    if not in_day_type(row_dt):
+                        continue
+                except (ValueError, TypeError):
+                    pass
+                # Filter by time-of-day window (HH:MM)
+                try:
+                    la_min = _hhmm_to_minutes(la[:5])
+                    if not in_time_window(_dt(2000, 1, 1, la_min // 60, la_min % 60)):
+                        continue
+                except Exception:
+                    pass
+                dur = None
+                if o.get("opened_at") and o.get("last_action_at") and o["opened_at"] != o["last_action_at"]:
+                    try:
+                        oo = _dt.strptime(o["opened_at"][:5], "%H:%M")
+                        ll = _dt.strptime(o["last_action_at"][:5], "%H:%M")
+                        delta = (ll - oo).total_seconds() // 60
+                        dur = int(delta) if delta > 0 else None
+                    except (ValueError, TypeError):
                         dur = None
-                        if o.get("opened_at") and o.get("last_action_at") and o["opened_at"] != o["last_action_at"]:
-                            try:
-                                oo = _dt.strptime(o["opened_at"][:5], "%H:%M")
-                                ll = _dt.strptime(o["last_action_at"][:5], "%H:%M")
-                                delta = (ll - oo).total_seconds() // 60
-                                dur = int(delta) if delta > 0 else None
-                            except (ValueError, TypeError):
-                                dur = None
-                        scraped_actions.append({
-                            "id": (o.get("id") or "—")[:12],
-                            "opened_at": f"{d} {o.get('opened_at') or la}",
-                            "last_action_at": f"{d} {la}",
-                            "duration_min": dur or 0,
-                            "total": float(o.get("total") or 0),
-                            "table": o.get("table"),
-                        })
-                    if scraped_actions:
-                        scraped_actions.sort(key=lambda x: x["last_action_at"], reverse=True)
-                        last_actions = scraped_actions[:5]
-        except Exception:
-            pass
+                if dur:
+                    durations.append(dur)
+                scraped_actions.append({
+                    "id": (o.get("id") or "—")[:12],
+                    "opened_at": f"{row_date} {o.get('opened_at') or la}",
+                    "last_action_at": f"{row_date} {la}",
+                    "duration_min": dur or 0,
+                    "total": float(o.get("total") or 0),
+                    "table": o.get("table"),
+                })
+            if scraped_actions:
+                # Newest action first
+                scraped_actions.sort(key=lambda x: x["last_action_at"], reverse=True)
+                last_actions = scraped_actions[:5]
+                open_count = len(scraped_actions)
+                if durations:
+                    avg_duration_min = round(sum(durations) / len(durations), 1)
+    except Exception:
+        pass
 
     return {
         "filter": {
@@ -586,6 +602,8 @@ async def caffesta_time_window(
         "samples": samples,
         "last_actions": last_actions,
         "open_orders_meta": open_orders_meta,
+        "avg_open_duration_min": avg_duration_min,
+        "open_orders_count": open_count,
     }
 
 

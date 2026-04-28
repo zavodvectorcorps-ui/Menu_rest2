@@ -639,20 +639,25 @@ async def caffesta_fetch_open_orders(
     restaurant_id: str,
     date_from: str = None,
     date_to: str = None,
+    activity: str = "process",  # "process" = только "В работе"; None/"" = все статусы (для истории)
     debug: bool = False,
 ) -> dict:
     """
-    Scrape Caffesta admin page `/admin/orders_history/list?filter[activity][value][]=process`
-    using PHPSESSID cookie stored in `admin_session_cookie`. Returns last "open" orders
-    (status "В работе") with timestamps of the last action.
+    Scrape Caffesta admin page `/admin/orders_history/list` using PHPSESSID cookie
+    stored in `admin_session_cookie`. Returns orders with timestamps of the last action.
+
+    activity="process": показывает только текущие открытые ("В работе"). Для live-режима.
+    activity=None/"":  показывает ВСЕ чеки за период, отсортированные по loggedAt DESC.
+                       Используется для исторических выборок (например "прошлая пятница" —
+                       чтобы увидеть когда был последний дозаказ в тот день).
 
     Returns:
       {
         "ok": bool,
         "reason": "no_cookie" | "session_expired" | "http_<code>" | "no_table" | None,
         "data": [
-          {"opened_at": "HH:MM" | "YYYY-MM-DD HH:MM",
-           "last_action_at": "...", "total": float|None,
+          {"opened_at": "HH:MM"|None, "last_action_at": "HH:MM"|None,
+           "date": "YYYY-MM-DD"|None, "total": float|None,
            "table": "...", "id": "...", "raw": "..."}
         ],
         "raw_head": <first 4000 chars of HTML when debug=True>,
@@ -671,11 +676,12 @@ async def caffesta_fetch_open_orders(
 
     base_url = f"https://{account}.caffesta.com/admin/orders_history/list"
     params = {
-        "filter[activity][value][]": "process",
         "filter[_per_page]": "200",
         "filter[_sort_by]": "loggedAt",
         "filter[_sort_order]": "DESC",
     }
+    if activity:
+        params["filter[activity][value][]"] = activity
     if date_from:
         params["filter[loggedAt][value][start]"] = date_from
     if date_to:
