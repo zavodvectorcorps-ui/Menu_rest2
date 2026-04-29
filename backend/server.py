@@ -70,12 +70,24 @@ async def startup():
     global scheduler
     logging.info("Starting up...")
     await create_superadmin()
-    # Daily digest at 10:00 Minsk time (UTC+3)
+    # Daily digest at 08:00 Europe/Minsk (UTC+3, no DST)
     try:
-        scheduler = AsyncIOScheduler(timezone=ZoneInfo("Europe/Minsk"))
-        scheduler.add_job(run_daily_digest_job, CronTrigger(hour=8, minute=0), id="daily_digest", replace_existing=True)
-        scheduler.add_job(run_margin_check_job, CronTrigger(hour=8, minute=5), id="margin_check", replace_existing=True)
+        minsk_tz = ZoneInfo("Europe/Minsk")
+        scheduler = AsyncIOScheduler(timezone=minsk_tz)
+        scheduler.add_job(
+            run_daily_digest_job,
+            CronTrigger(hour=8, minute=0, timezone=minsk_tz),
+            id="daily_digest", replace_existing=True,
+        )
+        scheduler.add_job(
+            run_margin_check_job,
+            CronTrigger(hour=8, minute=5, timezone=minsk_tz),
+            id="margin_check", replace_existing=True,
+        )
         scheduler.start()
+        # Log next run times so you can verify timezone on first start
+        for job in scheduler.get_jobs():
+            logging.info(f"Scheduler job '{job.id}' next run: {job.next_run_time}")
         logging.info("Scheduler started (digest 08:00, margin-check 08:05 Europe/Minsk)")
     except Exception as e:
         logging.exception(f"Scheduler failed to start (continuing without daily digest): {e}")
