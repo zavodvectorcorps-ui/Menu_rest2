@@ -25,7 +25,8 @@ async def create_restaurant(data: RestaurantCreate, current_user: dict = Depends
         description=data.description,
         address=data.address,
         phone=data.phone,
-        email=data.email
+        email=data.email,
+        enabled_modules=data.enabled_modules or [],
     )
     doc = restaurant.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
@@ -51,6 +52,10 @@ async def get_restaurant_by_id(restaurant_id: str, current_user: dict = Depends(
 async def update_restaurant(restaurant_id: str, data: RestaurantUpdate, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+
+    # enabled_modules — only superadmin can change feature flags
+    if 'enabled_modules' in update_data and current_user.get('role') != 'superadmin':
+        update_data.pop('enabled_modules')
 
     # Validate slug uniqueness and format
     if 'slug' in update_data:

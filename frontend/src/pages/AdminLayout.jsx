@@ -140,6 +140,25 @@ export default function AdminLayout() {
   };
 
   const currentRestaurant = restaurants.find(r => r.id === currentRestaurantId) || restaurant;
+  const enabledModules = currentRestaurant?.enabled_modules || [];
+  const isModuleEnabled = (mod) => user?.role === 'superadmin' || enabledModules.includes(mod);
+
+  // Filter analytics items by feature-flags
+  const visibleAnalyticsItems = analyticsItems.filter((it) => {
+    if (it.path === '/admin/analytics') return true; // Сводка всегда
+    if (it.path === '/admin/factual-margin') return isModuleEnabled('factual_margin');
+    if (it.path === '/admin/price-control') return isModuleEnabled('cost_control');
+    if (it.matchPath === '/admin/caffesta') return isModuleEnabled('caffesta');
+    return true;
+  });
+
+  // Filter system items by feature-flags
+  const visibleSystemItems = systemItems.filter((it) => {
+    if (it.path === '/admin/telegram-bot') return isModuleEnabled('telegram_bot');
+    if (it.path === '/admin/caffesta') return isModuleEnabled('caffesta');
+    if (it.path === '/admin/caffesta-mapping') return isModuleEnabled('caffesta_mapping');
+    return true;
+  });
 
   // Analytics group: open by default if active route is one of analytics items
   const analyticsPaths = ['/admin/analytics', '/admin/factual-margin', '/admin/price-control'];
@@ -292,7 +311,7 @@ export default function AdminLayout() {
                     </button>
                     {analyticsOpen && (
                       <div className="mt-1 ml-3 pl-3 border-l border-border space-y-1">
-                        {analyticsItems.map((ai) => {
+                        {visibleAnalyticsItems.map((ai) => {
                           const AIcon = ai.icon;
                           let aActive;
                           if (ai.matchPath) {
@@ -332,8 +351,8 @@ export default function AdminLayout() {
             return navLink;
           })}
 
-          {/* System section (collapsible) — superadmin only */}
-          {user?.role === 'superadmin' && (
+          {/* System section (collapsible) — superadmin (всегда) + administrator (если есть включённые модули) */}
+          {(user?.role === 'superadmin' || (user?.role === 'administrator' && visibleSystemItems.length > 0)) && (
           <div className="pt-2">
             <button
               type="button"
@@ -358,7 +377,7 @@ export default function AdminLayout() {
             </button>
             {systemOpen && (
               <div className="mt-1 ml-3 pl-3 border-l border-border space-y-1">
-                {systemItems.map((item) => {
+                {visibleSystemItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.path;
                   return (
@@ -401,6 +420,25 @@ export default function AdminLayout() {
               </div>
             )}
           </div>
+          )}
+
+          {/* Users + Restaurant modules (superadmin only) */}
+          {user?.role === 'superadmin' && (
+            <NavLink
+              to="/admin/restaurant-modules"
+              onClick={() => setSidebarOpen(false)}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+                location.pathname === '/admin/restaurant-modules'
+                  ? "bg-mint-500 text-white shadow-lg shadow-mint-500/30"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              data-testid="nav-restaurant-modules"
+            >
+              <Building2 className="w-5 h-5" />
+              <span className="font-medium">Модули ресторанов</span>
+              {location.pathname === '/admin/restaurant-modules' && <ChevronRight className="w-4 h-4 ml-auto" />}
+            </NavLink>
           )}
 
           {/* Users link (superadmin only) */}

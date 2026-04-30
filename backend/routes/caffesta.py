@@ -6,7 +6,7 @@ from typing import List
 from datetime import datetime, timedelta, timezone
 
 from database import db
-from auth import get_current_user, check_restaurant_access, ensure_can_write_system
+from auth import get_current_user, check_restaurant_access, ensure_can_write_system, ensure_module_access
 from services.caffesta import (
     caffesta_test_connection, caffesta_get_sales, caffesta_get_sales_totals,
     caffesta_get_products, caffesta_send_order, caffesta_get_order_status,
@@ -37,7 +37,7 @@ class CaffestaConfigUpdate(BaseModel):
 
 @router.get("/restaurants/{restaurant_id}/caffesta")
 async def get_caffesta_settings(restaurant_id: str, current_user: dict = Depends(get_current_user)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
     config = await get_caffesta_config(restaurant_id)
     if not config:
         return {"restaurant_id": restaurant_id, "account_name": "", "api_key": "", "pos_id": None, "payment_id": 1, "payment_methods": [], "enabled": False, "connected": False}
@@ -49,7 +49,7 @@ async def get_caffesta_settings(restaurant_id: str, current_user: dict = Depends
 
 @router.put("/restaurants/{restaurant_id}/caffesta")
 async def update_caffesta_settings(restaurant_id: str, data: CaffestaConfigUpdate, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
     payload = data.model_dump(exclude_none=True)
     # Serialize payment_methods if present
     if "payment_methods" in payload:
@@ -81,7 +81,7 @@ async def update_caffesta_settings(restaurant_id: str, data: CaffestaConfigUpdat
 
 @router.post("/restaurants/{restaurant_id}/caffesta/test")
 async def test_caffesta_connection(restaurant_id: str, current_user: dict = Depends(get_current_user)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
     config = await get_caffesta_config(restaurant_id)
     if not config or not config.get("account_name") or not config.get("api_key"):
         raise HTTPException(status_code=400, detail="Укажите account_name и API-ключ")
@@ -93,7 +93,7 @@ async def test_caffesta_connection(restaurant_id: str, current_user: dict = Depe
 
 @router.get("/restaurants/{restaurant_id}/caffesta/products")
 async def get_caffesta_products_list(restaurant_id: str, current_user: dict = Depends(get_current_user)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
     result = await caffesta_get_products(restaurant_id)
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result.get("message", "Ошибка"))
@@ -104,7 +104,7 @@ async def get_caffesta_products_list(restaurant_id: str, current_user: dict = De
 
 @router.post("/restaurants/{restaurant_id}/caffesta/send-order/{order_id}")
 async def send_order_to_caffesta(restaurant_id: str, order_id: str, current_user: dict = Depends(get_current_user)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
     order = await db.orders.find_one({"id": order_id, "restaurant_id": restaurant_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
@@ -116,7 +116,7 @@ async def send_order_to_caffesta(restaurant_id: str, order_id: str, current_user
 
 @router.get("/restaurants/{restaurant_id}/caffesta/order-status/{order_id}")
 async def get_caffesta_order_status(restaurant_id: str, order_id: str, current_user: dict = Depends(get_current_user)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
     order = await db.orders.find_one({"id": order_id, "restaurant_id": restaurant_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
@@ -131,7 +131,7 @@ async def get_caffesta_order_status(restaurant_id: str, order_id: str, current_u
 
 @router.get("/restaurants/{restaurant_id}/caffesta/analytics")
 async def get_caffesta_analytics(restaurant_id: str, days: int = 30, current_user: dict = Depends(get_current_user)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
 
     end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -216,7 +216,7 @@ async def get_caffesta_analytics(restaurant_id: str, days: int = 30, current_use
 @router.get("/restaurants/{restaurant_id}/caffesta/sales-report")
 async def get_caffesta_sales_report(restaurant_id: str, days: int = 7, cashier: str = "", current_user: dict = Depends(get_current_user)):
     """Detailed sales report by shift day with waiter/cashier filter."""
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
 
     end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -331,7 +331,7 @@ async def caffesta_time_window(
 ):
     """Sales within a specific day-of-week type and time-of-day window.
     Uses v1.1/draft/receipts_by_shift_day which provides real per-receipt timestamps."""
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
 
     if days < 1 or days > 120:
         raise HTTPException(400, "Период должен быть от 1 до 120 дней")
@@ -532,7 +532,7 @@ async def debug_raw_shift_day(
 ):
     """Debug: первые 5 строк из export_sales_shift_day за указанную дату."""
     from services.caffesta import caffesta_get_sales_shift_day
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
     if not date:
         date = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     res = await caffesta_get_sales_shift_day(restaurant_id, date, date)
@@ -562,7 +562,7 @@ async def debug_raw_receipts(
         caffesta_get_terminals as _t,
         caffesta_get_receipts_for_day as _fd,
     )
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
     cfg = await _g(restaurant_id)
     if not cfg or not cfg.get("enabled"):
         raise HTTPException(400, "Caffesta не настроена")
@@ -607,7 +607,7 @@ async def debug_raw_receipts(
 @router.post("/restaurants/{restaurant_id}/caffesta/stop-list/sync")
 async def sync_stop_list(restaurant_id: str, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
     """Fetch stop-list status from Caffesta (get_product_shop_data) and update menu items' availability."""
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta", current_user)
     res = await caffesta_get_product_shop_data(restaurant_id)
     if not res.get("ok"):
         raise HTTPException(status_code=400, detail=res.get("message", "Ошибка Caffesta"))

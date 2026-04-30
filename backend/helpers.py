@@ -34,6 +34,19 @@ async def create_superadmin():
     return admin
 
 
+async def migrate_enabled_modules():
+    """One-shot migration: existing restaurants get ALL modules enabled,
+    so behaviour is preserved for current customers. New restaurants will have empty list
+    by default unless superadmin enables modules explicitly."""
+    all_modules = ["caffesta", "caffesta_mapping", "telegram_bot", "cost_control", "factual_margin"]
+    res = await db.restaurants.update_many(
+        {"enabled_modules": {"$exists": False}},
+        {"$set": {"enabled_modules": all_modules}},
+    )
+    if res.modified_count:
+        print(f"Migration: enabled all modules for {res.modified_count} legacy restaurants")
+
+
 async def get_or_create_settings(restaurant_id: str):
     settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
     if not settings:

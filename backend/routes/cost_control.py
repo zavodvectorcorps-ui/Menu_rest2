@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from openpyxl import load_workbook
 from pydantic import BaseModel
 
-from auth import check_restaurant_access, get_current_user, ensure_can_write_system
+from auth import check_restaurant_access, get_current_user, ensure_can_write_system, ensure_module_access
 from database import db
 from helpers import get_or_create_settings
 from services.caffesta import get_caffesta_config, caffesta_get_balances
@@ -157,7 +157,7 @@ async def upload_costs(
     current_user: dict = Depends(get_current_user),
     _: dict = Depends(ensure_can_write_system),
 ):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
     content = await file.read()
     filename = (file.filename or "").lower()
 
@@ -185,7 +185,7 @@ async def upload_costs(
 
 @router.post("/restaurants/{restaurant_id}/costs/import-caffesta")
 async def import_caffesta_costs(restaurant_id: str, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
     config = await get_caffesta_config(restaurant_id)
     if not config or not config.get("enabled") or not config.get("api_key"):
         raise HTTPException(400, "Caffesta не настроена для этого ресторана")
@@ -209,7 +209,7 @@ async def import_caffesta_costs(restaurant_id: str, current_user: dict = Depends
 
 @router.get("/restaurants/{restaurant_id}/costs/analysis")
 async def costs_analysis(restaurant_id: str, current_user: dict = Depends(get_current_user)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
     settings = await get_or_create_settings(restaurant_id)
     items = await db.menu_items.find(
         {"restaurant_id": restaurant_id, "is_banner": {"$ne": True}}, {"_id": 0}
@@ -291,7 +291,7 @@ async def update_item_cost(
     current_user: dict = Depends(get_current_user),
     _: dict = Depends(ensure_can_write_system),
 ):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
     update = {}
     if payload.cost_price is not None:
         update["cost_price"] = payload.cost_price
@@ -320,7 +320,7 @@ async def update_category_threshold(
     current_user: dict = Depends(get_current_user),
     _: dict = Depends(ensure_can_write_system),
 ):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
     await db.categories.update_one(
         {"id": category_id, "restaurant_id": restaurant_id},
         {"$set": {"margin_threshold": payload.margin_threshold}},
@@ -434,7 +434,7 @@ async def trigger_alerts(
     restaurant_id: str, force: bool = False,
     current_user: dict = Depends(get_current_user),
 ):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
     result = await _send_margin_alerts(restaurant_id, force=force)
     return result
 
@@ -442,7 +442,7 @@ async def trigger_alerts(
 @router.post("/restaurants/{restaurant_id}/costs/reset-alerts")
 async def reset_alerts(restaurant_id: str, current_user: dict = Depends(get_current_user)):
     """Сбросить антиспам-историю — следующая проверка разошлёт алерты по всем критичным блюдам."""
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
     result = await db.menu_items.update_many(
         {"restaurant_id": restaurant_id},
         {"$unset": {"last_margin_alert_sig": "", "last_margin_alert_at": ""}},
@@ -460,7 +460,7 @@ async def factual_margin(
 ):
     """Compute FACTUAL margin by aggregating Caffesta receipts (uses self_cost_sum from each dish row).
     Returns per-product stats sorted by margin_pct ascending (lowest first)."""
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
     if days < 1 or days > 120:
         raise HTTPException(400, "Период должен быть от 1 до 120 дней")
 

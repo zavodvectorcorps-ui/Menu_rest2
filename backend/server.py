@@ -8,7 +8,7 @@ from pathlib import Path
 import logging
 
 from database import client
-from helpers import create_superadmin
+from helpers import create_superadmin, migrate_enabled_modules
 
 from routes.auth import router as auth_router
 from routes.restaurants import router as restaurants_router
@@ -70,6 +70,7 @@ async def startup():
     global scheduler
     logging.info("Starting up...")
     await create_superadmin()
+    await migrate_enabled_modules()
     # Daily digest at 08:00 Europe/Minsk (UTC+3, no DST)
     try:
         minsk_tz = ZoneInfo("Europe/Minsk")

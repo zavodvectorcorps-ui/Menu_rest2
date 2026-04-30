@@ -68,6 +68,9 @@ class Restaurant(BaseModel):
     logo_url: Optional[str] = ""
     working_hours: Optional[str] = ""
     slogan: Optional[str] = ""
+    # Feature flags — SaaS modules enabled for this restaurant.
+    # Possible values: 'caffesta', 'caffesta_mapping', 'telegram_bot', 'cost_control', 'factual_margin'
+    enabled_modules: List[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class RestaurantCreate(BaseModel):
@@ -77,6 +80,7 @@ class RestaurantCreate(BaseModel):
     address: Optional[str] = ""
     phone: Optional[str] = ""
     email: Optional[str] = ""
+    enabled_modules: Optional[List[str]] = None
 
 class RestaurantUpdate(BaseModel):
     name: Optional[str] = None
@@ -88,6 +92,7 @@ class RestaurantUpdate(BaseModel):
     logo_url: Optional[str] = None
     working_hours: Optional[str] = None
     slogan: Optional[str] = None
+    enabled_modules: Optional[List[str]] = None
 
 
 # ============ MENU MODELS ============

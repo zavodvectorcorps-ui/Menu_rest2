@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from rapidfuzz import fuzz, process as rfprocess
 
-from auth import check_restaurant_access, get_current_user, ensure_can_write_system
+from auth import check_restaurant_access, get_current_user, ensure_can_write_system, ensure_module_access
 from database import db
 from services.caffesta import caffesta_get_products
 
@@ -35,7 +35,7 @@ async def suggest_mapping(
 ):
     """Return top-3 Caffesta product candidates for each menu item with score >= threshold.
     If include_empty=True, also returns menu items without any candidates (for manual mapping)."""
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta_mapping", current_user)
 
     products_res = await caffesta_get_products(restaurant_id)
     if not products_res.get("ok"):
@@ -134,7 +134,7 @@ async def apply_mapping(
     _: dict = Depends(ensure_can_write_system),
 ):
     """Batch-apply caffesta_product_id to menu items."""
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "caffesta_mapping", current_user)
     updated = 0
     for m in payload.mappings:
         res = await db.menu_items.update_one(

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from database import db
 from models import TelegramBotUpdate
-from auth import get_current_user, check_restaurant_access, ensure_can_write_system
+from auth import get_current_user, check_restaurant_access, ensure_can_write_system, ensure_module_access
 from services.telegram import TELEGRAM_API, send_telegram_message
 
 router = APIRouter()
@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.get("/restaurants/{restaurant_id}/telegram-bot")
 async def get_telegram_bot(restaurant_id: str, current_user: dict = Depends(get_current_user)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "telegram_bot", current_user)
     settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
     bot_token = settings.get("telegram_bot_token", "") if settings else ""
 
@@ -48,7 +48,7 @@ async def get_telegram_bot(restaurant_id: str, current_user: dict = Depends(get_
 
 @router.put("/restaurants/{restaurant_id}/telegram-bot")
 async def update_telegram_bot(restaurant_id: str, data: TelegramBotUpdate, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "telegram_bot", current_user)
     bot_token = data.telegram_bot_token.strip()
     webhook_url = ""
 
@@ -108,7 +108,7 @@ async def update_telegram_bot(restaurant_id: str, data: TelegramBotUpdate, curre
 
 @router.delete("/restaurants/{restaurant_id}/telegram-bot")
 async def disconnect_telegram_bot(restaurant_id: str, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "telegram_bot", current_user)
 
     settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
     old_token = settings.get("telegram_bot_token") if settings else None
@@ -130,7 +130,7 @@ async def disconnect_telegram_bot(restaurant_id: str, current_user: dict = Depen
 
 @router.delete("/restaurants/{restaurant_id}/telegram-bot/subscribers/{chat_id}")
 async def remove_telegram_subscriber(restaurant_id: str, chat_id: str, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
-    await check_restaurant_access(current_user, restaurant_id)
+    await ensure_module_access(restaurant_id, "telegram_bot", current_user)
     await db.telegram_subscribers.delete_one({"restaurant_id": restaurant_id, "chat_id": chat_id})
     return {"message": "Подписчик удалён"}
 

@@ -51,15 +51,60 @@ async def require_superadmin(current_user: dict = Depends(get_current_user)):
 
 
 async def ensure_can_write_system(current_user: dict = Depends(get_current_user)):
-    """Block administrators from modifying 'Системные' sections.
-    Superadmin and manager can still write (manager already restricted by restaurant access).
+    """Block managers from modifying 'Системные' sections.
+    Superadmin: always allowed.
+    Administrator: allowed (per-module access enforced by ensure_module_access).
+    Manager: forbidden.
     """
-    if current_user.get("role") == UserRole.ADMINISTRATOR:
+    role = current_user.get("role")
+    if role not in (UserRole.SUPERADMIN, UserRole.ADMINISTRATOR):
         raise HTTPException(
             status_code=403,
-            detail="Раздел «Системные» доступен администратору только для чтения. Обратитесь к суперадмину.",
+            detail="Раздел «Системные» доступен только администратору ресторана и суперадмину.",
         )
     return current_user
+
+
+# Whitelist of system-section modules that can be toggled per-restaurant
+SYSTEM_MODULES = {
+    "caffesta",
+    "caffesta_mapping",
+    "telegram_bot",
+    "cost_control",
+    "factual_margin",
+}
+
+
+async def ensure_module_access(restaurant_id: str, module: str, user: dict, write: bool = False) -> None:
+    """Verify that:
+      - module is enabled for this restaurant (feature flag),
+      - user has access to the restaurant,
+      - user role is allowed to use the module.
+
+    Superadmin: bypass all checks (regardless of feature flag).
+    Administrator: must have restaurant access AND module must be enabled.
+    Manager: forbidden for system modules.
+
+    Raises 403/404 with a clear Russian message.
+    """
+    role = user.get("role")
+    if role == UserRole.SUPERADMIN:
+        return
+    if write and role == UserRole.MANAGER:
+        raise HTTPException(status_code=403, detail="Менеджер не имеет доступа к разделу «Системные»")
+    if role not in (UserRole.SUPERADMIN, UserRole.ADMINISTRATOR):
+        raise HTTPException(status_code=403, detail="Раздел доступен только администратору")
+    if restaurant_id not in user.get("restaurant_ids", []):
+        raise HTTPException(status_code=403, detail="Нет доступа к этому ресторану")
+    rest = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0, "enabled_modules": 1})
+    if not rest:
+        raise HTTPException(status_code=404, detail="Ресторан не найден")
+    enabled = rest.get("enabled_modules") or []
+    if module not in enabled:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Модуль «{module}» не подключён для этого ресторана. Обратитесь к суперадмину.",
+        )
 
 async def check_restaurant_access(user: dict, restaurant_id: str):
     if user.get("role") == UserRole.SUPERADMIN:
