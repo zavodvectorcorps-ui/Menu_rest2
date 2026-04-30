@@ -199,12 +199,26 @@ export default function AdminLayout() {
         {/* Logo/Header with Restaurant Selector */}
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-mint-500 flex items-center justify-center">
-                <UtensilsCrossed className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Личный кабинет</p>
+            <div className="flex items-center gap-3 min-w-0">
+              {currentRestaurant?.logo_url ? (
+                <img
+                  src={currentRestaurant.logo_url}
+                  alt={currentRestaurant.name || 'Logo'}
+                  className="w-10 h-10 rounded-xl object-cover flex-shrink-0"
+                  data-testid="brand-logo"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-mint-500 flex items-center justify-center flex-shrink-0">
+                  <UtensilsCrossed className="w-5 h-5 text-white" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-heading font-semibold truncate" data-testid="brand-name">
+                  {currentRestaurant?.name || 'Личный кабинет'}
+                </p>
+                {currentRestaurant?.slogan && (
+                  <p className="text-xs text-muted-foreground truncate">{currentRestaurant.slogan}</p>
+                )}
               </div>
             </div>
             <Button
