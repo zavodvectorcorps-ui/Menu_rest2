@@ -112,13 +112,29 @@ BLOCK_EOF
     SERVER_BLOCK=${SERVER_BLOCK//__DOMAIN__/$DOMAIN}
     SERVER_BLOCK=${SERVER_BLOCK//__ALL_DOMAINS__/$ALL_DOMAINS}
 
-    # Insert before the final closing '}' of http {} block
+    # Insert before the LAST closing '}' of the file (which is the closer of
+    # the http {} block). Naive "first ^}$ wins" inserts after events {} —
+    # that's how rest-menu.by went down on 2026-05-02.
+    BLOCK_FILE=$(mktemp)
+    printf '%s\n' "$SERVER_BLOCK" > "$BLOCK_FILE"
     TMP_FILE=$(mktemp)
-    awk -v block="$SERVER_BLOCK" '
-        /^}$/ && !inserted { print block; inserted=1 }
-        { print }
-    ' "$NGINX_CONF" > "$TMP_FILE" && mv "$TMP_FILE" "$NGINX_CONF"
-    ok "Server-блок добавлен"
+    python3 - "$NGINX_CONF" "$TMP_FILE" "$BLOCK_FILE" <<'PYEOF'
+import sys, pathlib
+src = pathlib.Path(sys.argv[1]).read_text().splitlines(keepends=True)
+block = pathlib.Path(sys.argv[3]).read_text()
+last_close = max(i for i, line in enumerate(src) if line.rstrip() == "}")
+src.insert(last_close, block if block.endswith("\n") else block + "\n")
+pathlib.Path(sys.argv[2]).write_text("".join(src))
+PYEOF
+    rm -f "$BLOCK_FILE"
+    mv "$TMP_FILE" "$NGINX_CONF"
+    # Validate config syntax before restarting nginx — fail fast if broken.
+    if ! docker run --rm -v "$NGINX_CONF":/etc/nginx/nginx.conf:ro nginx:alpine nginx -t -c /etc/nginx/nginx.conf >/dev/null 2>&1; then
+        warn "Конфиг nginx после вставки невалиден — откатываюсь к git."
+        git checkout HEAD -- "$NGINX_CONF" 2>/dev/null || true
+        err "Не удалось безопасно вставить server-блок. nginx.conf откачен."
+    fi
+    ok "Server-блок добавлен и проверен (nginx -t)"
 fi
 
 # -------- 2. Make sure nginx is up so certbot HTTP-01 challenge works --------
