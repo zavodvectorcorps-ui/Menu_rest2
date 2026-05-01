@@ -255,7 +255,7 @@ export default function AdminLayout() {
                     onClick={() => switchRestaurant(r.id)}
                     className={cn(
                       "cursor-pointer",
-                      r.id === currentRestaurantId && "bg-mint-50 dark:bg-mint-900/20"
+                      r.id === currentRestaurantId && "bg-mint-500 text-white focus:bg-mint-600 focus:text-white data-[highlighted]:bg-mint-600 data-[highlighted]:text-white"
                     )}
                   >
                     <Building2 className="w-4 h-4 mr-2" />
