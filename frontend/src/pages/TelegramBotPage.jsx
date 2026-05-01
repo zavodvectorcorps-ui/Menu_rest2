@@ -189,9 +189,29 @@ export default function TelegramBotPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Webhook:</span>
-                <Badge variant={webhookSet ? "default" : "destructive"} className={webhookSet ? "bg-green-500/10 text-green-600 border-green-200" : ""}>
-                  {webhookSet ? 'Установлен' : 'Не установлен'}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant={webhookSet ? "default" : "destructive"} className={webhookSet ? "bg-green-500/10 text-green-600 border-green-200" : ""}>
+                    {webhookSet ? 'Установлен' : 'Не установлен'}
+                  </Badge>
+                  {!webhookSet && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const res = await axios.post(`${API}/restaurants/${currentRestaurantId}/telegram-bot/webhook/reset`, {}, { headers: { Authorization: `Bearer ${token}` } });
+                          toast.success('Webhook установлен');
+                          load();
+                        } catch (e) {
+                          toast.error(e.response?.data?.detail || 'Ошибка установки webhook');
+                        }
+                      }}
+                      data-testid="btn-reset-webhook"
+                    >
+                      Переустановить
+                    </Button>
+                  )}
+                </div>
               </div>
               <p className="text-xs text-muted-foreground">
                 Отправьте ссылку на бота персоналу. После нажатия /start они будут получать уведомления о вызовах и заказах.

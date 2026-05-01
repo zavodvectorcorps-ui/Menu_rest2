@@ -106,6 +106,59 @@ async def update_telegram_bot(restaurant_id: str, data: TelegramBotUpdate, curre
     return {"message": "Настройки бота обновлены", "webhook_url": webhook_url if bot_token else ""}
 
 
+@router.post("/restaurants/{restaurant_id}/telegram-bot/webhook/reset")
+async def reset_telegram_webhook(
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user),
+    _: dict = Depends(ensure_can_write_system),
+):
+    """Re-set webhook for the existing bot. Useful when webhook dropped after
+    restart/migration. Returns actual Telegram response."""
+    await ensure_module_access(restaurant_id, "telegram_bot", current_user)
+    settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
+    if not settings or not settings.get("telegram_bot_token"):
+        raise HTTPException(status_code=400, detail="Сначала сохраните токен бота")
+    bot_token = settings["telegram_bot_token"]
+
+    # Resolve base URL: env var first, fall back to frontend .env
+    base_url = os.environ.get("PUBLIC_BASE_URL") or os.environ.get("REACT_APP_BACKEND_URL") or ""
+    if not base_url:
+        frontend_env = Path(__file__).parent.parent.parent / "frontend" / ".env"
+        if frontend_env.exists():
+            for line in frontend_env.read_text().splitlines():
+                if line.startswith("REACT_APP_BACKEND_URL="):
+                    base_url = line.split("=", 1)[1].strip()
+                    break
+    if not base_url:
+        raise HTTPException(status_code=500, detail="Не задан PUBLIC_BASE_URL в backend/.env")
+    base_url = base_url.rstrip("/")
+    webhook_url = f"{base_url}/api/telegram/webhook/{restaurant_id}"
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            # Drop pending updates so that old messages don't flood
+            r = await client.post(
+                f"{TELEGRAM_API}{bot_token}/setWebhook",
+                json={"url": webhook_url, "drop_pending_updates": True},
+            )
+            body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+            if not body.get("ok"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Telegram отклонил webhook: {body.get('description') or r.text[:200]}",
+                )
+            # Verify it actually set
+            info = await client.get(f"{TELEGRAM_API}{bot_token}/getWebhookInfo")
+            info_body = info.json() if info.headers.get("content-type", "").startswith("application/json") else {}
+            actual_url = (info_body.get("result") or {}).get("url") or ""
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка Telegram API: {e}")
+
+    return {"ok": True, "webhook_url": webhook_url, "actual_url": actual_url}
+
+
 @router.delete("/restaurants/{restaurant_id}/telegram-bot")
 async def disconnect_telegram_bot(restaurant_id: str, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
     await ensure_module_access(restaurant_id, "telegram_bot", current_user)
