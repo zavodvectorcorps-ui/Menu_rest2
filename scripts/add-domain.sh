@@ -66,7 +66,30 @@ else
     ok "DNS корректно указывает на этот сервер"
 fi
 
-# -------- 1. Add nginx server-block (idempotent) --------
+# -------- 1. Make sure nginx is up so certbot HTTP-01 challenge works --------
+# (Existing nginx already has a port-80 catch-all server with location
+#  /.well-known/acme-challenge/ that catches any Host, so we can issue a cert
+#  for the new domain BEFORE adding any HTTPS server-block for it.)
+log "Поднимаю nginx (для ACME challenge на порту 80)"
+docker compose up -d nginx >/dev/null
+
+# -------- 2. Issue Let's Encrypt certificate FIRST --------
+DOMAIN_ARGS=""
+for d in $ALL_DOMAINS; do DOMAIN_ARGS="$DOMAIN_ARGS -d $d"; done
+
+if [ -d "$PROJECT_DIR/nginx/ssl/live/$DOMAIN" ]; then
+    warn "Сертификат для ${DOMAIN} уже существует. Пропускаю выпуск."
+else
+    log "Получаю SSL-сертификат Let's Encrypt для ${ALL_DOMAINS}"
+    docker compose run --rm --entrypoint "\
+        certbot certonly --webroot -w /var/www/certbot \
+        --email admin@${DOMAIN} --agree-tos --no-eff-email \
+        $DOMAIN_ARGS" certbot \
+        || err "Certbot failed. Возможные причины: DNS не указывает на этот сервер, порт 80 закрыт, или Let's Encrypt rate limit."
+    ok "Сертификат получен"
+fi
+
+# -------- 3. Add nginx HTTPS server-block (idempotent, cert уже на месте) --------
 if grep -qE "server_name[^;]*\b${DOMAIN}\b" "$NGINX_CONF"; then
     warn "Домен ${DOMAIN} уже есть в nginx.conf. Пропускаю шаг добавления конфига."
 else
@@ -112,9 +135,12 @@ BLOCK_EOF
     SERVER_BLOCK=${SERVER_BLOCK//__DOMAIN__/$DOMAIN}
     SERVER_BLOCK=${SERVER_BLOCK//__ALL_DOMAINS__/$ALL_DOMAINS}
 
-    # Insert before the LAST closing '}' of the file (which is the closer of
-    # the http {} block). Naive "first ^}$ wins" inserts after events {} —
-    # that's how rest-menu.by went down on 2026-05-02.
+    # Backup current valid config in case we need to roll back manually
+    cp "$NGINX_CONF" "${NGINX_CONF}.bak.$(date +%s)"
+
+    # Insert before the LAST closing '}' of the file (closer of http {}).
+    # Naive "first ^}$ wins" inserts after events {} — that's how rest-menu.by
+    # went down on 2026-05-02.
     BLOCK_FILE=$(mktemp)
     printf '%s\n' "$SERVER_BLOCK" > "$BLOCK_FILE"
     TMP_FILE=$(mktemp)
@@ -128,33 +154,21 @@ pathlib.Path(sys.argv[2]).write_text("".join(src))
 PYEOF
     rm -f "$BLOCK_FILE"
     mv "$TMP_FILE" "$NGINX_CONF"
-    # Validate config syntax before restarting nginx — fail fast if broken.
-    if ! docker run --rm -v "$NGINX_CONF":/etc/nginx/nginx.conf:ro nginx:alpine nginx -t -c /etc/nginx/nginx.conf >/dev/null 2>&1; then
+
+    # Validate before reloading nginx. Mount BOTH the conf AND the SSL dir so
+    # the cert files are visible to nginx -t (otherwise it fails on missing
+    # ssl_certificate path).
+    log "Проверяю nginx -t..."
+    NGINX_TEST_OUTPUT=$(docker run --rm \
+        -v "$NGINX_CONF":/etc/nginx/nginx.conf:ro \
+        -v "$PROJECT_DIR/nginx/ssl":/etc/nginx/ssl:ro \
+        nginx:alpine nginx -t -c /etc/nginx/nginx.conf 2>&1) || {
+        echo "$NGINX_TEST_OUTPUT" | sed 's/^/  /'
         warn "Конфиг nginx после вставки невалиден — откатываюсь к git."
         git checkout HEAD -- "$NGINX_CONF" 2>/dev/null || true
         err "Не удалось безопасно вставить server-блок. nginx.conf откачен."
-    fi
+    }
     ok "Server-блок добавлен и проверен (nginx -t)"
-fi
-
-# -------- 2. Make sure nginx is up so certbot HTTP-01 challenge works --------
-log "Поднимаю nginx (для ACME challenge)"
-docker compose up -d nginx >/dev/null
-
-# -------- 3. Issue Let's Encrypt certificate --------
-DOMAIN_ARGS=""
-for d in $ALL_DOMAINS; do DOMAIN_ARGS="$DOMAIN_ARGS -d $d"; done
-
-if [ -d "$PROJECT_DIR/nginx/ssl/live/$DOMAIN" ]; then
-    warn "Сертификат для ${DOMAIN} уже существует. Пропускаю выпуск."
-else
-    log "Получаю SSL-сертификат Let's Encrypt для ${ALL_DOMAINS}"
-    docker compose run --rm --entrypoint "\
-        certbot certonly --webroot -w /var/www/certbot \
-        --email admin@${DOMAIN} --agree-tos --no-eff-email \
-        $DOMAIN_ARGS" certbot \
-        || err "Certbot failed. Возможные причины: DNS не указывает на этот сервер, порт 80 закрыт, или Let's Encrypt rate limit."
-    ok "Сертификат получен"
 fi
 
 # -------- 4. Reload nginx --------
