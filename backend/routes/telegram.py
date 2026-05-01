@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime, timezone
 import os
 import logging
@@ -11,6 +11,48 @@ from auth import get_current_user, check_restaurant_access, ensure_can_write_sys
 from services.telegram import TELEGRAM_API, send_telegram_message
 
 router = APIRouter()
+
+
+def _resolve_public_base_url(request: Request | None = None) -> str:
+    """Return public base URL for webhooks.
+
+    Priority:
+    1. PUBLIC_BASE_URL env var (explicit override)
+    2. Origin/Referer/forwarded headers from the admin request (the domain the
+       admin is currently using — works for any tenant domain automatically)
+    3. frontend/.env REACT_APP_BACKEND_URL (legacy fallback for local dev)
+    """
+    # 1. Explicit env override
+    base = (os.environ.get("PUBLIC_BASE_URL") or "").strip()
+    if base:
+        return base.rstrip("/")
+
+    # 2. Derive from incoming admin request (works on any domain)
+    if request is not None:
+        forwarded_host = (
+            request.headers.get("x-forwarded-host")
+            or request.headers.get("host")
+            or ""
+        ).strip()
+        proto = (
+            request.headers.get("x-forwarded-proto")
+            or request.url.scheme
+            or "https"
+        ).strip()
+        if forwarded_host:
+            return f"{proto}://{forwarded_host}".rstrip("/")
+
+    # 3. Legacy: read frontend/.env (only useful in local dev, not in container)
+    frontend_env = Path(__file__).parent.parent.parent / "frontend" / ".env"
+    if frontend_env.exists():
+        try:
+            for line in frontend_env.read_text().splitlines():
+                if line.startswith("REACT_APP_BACKEND_URL="):
+                    return line.split("=", 1)[1].strip().rstrip("/")
+        except Exception:
+            pass
+
+    return ""
 
 
 @router.get("/restaurants/{restaurant_id}/telegram-bot")
@@ -47,7 +89,7 @@ async def get_telegram_bot(restaurant_id: str, current_user: dict = Depends(get_
 
 
 @router.put("/restaurants/{restaurant_id}/telegram-bot")
-async def update_telegram_bot(restaurant_id: str, data: TelegramBotUpdate, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
+async def update_telegram_bot(restaurant_id: str, data: TelegramBotUpdate, request: Request, current_user: dict = Depends(get_current_user), _: dict = Depends(ensure_can_write_system)):
     await ensure_module_access(restaurant_id, "telegram_bot", current_user)
     bot_token = data.telegram_bot_token.strip()
     webhook_url = ""
@@ -61,15 +103,10 @@ async def update_telegram_bot(restaurant_id: str, data: TelegramBotUpdate, curre
         except httpx.RequestError:
             raise HTTPException(status_code=400, detail="Не удалось подключиться к Telegram API")
 
-        webhook_url = f"{os.environ.get('REACT_APP_BACKEND_URL', '')}/api/telegram/webhook/{restaurant_id}"
-        frontend_env_path = Path(__file__).parent.parent.parent / "frontend" / ".env"
-        if frontend_env_path.exists():
-            with open(frontend_env_path) as f:
-                for line in f:
-                    if line.startswith("REACT_APP_BACKEND_URL="):
-                        external_url = line.split("=", 1)[1].strip()
-                        webhook_url = f"{external_url}/api/telegram/webhook/{restaurant_id}"
-                        break
+        base_url = _resolve_public_base_url(request)
+        if not base_url:
+            raise HTTPException(status_code=500, detail="Не удалось определить публичный URL для webhook. Задайте PUBLIC_BASE_URL в окружении backend.")
+        webhook_url = f"{base_url}/api/telegram/webhook/{restaurant_id}"
 
         try:
             async with httpx.AsyncClient(timeout=10) as client:
@@ -109,6 +146,7 @@ async def update_telegram_bot(restaurant_id: str, data: TelegramBotUpdate, curre
 @router.post("/restaurants/{restaurant_id}/telegram-bot/webhook/reset")
 async def reset_telegram_webhook(
     restaurant_id: str,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     _: dict = Depends(ensure_can_write_system),
 ):
@@ -120,18 +158,9 @@ async def reset_telegram_webhook(
         raise HTTPException(status_code=400, detail="Сначала сохраните токен бота")
     bot_token = settings["telegram_bot_token"]
 
-    # Resolve base URL: env var first, fall back to frontend .env
-    base_url = os.environ.get("PUBLIC_BASE_URL") or os.environ.get("REACT_APP_BACKEND_URL") or ""
+    base_url = _resolve_public_base_url(request)
     if not base_url:
-        frontend_env = Path(__file__).parent.parent.parent / "frontend" / ".env"
-        if frontend_env.exists():
-            for line in frontend_env.read_text().splitlines():
-                if line.startswith("REACT_APP_BACKEND_URL="):
-                    base_url = line.split("=", 1)[1].strip()
-                    break
-    if not base_url:
-        raise HTTPException(status_code=500, detail="Не задан PUBLIC_BASE_URL в backend/.env")
-    base_url = base_url.rstrip("/")
+        raise HTTPException(status_code=500, detail="Не удалось определить публичный URL для webhook. Задайте PUBLIC_BASE_URL в окружении backend.")
     webhook_url = f"{base_url}/api/telegram/webhook/{restaurant_id}"
 
     try:

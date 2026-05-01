@@ -1,13 +1,11 @@
 # Test Credentials
 
-## Admin (superadmin)
-- username: `admin`
-- password: `220066`
+## Web Application
 
-## Administrator (test)
-- username: `admin_test`
-- password: `adm123`
-- restaurant_ids: ["aa25189d-d668-4838-915a-c5d936547f3f"]
-- доступ: read-only к разделу «Системные» (Telegram-бот, Caffesta, Маппинг, Контроль цен, Факт. маржа)
+**Superadmin (полный доступ, видит всё):**
+- Username: `admin`
+- Password: `220066`
 
-Login endpoint: `POST /api/auth/login` with `{"username": "admin", "password": "220066"}`
+**Administrator (read-only для системных модулей):**
+- Username: `admin_test`
+- Password: `test123456`

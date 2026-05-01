@@ -1,8 +1,11 @@
 # PRD: Личный кабинет ресторана
 
 ## Дата создания: 2026-01-26
-## Последнее обновление: 2026-04-21
+## Последнее обновление: 2026-05-02
 
+### Изменения 2026-05-02
+- **Telegram webhook auto-detect (P0, DONE)**: webhook URL теперь вычисляется автоматически из заголовков входящего запроса админа (`X-Forwarded-Host` + `X-Forwarded-Proto`). Помощник `_resolve_public_base_url()` в `routes/telegram.py`. `PUBLIC_BASE_URL` env-переменная остаётся опциональным override. Фикс ошибки "Не задан PUBLIC_BASE_URL" при подключении бота на новых ресторанах (Мясная лавка).
+- **Защита Nginx от 502 Bad Gateway (P0, DONE)**: `nginx/nginx.conf` использует встроенный DNS Docker (`resolver 127.0.0.11 valid=10s`) и динамический upstream через переменные (`set $backend_upstream "backend:8001"; proxy_pass http://$backend_upstream;`). При пересборке backend-контейнера Nginx автоматически перерезолвит новый IP без рестарта. Добавлен `proxy_next_upstream` для отказоустойчивости и `X-Forwarded-Host` для авторезолва webhook-домена.
 
 ### Изменения 2026-04-27 (часть 2)
 - **Fuzzy-маппинг блюд с Caffesta (P1, DONE)**:
