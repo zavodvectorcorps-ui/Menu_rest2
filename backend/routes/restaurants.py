@@ -1,4 +1,7 @@
 import re
+import socket
+import asyncio
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from database import db
 from models import Restaurant, RestaurantCreate, RestaurantUpdate
@@ -109,3 +112,82 @@ async def delete_restaurant(restaurant_id: str, current_user: dict = Depends(req
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Ресторан не найден")
     return {"message": "Ресторан удален"}
+
+
+@router.get("/restaurants/{restaurant_id}/domains/check")
+async def check_custom_domain(
+    restaurant_id: str,
+    domain: str,
+    current_user: dict = Depends(require_superadmin),
+):
+    """Diagnose whether a custom domain is fully wired up.
+
+    Performs three checks:
+    1. DNS — does the domain resolve at all?
+    2. HTTPS reachable — does GET https://{domain}/api/health succeed?
+    3. Domain bound to THIS restaurant in DB?
+
+    Returns a structured object the UI can render as a green/yellow/red traffic
+    light. Does NOT modify anything (read-only diagnostic).
+    """
+    restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Ресторан не найден")
+
+    domain = (domain or "").strip().lower().replace("https://", "").replace("http://", "").split("/", 1)[0].split(":", 1)[0]
+    if not domain:
+        raise HTTPException(status_code=400, detail="Не указан домен")
+
+    result = {
+        "domain": domain,
+        "dns": {"ok": False, "ips": [], "error": None},
+        "https": {"ok": False, "status_code": None, "error": None},
+        "binding": {"ok": False, "bound_to": None},
+        "overall": "error",
+        "summary": "",
+    }
+
+    # 1. DNS check
+    try:
+        infos = await asyncio.get_event_loop().getaddrinfo(domain, 443, type=socket.SOCK_STREAM)
+        ips = sorted({info[4][0] for info in infos})
+        result["dns"]["ips"] = ips
+        result["dns"]["ok"] = bool(ips)
+    except Exception as e:
+        result["dns"]["error"] = str(e)
+
+    # 2. HTTPS reachability — hit /api/health (defined in routes/seed.py)
+    try:
+        async with httpx.AsyncClient(timeout=8, verify=True, follow_redirects=False) as client:
+            r = await client.get(f"https://{domain}/api/health")
+            result["https"]["status_code"] = r.status_code
+            result["https"]["ok"] = r.status_code == 200
+    except httpx.ConnectError as e:
+        result["https"]["error"] = f"Не удалось подключиться: {e}"
+    except Exception as e:
+        result["https"]["error"] = str(e)
+
+    # 3. Binding check
+    bound = await db.restaurants.find_one({"custom_domains": domain}, {"_id": 0, "id": 1, "name": 1})
+    if bound:
+        result["binding"]["bound_to"] = {"id": bound["id"], "name": bound.get("name")}
+        result["binding"]["ok"] = bound["id"] == restaurant_id
+
+    # Overall verdict
+    if result["dns"]["ok"] and result["https"]["ok"] and result["binding"]["ok"]:
+        result["overall"] = "ok"
+        result["summary"] = f"✓ Домен полностью настроен и привязан к ресторану «{restaurant.get('name','')}»."
+    elif not result["dns"]["ok"]:
+        result["overall"] = "error"
+        result["summary"] = f"DNS не настроен. Сделайте A-запись {domain} → IP вашего VPS у регистратора."
+    elif not result["https"]["ok"]:
+        result["overall"] = "warning"
+        result["summary"] = f"DNS настроен ({', '.join(result['dns']['ips'])}), но HTTPS не отвечает. Запустите на VPS: ./scripts/add-domain.sh {domain}"
+    elif not result["binding"]["ok"]:
+        result["overall"] = "warning"
+        if result["binding"]["bound_to"]:
+            result["summary"] = f"Домен HTTPS работает, но привязан к другому ресторану «{result['binding']['bound_to']['name']}»."
+        else:
+            result["summary"] = "Домен отвечает, но не сохранён в списке custom_domains этого ресторана."
+
+    return result

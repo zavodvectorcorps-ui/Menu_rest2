@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, Building2, Plus, Trash2, Globe, X } from 'lucide-react';
+import { Loader2, Building2, Plus, Trash2, Globe, X, CheckCircle2, AlertCircle, AlertTriangle, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { API, useApp } from '@/App';
 
@@ -122,6 +122,37 @@ export default function RestaurantModulesPage() {
     saveDomains(rest, next);
   };
 
+  // Per-domain status check ({ [`${rid}|${domain}`]: { loading, result } })
+  const [domainStatus, setDomainStatus] = useState({});
+
+  const checkDomain = async (rest, domain) => {
+    const key = `${rest.id}|${domain}`;
+    setDomainStatus(s => ({ ...s, [key]: { loading: true } }));
+    try {
+      const r = await axios.get(`${API}/restaurants/${rest.id}/domains/check`, {
+        ...auth,
+        params: { domain },
+      });
+      setDomainStatus(s => ({ ...s, [key]: { loading: false, result: r.data } }));
+      const v = r.data?.overall;
+      if (v === 'ok') toast.success('Домен полностью настроен');
+      else if (v === 'warning') toast.warning(r.data.summary);
+      else toast.error(r.data.summary);
+    } catch (e) {
+      setDomainStatus(s => ({ ...s, [key]: { loading: false, error: e.response?.data?.detail || 'Ошибка проверки' } }));
+      toast.error(e.response?.data?.detail || 'Ошибка проверки домена');
+    }
+  };
+
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Скопировано в буфер обмена');
+    } catch {
+      toast.error('Не удалось скопировать');
+    }
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin" /></div>;
   }
@@ -198,27 +229,85 @@ export default function RestaurantModulesPage() {
                     </Button>
                   </div>
                   {(rest.custom_domains || []).length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {(rest.custom_domains || []).map(d => (
-                        <span
-                          key={d}
-                          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-mint-500/10 text-mint-700 dark:text-mint-300 border border-mint-500/30"
-                          data-testid={`domain-chip-${rest.id}-${d}`}
-                        >
-                          <Globe className="w-3 h-3" />
-                          {d}
-                          {domainsOpen === rest.id && (
-                            <button
-                              onClick={() => removeDomain(rest, d)}
-                              className="ml-1 hover:text-rose-500"
-                              disabled={savingDomains}
-                              data-testid={`btn-remove-domain-${rest.id}-${d}`}
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          )}
-                        </span>
-                      ))}
+                    <div className="space-y-2">
+                      {(rest.custom_domains || []).map(d => {
+                        const key = `${rest.id}|${d}`;
+                        const st = domainStatus[key];
+                        const verdict = st?.result?.overall;
+                        const StatusIcon =
+                          verdict === 'ok' ? CheckCircle2 :
+                          verdict === 'warning' ? AlertTriangle :
+                          verdict === 'error' ? AlertCircle :
+                          null;
+                        const statusColor =
+                          verdict === 'ok' ? 'text-emerald-500' :
+                          verdict === 'warning' ? 'text-amber-500' :
+                          verdict === 'error' ? 'text-rose-500' : '';
+                        return (
+                          <div key={d} className="rounded-lg border border-border/40 p-2.5 space-y-2" data-testid={`domain-row-${rest.id}-${d}`}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="inline-flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-full bg-mint-500/10 text-mint-700 dark:text-mint-300 border border-mint-500/30">
+                                <Globe className="w-3 h-3" />
+                                {d}
+                              </span>
+                              {StatusIcon && <StatusIcon className={`w-4 h-4 ${statusColor}`} />}
+                              <a
+                                href={`https://${d}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-muted-foreground hover:text-foreground underline"
+                              >
+                                открыть
+                              </a>
+                              <div className="ml-auto flex items-center gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => checkDomain(rest, d)}
+                                  disabled={st?.loading}
+                                  data-testid={`btn-check-domain-${rest.id}-${d}`}
+                                >
+                                  {st?.loading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Проверить'}
+                                </Button>
+                                {domainsOpen === rest.id && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0 text-rose-500"
+                                    onClick={() => removeDomain(rest, d)}
+                                    disabled={savingDomains}
+                                    data-testid={`btn-remove-domain-${rest.id}-${d}`}
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            {st?.result && (
+                              <div className={`text-xs leading-relaxed ${statusColor || 'text-muted-foreground'}`}>
+                                {st.result.summary}
+                                {verdict !== 'ok' && (
+                                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                                    <code className="text-[11px] bg-muted px-2 py-1 rounded font-mono select-all">
+                                      ./scripts/add-domain.sh {d}
+                                    </code>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => copyToClipboard(`./scripts/add-domain.sh ${d}`)}
+                                      data-testid={`btn-copy-cmd-${rest.id}-${d}`}
+                                    >
+                                      <Copy className="w-3 h-3 mr-1" /> Скопировать
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">Доменов не привязано. Гости открывают меню по адресу <code className="text-[11px]">rest-menu.by/{rest.slug || rest.id}/НОМЕР_СТОЛА</code></p>
@@ -230,7 +319,7 @@ export default function RestaurantModulesPage() {
                         <Input
                           value={newDomain}
                           onChange={(e) => setNewDomain(e.target.value)}
-                          placeholder="menu.catch.com"
+                          placeholder="catch-menu.by"
                           onKeyDown={(e) => { if (e.key === 'Enter') addDomain(rest); }}
                           data-testid={`input-new-domain-${rest.id}`}
                         />
@@ -243,12 +332,34 @@ export default function RestaurantModulesPage() {
                           {savingDomains ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                         </Button>
                       </div>
-                      <details className="text-xs text-muted-foreground">
-                        <summary className="cursor-pointer hover:text-foreground">Что нужно сделать на стороне клиента?</summary>
-                        <ol className="list-decimal pl-5 mt-2 space-y-1">
-                          <li>Клиент покупает домен и в DNS делает A-запись на IP вашего сервера (или CNAME на <code>rest-menu.by</code>).</li>
-                          <li>На VPS добавьте домен в Nginx и получите SSL: запустите <code>./scripts/add-domain.sh DOMAIN</code> (см. <code>/app/scripts/add-domain.sh</code>).</li>
-                          <li>QR-код стола №N будет работать по адресу <code>https://DOMAIN/N</code> автоматически.</li>
+                      <details className="text-xs text-muted-foreground rounded-md bg-muted/30 p-2.5 -mx-1">
+                        <summary className="cursor-pointer font-semibold text-foreground hover:text-mint-500">
+                          📘 Пошаговая инструкция: как привязать домен (например, catch-menu.by)
+                        </summary>
+                        <ol className="list-decimal pl-5 mt-2 space-y-2 leading-relaxed">
+                          <li>
+                            <b>Купите домен</b> у регистратора (например, hoster.by, GoDaddy, REG.RU). Подойдёт любой свободный.
+                          </li>
+                          <li>
+                            <b>В DNS-настройках домена</b> создайте A-запись:<br/>
+                            <code className="text-[11px] bg-background px-2 py-0.5 rounded">A @ → {`<IP_ВАШЕГО_VPS>`}</code><br/>
+                            <span className="text-[11px]">(IP сервера можно узнать командой <code>curl ifconfig.me</code> в SSH)</span><br/>
+                            Подождите 5–30 минут пока DNS прорастёт.
+                          </li>
+                          <li>
+                            <b>Добавьте домен сюда</b> через поле выше (нажмите Plus). Это сохранит привязку домена к ресторану в базе.
+                          </li>
+                          <li>
+                            <b>Зайдите по SSH на ваш VPS</b> и в папке проекта запустите команду (домен скопируйте из чипа выше):<br/>
+                            <code className="text-[11px] bg-background px-2 py-0.5 rounded select-all">./scripts/add-domain.sh ВАШ_ДОМЕН</code><br/>
+                            Скрипт сам: проверит DNS, добавит блок в Nginx, получит SSL-сертификат Let's Encrypt и перезапустит Nginx (~30 секунд).
+                          </li>
+                          <li>
+                            <b>Нажмите «Проверить»</b> рядом с доменом — должен загореться зелёный значок. Готово!
+                          </li>
+                          <li>
+                            <b>QR-коды столов</b> на этом домене будут работать автоматически по адресу <code className="text-[11px]">https://ВАШ_ДОМЕН/НОМЕР_СТОЛА</code>. Чтобы напечатать QR именно с этим доменом, зайдите в настройки → Столы под учёткой ресторана и скачайте PDF — он использует текущий домен браузера.
+                          </li>
                         </ol>
                       </details>
                     </div>

@@ -1,0 +1,61 @@
+{
+  "summary": "Iteration 19 — GET /api/restaurants/{rid}/domains/check diagnostic endpoint + RestaurantModulesPage UI. Backend 8/9 pytest PASS (1 skipped: admin_test user isn't seeded in DB — same as iter18). Frontend e2e verified: domain row with chip + 'Проверить' button + 'открыть' link, real-time DNS+HTTPS+binding traffic-light, copy-cmd button on verdict!='ok', 6-step instruction details, idempotent add/remove. Regression on PUT custom_domains, menu-by-domain, qr-pdf still green.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/login", "issue": "admin_test user (credentials in /app/memory/test_credentials.md) cannot authenticate — returns 401 'Неверный логин или пароль'. Blocks verifying require_superadmin 403 path for a real non-super user. Same pre-existing issue as iter18. Workaround: seed admin_test on backend startup OR update test_credentials.md."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "RestaurantModulesPage / domain check toast", "issues": ["copyToClipboard shows 'Не удалось скопировать' toast inside headless Chromium (clipboard API denied without user-gesture permissions). Only affects automation/iframe contexts; fine in real user browser. Consider a document.execCommand('copy') fallback for embedded/iframe preview environments."]}
+    ]
+  },
+  "passed_tests": [
+    "BE: GET /api/restaurants/{MYATA}/domains/check without Bearer token → 403 (auth enforced)",
+    "BE: GET .../domains/check?domain=nonexistent-zzz12345.example.invalid → 200 overall='error', dns.ok=false, summary mentions DNS / A-запись",
+    "BE: GET .../domains/check?domain=rest-menu.by → 200, dns.ok=true with non-empty ips, overall∈{ok,warning}, full {https,binding} structure present",
+    "BE: GET .../domains/check?domain= (empty) → 400 'Не указан домен'",
+    "BE: GET .../domains/check?domain='HTTPS://Rest-Menu.by:443/foo' → 200, normalized data.domain=='rest-menu.by' (scheme/port/path stripped, lowercased)",
+    "BE: GET /api/restaurants/<unknown-uuid>/domains/check → 404 'Ресторан не найден'",
+    "BE: Regression — PUT /restaurants/{MYATA} custom_domains=['rest-menu.by'] OK; domains/check then reports binding.ok=true + bound_to.id==MYATA_ID; GET /public/menu-by-domain/1?host=rest-menu.by returns 200/404 (not 500). Final state restored to [].",
+    "BE: Regression — GET /restaurants/{rid}/tables/{tid}/qr-pdf?size=a5 returns application/pdf with %PDF- body.",
+    "FE: /admin/restaurant-modules — click 'Управление' for Мята, add 'rest-menu.by' via input + Plus → chip + 'открыть' link (href='https://rest-menu.by') + 'Проверить' button render (data-testid='domain-row-{rid}-{domain}').",
+    "FE: Click 'Проверить' → Loader2 spinner during fetch → green CheckCircle2 + summary '✓ Домен полностью настроен и привязан к ресторану «Мята Спортивная».' (text-emerald-500). Since binding=ok + dns=ok + https=ok, verdict='ok' and copy-cmd block correctly hidden.",
+    "FE: Add 'nonexistent-test-xyz.example.invalid' → click 'Проверить' → red AlertCircle (text-rose-500) + DNS error summary + code block './scripts/add-domain.sh nonexistent-test-xyz.example.invalid' + 'Скопировать' button (data-testid='btn-copy-cmd-{rid}-{domain}') all visible.",
+    "FE: details/summary '📘 Пошаговая инструкция…' expands to exactly 6 numbered list items.",
+    "FE: 'открыть' link target = https://{domain} as required.",
+    "FE: Remove (X) cleanly unbinds after test; domain row disappears; state restored."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter19_domain_check.py",
+    "/app/test_reports/pytest/iter19.xml"
+  ],
+  "action_items": [
+    "(low) Seed admin_test user with password test123456 on startup OR update /app/memory/test_credentials.md — currently unable to execute the non-superadmin 403 test.",
+    "(low) copyToClipboard: add execCommand('copy') fallback for embedded/iframe contexts where navigator.clipboard.writeText rejects."
+  ],
+  "critical_code_review_comments": [
+    "routes/restaurants.py check_custom_domain — DNS lookup via asyncio.get_event_loop().getaddrinfo(): asyncio.get_event_loop() is deprecated in Python 3.12+, prefer asyncio.get_running_loop(). Minor.",
+    "routes/restaurants.py check_custom_domain — httpx client timeout=8 is fine; however verify=True + follow_redirects=False means a site that 301→HTTPS primary path would report non-200; acceptable for diagnostic but worth a comment in UI text that redirects count as warning.",
+    "routes/restaurants.py check_custom_domain — binding check uses db.restaurants.find_one({'custom_domains': domain}). Since custom_domains is an array, Mongo will match any element ✓. Good.",
+    "RestaurantModulesPage.jsx — the 'Проверить' button is visible even when the panel is collapsed (domainsOpen !== rest.id), but remove (X) button is gated behind domainsOpen. Consistent UX intent: any operator can diagnose, only those actively managing can remove. OK.",
+    "RestaurantModulesPage.jsx — domainStatus state keyed by `${rid}|${domain}` — stale state persists across add/remove of same-named domain; not a bug (re-check overrides) but could be pruned on remove for cleanliness.",
+    "add-domain.sh was listed in files_of_reference but not verified at runtime (requires root + certbot on real VPS; out of scope for preview). Script file exists at /app/scripts/add-domain.sh and is syntactically valid bash (shellcheck-clean on spot review)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter19_domain_check.py"
+  ],
+  "success_rate": {
+    "backend": "100% of executable tests (8/8 passed, 1 legitimately skipped due to missing admin_test user)",
+    "frontend": "100% (all listed flows green: check button, status icons, copy-cmd, instructions, открыть link, cleanup)"
+  },
+  "test_credentials": {"superadmin": {"username": "admin", "password": "220066"}},
+  "seed_data_creation": "Test suite temporarily attaches rest-menu.by / nonexistent-test-xyz.example.invalid to Мята restaurant (aa25189d-d668-4838-915a-c5d936547f3f) and restores custom_domains=[] in a try/finally. Catch (d433dc80-...) was NOT modified. Final DB state = clean.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 19 is fully green. Reusable pytest: /app/backend/tests/test_iter19_domain_check.py (~4s, idempotent, self-restoring). For frontend retest, credentials admin/220066, MYATA_ID=aa25189d-d668-4838-915a-c5d936547f3f, test domain=rest-menu.by (resolves + is reachable from container). Do NOT permanently bind rest-menu.by outside tests; always clean up. Backend add-domain.sh not tested at runtime (needs real VPS root+certbot).",
+  "rca of the issue": "N/A — no defects. Two soft observations: (a) admin_test user isn't seeded so the 'non-super 403' test is skipped (pre-existing from iter18); (b) clipboard toast shows failure inside headless Chromium due to browser permissions, irrelevant for real users."
+}
