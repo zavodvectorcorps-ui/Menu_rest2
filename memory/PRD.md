@@ -3,6 +3,9 @@
 ## Дата создания: 2026-01-26
 ## Последнее обновление: 2026-05-02
 
+### Изменения 2026-05-02 (часть 3)
+- **Bulk QR PDF (P2, DONE)**: Endpoint `GET /api/restaurants/{rid}/tables/qr-pdf-all?size=a5|a6` возвращает один PDF со всеми активными столами ресторана (одна страница на стол). Используется общий хелпер `_qr_draw_page()` (рефакторинг single-PDF endpoint'а). Логотип скачивается один раз и переиспользуется. Кнопки «Все QR (A5)» и «Все QR (A6)» в шапке вкладки «Столы» в настройках. Идеально для отдачи в типографию одним файлом.
+
 ### Изменения 2026-05-02 (часть 2)
 - **Модуль "Корзина" (cart_only) (P1, DONE)**: Новый feature-flag `cart_only` в `enabled_modules`. Когда включён — гость собирает блюда в корзину, видит окно «Покажите заказ официанту» с номером стола, кнопками «Очистить» и «Готово». На кухню/в Telegram ничего не отправляется. Кнопки «+» в меню видны даже если `online_orders_enabled=false`. Реализовано в `ClientMenuPage.jsx` + переключатель в `RestaurantModulesPage.jsx`.
 - **Кастомные домены (P1, DONE)**: Поле `custom_domains: List[str]` в модели Restaurant. Суперадмин в `/admin/restaurant-modules` управляет списком доменов на каждом ресторане (нормализация к lowercase, без http/портов, проверка уникальности). Новый публичный endpoint `GET /api/public/menu-by-domain/{table_number}` определяет ресторан по Host-заголовку (или `?host=`). Frontend route `/:tableNumber` в режиме `domainMode` вызывает этот endpoint. Скрипт `/app/scripts/add-domain.sh DOMAIN` добавляет server-блок в Nginx + получает Let's Encrypt SSL.

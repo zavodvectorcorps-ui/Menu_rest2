@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Palette, Building2, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2, Link, Megaphone, Upload as UploadIcon, Image as ImageIcon } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Building2, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2, Link, Megaphone, Upload as UploadIcon, Image as ImageIcon, FileDown } from 'lucide-react';
 import ImageCropDialog from '@/components/ImageCropDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -324,6 +324,31 @@ export default function SettingsPage() {
       toast.success(`PDF (${size.toUpperCase()}) скачан`);
     } catch (e) {
       toast.error('Не удалось сформировать PDF');
+    }
+  };
+
+  const [bulkPdfLoading, setBulkPdfLoading] = useState(false);
+  const downloadAllQrPdf = async (size) => {
+    setBulkPdfLoading(true);
+    try {
+      const baseUrl = window.location.origin;
+      const resp = await axios.get(
+        `${API}/restaurants/${currentRestaurantId}/tables/qr-pdf-all?size=${size}&base_url=${encodeURIComponent(baseUrl)}`,
+        { ...authHeaders, responseType: 'blob' }
+      );
+      const url = URL.createObjectURL(new Blob([resp.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `qr_all_tables_${size}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`PDF со всеми столами (${size.toUpperCase()}) скачан`);
+    } catch (e) {
+      toast.error(e.response?.status === 404 ? 'У ресторана нет активных столов' : 'Не удалось сформировать PDF');
+    } finally {
+      setBulkPdfLoading(false);
     }
   };
 
@@ -875,19 +900,41 @@ export default function SettingsPage() {
         {/* Tables Tab */}
         <TabsContent value="tables" className="mt-6">
           <Card className="border-none shadow-md" data-testid="tables-card">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
               <div>
                 <CardTitle className="font-heading">Управление столами</CardTitle>
                 <CardDescription>QR-коды и ссылки для каждого стола</CardDescription>
               </div>
-              <Button 
-                className="bg-mint-500 hover:bg-mint-600 rounded-full"
-                onClick={() => openTableDialog()}
-                data-testid="add-table-btn"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Добавить стол
-              </Button>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={() => downloadAllQrPdf('a5')}
+                  disabled={bulkPdfLoading || tables.length === 0}
+                  data-testid="bulk-qr-pdf-a5-btn"
+                >
+                  {bulkPdfLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
+                  Все QR (A5)
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={() => downloadAllQrPdf('a6')}
+                  disabled={bulkPdfLoading || tables.length === 0}
+                  data-testid="bulk-qr-pdf-a6-btn"
+                >
+                  {bulkPdfLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
+                  Все QR (A6)
+                </Button>
+                <Button
+                  className="bg-mint-500 hover:bg-mint-600 rounded-full"
+                  onClick={() => openTableDialog()}
+                  data-testid="add-table-btn"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Добавить стол
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {tables.length === 0 ? (
