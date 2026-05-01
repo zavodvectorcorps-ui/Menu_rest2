@@ -1224,7 +1224,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
         item={detailsItem}
         currency={currency}
         labelsMap={labelsMap}
-        ordersEnabled={settings?.online_orders_enabled}
+        ordersEnabled={cartEnabled}
         onAdd={addToCart}
       />
 
