@@ -277,6 +277,8 @@ function App() {
               {/* Client Menu Route (Public) */}
               <Route path="/menu/:tableCode" element={<ClientMenuPage />} />
               <Route path="/:slug/:tableNumber" element={<ClientMenuPage />} />
+              {/* Custom-domain mode: bare /:tableNumber on a tenant domain (e.g. catch.com/5) */}
+              <Route path="/:tableNumber" element={<ClientMenuPage domainMode />} />
               
               {/* Default redirect */}
               <Route path="/" element={<Navigate to={token ? "/admin/profile" : "/login"} replace />} />

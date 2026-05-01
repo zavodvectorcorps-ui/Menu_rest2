@@ -70,8 +70,11 @@ class Restaurant(BaseModel):
     slogan: Optional[str] = ""
     currency: str = "BYN"  # ISO 4217. Supported: BYN, USD, EUR, RUB, PLN, KZT, UAH, GEL
     # Feature flags — SaaS modules enabled for this restaurant.
-    # Possible values: 'caffesta', 'caffesta_mapping', 'telegram_bot', 'cost_control', 'factual_margin'
+    # Possible values: 'caffesta', 'caffesta_mapping', 'telegram_bot', 'cost_control', 'factual_margin', 'cart_only'
     enabled_modules: List[str] = Field(default_factory=list)
+    # Custom domains pointing to this restaurant's menu (e.g. ["catch.com", "www.catch.com"]).
+    # Lookup is case-insensitive. Domains must be added on Nginx side separately.
+    custom_domains: List[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class RestaurantCreate(BaseModel):
@@ -96,6 +99,7 @@ class RestaurantUpdate(BaseModel):
     slogan: Optional[str] = None
     enabled_modules: Optional[List[str]] = None
     currency: Optional[str] = None
+    custom_domains: Optional[List[str]] = None
 
 
 # ============ MENU MODELS ============

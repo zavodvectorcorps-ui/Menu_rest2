@@ -305,6 +305,28 @@ export default function SettingsPage() {
     toast.success('QR-код скачан');
   };
 
+  const downloadQrPdf = async (size) => {
+    if (!qrData) return;
+    try {
+      const baseUrl = window.location.origin;
+      const resp = await axios.get(
+        `${API}/restaurants/${currentRestaurantId}/tables/${qrData.table_id}/qr-pdf?size=${size}&base_url=${encodeURIComponent(baseUrl)}`,
+        { ...authHeaders, responseType: 'blob' }
+      );
+      const url = URL.createObjectURL(new Blob([resp.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `qr_table_${qrData.table_number}_${size}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`PDF (${size.toUpperCase()}) скачан`);
+    } catch (e) {
+      toast.error('Не удалось сформировать PDF');
+    }
+  };
+
   // Employee handlers
   const openEmployeeDialog = (employee = null) => {
     if (employee) {
@@ -1460,18 +1482,36 @@ export default function SettingsPage() {
               </div>
             ) : null}
           </div>
-          <DialogFooter className="flex gap-2">
+          <DialogFooter className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => setQrDialogOpen(false)}>
               Закрыть
             </Button>
-            <Button 
-              className="bg-mint-500 hover:bg-mint-600"
+            <Button
+              variant="outline"
               onClick={downloadQrCode}
               disabled={!qrData}
               data-testid="download-qr-btn"
             >
               <Download className="w-4 h-4 mr-2" />
-              Скачать PNG
+              PNG
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => downloadQrPdf('a6')}
+              disabled={!qrData}
+              data-testid="download-qr-pdf-a6-btn"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              PDF A6
+            </Button>
+            <Button
+              className="bg-mint-500 hover:bg-mint-600"
+              onClick={() => downloadQrPdf('a5')}
+              disabled={!qrData}
+              data-testid="download-qr-pdf-a5-btn"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              PDF A5
             </Button>
           </DialogFooter>
         </DialogContent>

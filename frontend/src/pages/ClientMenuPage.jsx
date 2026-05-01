@@ -13,10 +13,15 @@ import ItemDetailsDialog from '@/components/ItemDetailsDialog';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-export default function ClientMenuPage() {
+export default function ClientMenuPage({ domainMode = false } = {}) {
   const { tableCode, slug, tableNumber } = useParams();
   const isSlugMode = !!slug && !!tableNumber;
-  const storageKey = isSlugMode ? `order_${slug}_${tableNumber}` : `order_${tableCode}`;
+  const isDomainMode = !!domainMode && !!tableNumber && !slug;
+  const storageKey = isDomainMode
+    ? `order_dom_${window.location.host}_${tableNumber}`
+    : isSlugMode
+      ? `order_${slug}_${tableNumber}`
+      : `order_${tableCode}`;
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -92,9 +97,18 @@ export default function ClientMenuPage() {
 
   useEffect(() => {
     const fetchMenu = async () => {
+      // Domain mode catches a bare /:tableNumber. Reject non-numeric values so
+      // unrelated paths like "/admin" or "/login" don't trigger this route.
+      if (isDomainMode && !/^\d+$/.test(String(tableNumber || ''))) {
+        setError('Стол не найден');
+        setLoading(false);
+        return;
+      }
       try {
         let response;
-        if (isSlugMode) {
+        if (isDomainMode) {
+          response = await axios.get(`${API}/public/menu-by-domain/${tableNumber}?host=${encodeURIComponent(window.location.host)}`);
+        } else if (isSlugMode) {
           response = await axios.get(`${API}/public/menu-by-slug/${slug}/${tableNumber}`);
         } else {
           response = await axios.get(`${API}/public/menu/${tableCode}`);
@@ -119,7 +133,7 @@ export default function ClientMenuPage() {
     };
 
     fetchMenu();
-  }, [tableCode, slug, tableNumber, isSlugMode]);
+  }, [tableCode, slug, tableNumber, isSlugMode, isDomainMode]);
 
   // Poll order status
   useEffect(() => {
@@ -276,6 +290,10 @@ export default function ClientMenuPage() {
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const isPreorder = data?.table?.is_preorder || false;
   const isDelivery = data?.table?.is_delivery || false;
+  const isCartOnly = (data?.restaurant?.enabled_modules || []).includes('cart_only');
+  // В режиме "корзина без заказа" кнопки "Добавить" должны быть видны,
+  // даже если online_orders_enabled выключен — это и есть смысл модуля.
+  const cartEnabled = (data?.settings?.online_orders_enabled ?? true) || isCartOnly;
 
   // Preorder form
   const [preorderForm, setPreorderForm] = useState({ name: '', phone: '', date: '', time: '' });
@@ -905,7 +923,7 @@ export default function ClientMenuPage() {
                                     )}
                                   </div>
 
-                                  {settings.online_orders_enabled && (
+                                  {cartEnabled && (
                                     <Button
                                       size="sm"
                                       className="h-8 rounded-full bg-mint-500 hover:bg-mint-600 text-white px-3"
@@ -957,7 +975,7 @@ export default function ClientMenuPage() {
       </div>
 
       {/* Cart button */}
-      {settings.online_orders_enabled && cart.length > 0 && (
+      {cartEnabled && cart.length > 0 && (
         <div className="fixed bottom-4 left-4 right-4 z-50" data-testid="cart-button-container">
           <Button
             className="w-full h-14 rounded-2xl bg-mint-500 hover:bg-mint-600 text-white shadow-lg shadow-mint-500/30"
@@ -1000,7 +1018,14 @@ export default function ClientMenuPage() {
       <Dialog open={cartOpen} onOpenChange={setCartOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-hidden flex flex-col" data-testid="cart-dialog">
           <DialogHeader>
-            <DialogTitle className="font-heading">Ваш заказ</DialogTitle>
+            <DialogTitle className="font-heading">
+              {isCartOnly ? 'Покажите заказ официанту' : 'Ваш заказ'}
+            </DialogTitle>
+            {isCartOnly && data?.table?.number && (
+              <p className="text-sm text-muted-foreground" data-testid="cart-only-table-info">
+                Стол №<span className="font-semibold text-foreground">{data.table.number}</span>
+              </p>
+            )}
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto py-4 space-y-3">
@@ -1044,7 +1069,7 @@ export default function ClientMenuPage() {
             ))}
 
             <div className="pt-3 space-y-3">
-              {isPreorder && (
+              {!isCartOnly && isPreorder && (
                 <div className="space-y-3 p-3 rounded-xl bg-purple-500/5 border border-purple-500/20">
                   <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Данные для предзаказа</p>
                   <input
@@ -1081,7 +1106,7 @@ export default function ClientMenuPage() {
                   </div>
                 </div>
               )}
-              {isDelivery && (
+              {!isCartOnly && isDelivery && (
                 <div className="space-y-3 p-3 rounded-xl bg-orange-500/5 border border-orange-500/20">
                   <p className="text-sm font-medium text-orange-600 dark:text-orange-400">🚚 Данные для доставки</p>
                   <input
@@ -1118,14 +1143,25 @@ export default function ClientMenuPage() {
                   />
                 </div>
               )}
-              <Textarea
-                placeholder="Комментарий к заказу (аллергии, пожелания...)"
-                value={orderNotes}
-                onChange={(e) => setOrderNotes(e.target.value)}
-                rows={2}
-                className="resize-none"
-                data-testid="order-notes-input"
-              />
+              {!isCartOnly && (
+                <Textarea
+                  placeholder="Комментарий к заказу (аллергии, пожелания...)"
+                  value={orderNotes}
+                  onChange={(e) => setOrderNotes(e.target.value)}
+                  rows={2}
+                  className="resize-none"
+                  data-testid="order-notes-input"
+                />
+              )}
+              {isCartOnly && (
+                <div className="rounded-xl bg-mint-500/10 border border-mint-500/30 p-4 text-center">
+                  <Hand className="w-8 h-8 text-mint-500 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-foreground">Покажите этот заказ официанту</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Это просто черновик — он не отправлен на кухню. Оформите его лично у официанта.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1134,25 +1170,48 @@ export default function ClientMenuPage() {
               <span className="text-lg font-heading font-semibold">Итого:</span>
               <span className="text-2xl font-bold text-mint-500">{cartTotal} {currency}</span>
             </div>
-            
-            <Button
-              className="w-full h-12 rounded-xl bg-mint-500 hover:bg-mint-600 text-white font-semibold"
-              onClick={submitOrder}
-              disabled={submittingOrder || cart.length === 0}
-              data-testid="submit-order-btn"
-            >
-              {submittingOrder ? (
-                <>
-                  <div className="spinner mr-2" />
-                  Оформление...
-                </>
-              ) : (
-                <>
-                  <Send className="w-5 h-5 mr-2" />
-                  Оформить заказ
-                </>
-              )}
-            </Button>
+
+            {isCartOnly ? (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 rounded-xl"
+                  onClick={() => { setCart([]); toast.success('Корзина очищена'); }}
+                  disabled={cart.length === 0}
+                  data-testid="clear-cart-btn"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Очистить
+                </Button>
+                <Button
+                  className="flex-1 h-12 rounded-xl bg-mint-500 hover:bg-mint-600 text-white font-semibold"
+                  onClick={() => setCartOpen(false)}
+                  data-testid="cart-only-close-btn"
+                >
+                  <Check className="w-5 h-5 mr-2" />
+                  Готово
+                </Button>
+              </div>
+            ) : (
+              <Button
+                className="w-full h-12 rounded-xl bg-mint-500 hover:bg-mint-600 text-white font-semibold"
+                onClick={submitOrder}
+                disabled={submittingOrder || cart.length === 0}
+                data-testid="submit-order-btn"
+              >
+                {submittingOrder ? (
+                  <>
+                    <div className="spinner mr-2" />
+                    Оформление...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5 mr-2" />
+                    Оформить заказ
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 import html as html_module
 
 from database import db
@@ -11,6 +11,13 @@ from services.caffesta import is_caffesta_enabled, caffesta_send_order
 from services.websocket import manager
 
 router = APIRouter()
+
+
+def _normalize_host(host: str) -> str:
+    """Strip port + lowercase. Accepts 'Catch.com:443' → 'catch.com'."""
+    if not host:
+        return ""
+    return host.split(':', 1)[0].strip().lower()
 
 
 @router.get("/public/menu/{table_code}")
@@ -58,6 +65,61 @@ async def get_public_menu_by_slug(slug: str, table_number: int):
     restaurant = await db.restaurants.find_one({"slug": slug}, {"_id": 0})
     if not restaurant:
         raise HTTPException(status_code=404, detail="Ресторан не найден")
+
+    restaurant_id = restaurant['id']
+    table = await db.tables.find_one({"restaurant_id": restaurant_id, "number": table_number}, {"_id": 0})
+    if not table:
+        raise HTTPException(status_code=404, detail="Стол не найден")
+
+    settings = await get_or_create_settings(restaurant_id)
+    if isinstance(settings, dict) and restaurant.get('currency'):
+        settings['currency'] = restaurant['currency']
+    sections = await get_or_create_menu_sections(restaurant_id)
+    call_types = await get_or_create_call_types(restaurant_id)
+    categories = await db.categories.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(1000)
+    items = await db.menu_items.find({"restaurant_id": restaurant_id, "is_available": True}, {"_id": 0}).sort("sort_order", 1).to_list(5000)
+    labels = await db.labels.find({"restaurant_id": restaurant_id}, {"_id": 0}).sort("sort_order", 1).to_list(500)
+    splash_ads = await db.splash_ads.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(50)
+
+    view = MenuView(restaurant_id=restaurant_id, table_code=table.get('code'))
+    doc = view.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.menu_views.insert_one(doc)
+
+    return {
+        "restaurant": serialize_doc(restaurant),
+        "table": serialize_doc(table),
+        "settings": settings,
+        "sections": sections,
+        "call_types": call_types,
+        "categories": [serialize_doc(c) for c in categories],
+        "items": [serialize_doc(i) for i in items],
+        "labels": labels,
+        "splash_ads": [serialize_doc(s) for s in splash_ads],
+    }
+
+
+@router.get("/public/menu-by-domain/{table_number}")
+async def get_public_menu_by_domain(table_number: int, request: Request, host: str | None = None):
+    """Resolve restaurant by the domain that the client is currently visiting.
+
+    The client passes the active hostname either via Host header (set by Nginx)
+    or as `?host=` query (browser fallback). Nginx must already route this
+    domain to the backend; this endpoint just looks up which restaurant owns it.
+    """
+    raw_host = (
+        host
+        or request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or ""
+    )
+    domain = _normalize_host(raw_host)
+    if not domain:
+        raise HTTPException(status_code=400, detail="Не удалось определить домен")
+
+    restaurant = await db.restaurants.find_one({"custom_domains": domain}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail=f"Домен {domain} не привязан к ресторану")
 
     restaurant_id = restaurant['id']
     table = await db.tables.find_one({"restaurant_id": restaurant_id, "number": table_number}, {"_id": 0})

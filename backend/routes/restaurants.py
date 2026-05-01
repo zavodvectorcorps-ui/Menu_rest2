@@ -58,6 +58,32 @@ async def update_restaurant(restaurant_id: str, data: RestaurantUpdate, current_
     if 'enabled_modules' in update_data and current_user.get('role') != 'superadmin':
         update_data.pop('enabled_modules')
 
+    # custom_domains — only superadmin can manage tenant domains.
+    # Normalise to lowercase, no scheme/path, deduplicated.
+    if 'custom_domains' in update_data:
+        if current_user.get('role') != 'superadmin':
+            update_data.pop('custom_domains')
+        else:
+            cleaned = []
+            for d in (update_data['custom_domains'] or []):
+                if not isinstance(d, str):
+                    continue
+                d = d.strip().lower()
+                if d.startswith('http://'):
+                    d = d[7:]
+                elif d.startswith('https://'):
+                    d = d[8:]
+                d = d.split('/', 1)[0].split(':', 1)[0]  # drop path/port
+                if d and d not in cleaned:
+                    # uniqueness across all restaurants
+                    other = await db.restaurants.find_one(
+                        {"custom_domains": d, "id": {"$ne": restaurant_id}}, {"_id": 0, "name": 1}
+                    )
+                    if other:
+                        raise HTTPException(status_code=400, detail=f"Домен {d} уже привязан к ресторану «{other.get('name','?')}»")
+                    cleaned.append(d)
+            update_data['custom_domains'] = cleaned
+
     # Validate slug uniqueness and format
     if 'slug' in update_data:
         slug = update_data['slug'].lower().strip()

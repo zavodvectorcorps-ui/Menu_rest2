@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from typing import Optional
 import uuid
 import qrcode
@@ -90,3 +91,154 @@ async def get_table_qr(restaurant_id: str, table_id: str, base_url: Optional[str
         "menu_url": menu_url,
         "qr_base64": f"data:image/png;base64,{img_base64}"
     }
+
+
+@router.get("/restaurants/{restaurant_id}/tables/{table_id}/qr-pdf")
+async def get_table_qr_pdf(
+    restaurant_id: str,
+    table_id: str,
+    base_url: Optional[str] = None,
+    size: str = "a5",
+    current_user: dict = Depends(get_current_user),
+):
+    """Generate a print-ready PDF for a table QR-code.
+
+    size: 'a5' (default, full A5 page) or 'a6' (A6 page, fits in stand).
+    """
+    from reportlab.lib.pagesizes import A5, A6
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.units import mm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.lib.utils import ImageReader
+
+    await check_restaurant_access(current_user, restaurant_id)
+    table = await db.tables.find_one({"id": table_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+
+    if not base_url:
+        base_url = os.environ.get('FRONTEND_URL', 'https://example.com')
+    base_url = base_url.rstrip("/")
+
+    slug = restaurant.get('slug', '') or ''
+    if slug:
+        menu_url = f"{base_url}/{slug}/{table['number']}"
+    else:
+        menu_url = f"{base_url}/menu/{table['code']}"
+
+    # --- Cyrillic font (try DejaVu first, fallback to default) ---
+    font_name = "Helvetica"
+    font_bold = "Helvetica-Bold"
+    for path in (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    ):
+        if os.path.exists(path):
+            try:
+                pdfmetrics.registerFont(TTFont("DejaVu", path))
+                bold_path = path.replace("DejaVuSans.ttf", "DejaVuSans-Bold.ttf")
+                if os.path.exists(bold_path):
+                    pdfmetrics.registerFont(TTFont("DejaVu-Bold", bold_path))
+                    font_bold = "DejaVu-Bold"
+                font_name = "DejaVu"
+                break
+            except Exception:
+                pass
+
+    # --- Generate QR PNG into memory ---
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=2)
+    qr.add_data(menu_url)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="#1a1a1a", back_color="white").convert("RGB")
+    qr_buf = BytesIO()
+    qr_img.save(qr_buf, format="PNG")
+    qr_buf.seek(0)
+    qr_reader = ImageReader(qr_buf)
+
+    # --- Page setup ---
+    page_size = A6 if size.lower() == "a6" else A5
+    width, height = page_size
+
+    pdf_buf = BytesIO()
+    c = canvas.Canvas(pdf_buf, pagesize=page_size)
+
+    restaurant_name = restaurant.get('name', '') or ''
+    table_number = table.get('number', '?')
+    accent = "#5DA9A4"  # mint, matches admin UI
+
+    # ---------- Background frame ----------
+    margin = 8 * mm
+    c.setStrokeColor(accent)
+    c.setLineWidth(1.2)
+    c.roundRect(margin, margin, width - 2 * margin, height - 2 * margin, 6 * mm, stroke=1, fill=0)
+
+    # ---------- Top: restaurant name ----------
+    logo_url = (restaurant.get('logo_url') or '').strip()
+    cursor_y = height - margin - 12 * mm
+    if logo_url and logo_url.startswith('http'):
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=5) as client:
+                r = await client.get(logo_url)
+                if r.status_code == 200:
+                    logo_buf = BytesIO(r.content)
+                    logo_reader = ImageReader(logo_buf)
+                    iw, ih = logo_reader.getSize()
+                    target_h = 14 * mm
+                    target_w = target_h * (iw / ih)
+                    c.drawImage(logo_reader, (width - target_w) / 2, cursor_y - target_h,
+                                width=target_w, height=target_h, mask='auto')
+                    cursor_y -= target_h + 3 * mm
+        except Exception:
+            pass
+
+    if restaurant_name:
+        c.setFont(font_bold, 16 if size.lower() == "a6" else 20)
+        c.setFillColor("#1a1a1a")
+        c.drawCentredString(width / 2, cursor_y, restaurant_name)
+        cursor_y -= 8 * mm
+
+    # ---------- Headline ----------
+    c.setFont(font_name, 10 if size.lower() == "a6" else 12)
+    c.setFillColor("#666666")
+    c.drawCentredString(width / 2, cursor_y, "Отсканируйте код, чтобы открыть меню")
+    cursor_y -= 6 * mm
+
+    # ---------- QR code ----------
+    qr_size = (62 * mm) if size.lower() == "a6" else (90 * mm)
+    qr_x = (width - qr_size) / 2
+    qr_y = cursor_y - qr_size
+    # White rounded card behind QR
+    pad = 4 * mm
+    c.setFillColor("white")
+    c.setStrokeColor("#e5e7eb")
+    c.setLineWidth(0.6)
+    c.roundRect(qr_x - pad, qr_y - pad, qr_size + 2 * pad, qr_size + 2 * pad, 3 * mm, stroke=1, fill=1)
+    c.drawImage(qr_reader, qr_x, qr_y, width=qr_size, height=qr_size, preserveAspectRatio=True, mask='auto')
+    cursor_y = qr_y - pad - 6 * mm
+
+    # ---------- Table number ----------
+    c.setFont(font_bold, 22 if size.lower() == "a6" else 28)
+    c.setFillColor(accent)
+    c.drawCentredString(width / 2, cursor_y - 8 * mm, f"Стол №{table_number}")
+
+    # ---------- Footer (small) ----------
+    c.setFont(font_name, 7)
+    c.setFillColor("#9ca3af")
+    c.drawCentredString(width / 2, margin + 4 * mm, menu_url)
+
+    c.showPage()
+    c.save()
+    pdf_buf.seek(0)
+
+    filename = f"qr_table_{table_number}_{size.lower()}.pdf"
+    return StreamingResponse(
+        pdf_buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

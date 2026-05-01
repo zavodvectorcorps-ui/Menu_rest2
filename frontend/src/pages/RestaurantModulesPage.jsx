@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Loader2, Building2, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Building2, Plus, Trash2, Globe, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { API, useApp } from '@/App';
 
@@ -16,6 +16,7 @@ const ALL_MODULES = [
   { key: 'telegram_bot',     label: 'Telegram-бот',          desc: 'Уведомления о заказах и вызовах, Утренний дайджест, Алерты по марже' },
   { key: 'cost_control',     label: 'Контроль цен и маржи',  desc: 'Импорт себестоимости, мониторинг маржинальности, Telegram-алерты' },
   { key: 'factual_margin',   label: 'Фактическая маржа',     desc: 'Расчёт реального P&L по чекам Caffesta' },
+  { key: 'cart_only',        label: 'Корзина (без онлайн-заказа)', desc: 'Гость собирает блюда в корзину и показывает официанту. Отправки на кухню/в Telegram нет.' },
 ];
 
 export default function RestaurantModulesPage() {
@@ -84,6 +85,43 @@ export default function RestaurantModulesPage() {
     }
   };
 
+  // Custom domains
+  const [domainsOpen, setDomainsOpen] = useState(null);  // restaurant id
+  const [newDomain, setNewDomain] = useState('');
+  const [savingDomains, setSavingDomains] = useState(false);
+
+  const saveDomains = async (rest, domains) => {
+    setSavingDomains(true);
+    try {
+      const r = await axios.put(`${API}/restaurants/${rest.id}`, { custom_domains: domains }, auth);
+      const updated = r.data?.custom_domains || domains;
+      setRestaurants(rs => rs.map(x => x.id === rest.id ? { ...x, custom_domains: updated } : x));
+      toast.success('Домены обновлены');
+      setNewDomain('');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Не удалось сохранить');
+    } finally {
+      setSavingDomains(false);
+    }
+  };
+
+  const addDomain = (rest) => {
+    const d = newDomain.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+    if (!d) return;
+    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(d)) {
+      toast.error('Введите валидный домен (например, menu.catch.com)');
+      return;
+    }
+    const current = rest.custom_domains || [];
+    if (current.includes(d)) { toast.error('Этот домен уже добавлен'); return; }
+    saveDomains(rest, [...current, d]);
+  };
+
+  const removeDomain = (rest, domain) => {
+    const next = (rest.custom_domains || []).filter(d => d !== domain);
+    saveDomains(rest, next);
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin" /></div>;
   }
@@ -122,7 +160,7 @@ export default function RestaurantModulesPage() {
                 </CardTitle>
                 <CardDescription>{rest.address || rest.email || 'Без адреса'}</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {ALL_MODULES.map(m => {
                     const isOn = (rest.enabled_modules || []).includes(m.key);
@@ -141,6 +179,80 @@ export default function RestaurantModulesPage() {
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Custom domains */}
+                <div className="rounded-lg border border-border/60 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-mint-500" />
+                      <p className="text-sm font-semibold">Кастомные домены</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setDomainsOpen(domainsOpen === rest.id ? null : rest.id); setNewDomain(''); }}
+                      data-testid={`btn-toggle-domains-${rest.id}`}
+                    >
+                      {domainsOpen === rest.id ? 'Свернуть' : 'Управление'}
+                    </Button>
+                  </div>
+                  {(rest.custom_domains || []).length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {(rest.custom_domains || []).map(d => (
+                        <span
+                          key={d}
+                          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-mint-500/10 text-mint-700 dark:text-mint-300 border border-mint-500/30"
+                          data-testid={`domain-chip-${rest.id}-${d}`}
+                        >
+                          <Globe className="w-3 h-3" />
+                          {d}
+                          {domainsOpen === rest.id && (
+                            <button
+                              onClick={() => removeDomain(rest, d)}
+                              className="ml-1 hover:text-rose-500"
+                              disabled={savingDomains}
+                              data-testid={`btn-remove-domain-${rest.id}-${d}`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Доменов не привязано. Гости открывают меню по адресу <code className="text-[11px]">rest-menu.by/{rest.slug || rest.id}/НОМЕР_СТОЛА</code></p>
+                  )}
+
+                  {domainsOpen === rest.id && (
+                    <div className="pt-2 border-t border-border/40 space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          value={newDomain}
+                          onChange={(e) => setNewDomain(e.target.value)}
+                          placeholder="menu.catch.com"
+                          onKeyDown={(e) => { if (e.key === 'Enter') addDomain(rest); }}
+                          data-testid={`input-new-domain-${rest.id}`}
+                        />
+                        <Button
+                          onClick={() => addDomain(rest)}
+                          disabled={savingDomains || !newDomain.trim()}
+                          className="bg-mint-500 hover:bg-mint-600 shrink-0"
+                          data-testid={`btn-add-domain-${rest.id}`}
+                        >
+                          {savingDomains ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                      <details className="text-xs text-muted-foreground">
+                        <summary className="cursor-pointer hover:text-foreground">Что нужно сделать на стороне клиента?</summary>
+                        <ol className="list-decimal pl-5 mt-2 space-y-1">
+                          <li>Клиент покупает домен и в DNS делает A-запись на IP вашего сервера (или CNAME на <code>rest-menu.by</code>).</li>
+                          <li>На VPS добавьте домен в Nginx и получите SSL: запустите <code>./scripts/add-domain.sh DOMAIN</code> (см. <code>/app/scripts/add-domain.sh</code>).</li>
+                          <li>QR-код стола №N будет работать по адресу <code>https://DOMAIN/N</code> автоматически.</li>
+                        </ol>
+                      </details>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
