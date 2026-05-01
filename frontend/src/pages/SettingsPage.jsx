@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
@@ -597,6 +599,24 @@ export default function SettingsPage() {
                     data-testid="restaurant-slogan-input"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Валюта</Label>
+                <Select
+                  value={restaurantForm.currency || 'BYN'}
+                  onValueChange={(v) => setRestaurantForm({ ...restaurantForm, currency: v })}
+                >
+                  <SelectTrigger data-testid="restaurant-currency-select" className="md:w-[320px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_CURRENCIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Используется во всех ценниках, чеках, аналитике и Telegram-дайджесте.</p>
               </div>
 
               <div className="space-y-2">

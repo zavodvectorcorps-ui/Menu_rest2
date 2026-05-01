@@ -46,6 +46,14 @@ async def migrate_enabled_modules():
     if res.modified_count:
         print(f"Migration: enabled all modules for {res.modified_count} legacy restaurants")
 
+    # Default currency for legacy restaurants
+    res2 = await db.restaurants.update_many(
+        {"currency": {"$exists": False}},
+        {"$set": {"currency": "BYN"}},
+    )
+    if res2.modified_count:
+        print(f"Migration: set currency=BYN for {res2.modified_count} legacy restaurants")
+
 
 async def get_or_create_settings(restaurant_id: str):
     settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})

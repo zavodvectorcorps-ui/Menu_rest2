@@ -27,6 +27,7 @@ async def create_restaurant(data: RestaurantCreate, current_user: dict = Depends
         phone=data.phone,
         email=data.email,
         enabled_modules=data.enabled_modules or [],
+        currency=data.currency or "BYN",
     )
     doc = restaurant.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
