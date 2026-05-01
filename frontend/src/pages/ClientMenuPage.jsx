@@ -275,14 +275,23 @@ export default function ClientMenuPage() {
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const isPreorder = data?.table?.is_preorder || false;
+  const isDelivery = data?.table?.is_delivery || false;
 
   // Preorder form
   const [preorderForm, setPreorderForm] = useState({ name: '', phone: '', date: '', time: '' });
+  const [deliveryForm, setDeliveryForm] = useState({ name: '', phone: '', city: '', address: '' });
 
   const submitOrder = async () => {
     if (cart.length === 0) return;
 
-    if (isPreorder) {
+    if (isDelivery) {
+      if (!deliveryForm.name.trim() || !deliveryForm.phone.trim()) {
+        toast.error('Укажите имя и телефон'); return;
+      }
+      if (!deliveryForm.city.trim() || !deliveryForm.address.trim()) {
+        toast.error('Укажите город и адрес доставки'); return;
+      }
+    } else if (isPreorder) {
       if (!preorderForm.name.trim() || !preorderForm.phone.trim()) {
         toast.error('Укажите имя и телефон для предзаказа');
         return;
@@ -310,6 +319,12 @@ export default function ClientMenuPage() {
           customer_phone: preorderForm.phone,
           preorder_date: preorderForm.date,
           preorder_time: preorderForm.time,
+        }),
+        ...(isDelivery && {
+          customer_name: deliveryForm.name,
+          customer_phone: deliveryForm.phone,
+          customer_city: deliveryForm.city,
+          customer_address: deliveryForm.address,
         })
       });
       const orderData = { id: resp.data.id, status: 'new' };
@@ -320,6 +335,7 @@ export default function ClientMenuPage() {
       setCart([]);
       setOrderNotes('');
       setPreorderForm({ name: '', phone: '', date: '', time: '' });
+      setDeliveryForm({ name: '', phone: '', city: '', address: '' });
       setTimeout(() => setOrderSuccess(false), 5000);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Ошибка оформления заказа');
@@ -1063,6 +1079,43 @@ export default function ClientMenuPage() {
                       data-testid="preorder-time"
                     />
                   </div>
+                </div>
+              )}
+              {isDelivery && (
+                <div className="space-y-3 p-3 rounded-xl bg-orange-500/5 border border-orange-500/20">
+                  <p className="text-sm font-medium text-orange-600 dark:text-orange-400">🚚 Данные для доставки</p>
+                  <input
+                    type="text"
+                    placeholder="Ваше имя *"
+                    value={deliveryForm.name}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, name: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-sm"
+                    data-testid="delivery-name"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Телефон *"
+                    value={deliveryForm.phone}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, phone: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-sm"
+                    data-testid="delivery-phone"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Город *"
+                    value={deliveryForm.city}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, city: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-sm"
+                    data-testid="delivery-city"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Улица, дом, квартира, подъезд *"
+                    value={deliveryForm.address}
+                    onChange={(e) => setDeliveryForm({ ...deliveryForm, address: e.target.value })}
+                    className="w-full p-2.5 rounded-lg border border-border bg-background text-sm"
+                    data-testid="delivery-address"
+                  />
                 </div>
               )}
               <Textarea

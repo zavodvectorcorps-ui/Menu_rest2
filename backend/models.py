@@ -68,7 +68,7 @@ class Restaurant(BaseModel):
     logo_url: Optional[str] = ""
     working_hours: Optional[str] = ""
     slogan: Optional[str] = ""
-    currency: str = "BYN"  # ISO 4217. Supported: BYN, USD, EUR, RUB, PLN, KZT, UAH
+    currency: str = "BYN"  # ISO 4217. Supported: BYN, USD, EUR, RUB, PLN, KZT, UAH, GEL
     # Feature flags — SaaS modules enabled for this restaurant.
     # Possible values: 'caffesta', 'caffesta_mapping', 'telegram_bot', 'cost_control', 'factual_margin'
     enabled_modules: List[str] = Field(default_factory=list)
@@ -224,6 +224,7 @@ class Table(BaseModel):
     name: Optional[str] = ""
     is_active: bool = True
     is_preorder: bool = False
+    is_delivery: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class TableCreate(BaseModel):
@@ -231,6 +232,7 @@ class TableCreate(BaseModel):
     name: Optional[str] = ""
     is_active: bool = True
     is_preorder: bool = False
+    is_delivery: bool = False
 
 
 # ============ ORDER MODELS ============
@@ -252,8 +254,11 @@ class Order(BaseModel):
     status: OrderStatus = OrderStatus.NEW
     notes: Optional[str] = ""
     is_preorder: bool = False
+    is_delivery: bool = False
     customer_name: Optional[str] = ""
     customer_phone: Optional[str] = ""
+    customer_city: Optional[str] = ""
+    customer_address: Optional[str] = ""
     preorder_date: Optional[str] = ""
     preorder_time: Optional[str] = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -264,6 +269,8 @@ class OrderCreate(BaseModel):
     notes: Optional[str] = ""
     customer_name: Optional[str] = ""
     customer_phone: Optional[str] = ""
+    customer_city: Optional[str] = ""
+    customer_address: Optional[str] = ""
     preorder_date: Optional[str] = ""
     preorder_time: Optional[str] = ""
 

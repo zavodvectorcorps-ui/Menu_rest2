@@ -44,7 +44,7 @@ export default function SettingsPage() {
   const [editingSection, setEditingSection] = useState(null);
   const [editingCallType, setEditingCallType] = useState(null);
   
-  const [tableForm, setTableForm] = useState({ number: '', name: '', is_active: true });
+  const [tableForm, setTableForm] = useState({ number: '', name: '', is_active: true, is_preorder: false, is_delivery: false });
   const [employeeForm, setEmployeeForm] = useState({ name: '', role: '', telegram_id: '', is_active: true });
   const [sectionForm, setSectionForm] = useState({ name: '', sort_order: 0, is_active: true });
   const [callTypeForm, setCallTypeForm] = useState({ name: '', telegram_message: '', sort_order: 0, is_active: true });
@@ -217,10 +217,10 @@ export default function SettingsPage() {
   const openTableDialog = (table = null) => {
     if (table) {
       setEditingTable(table);
-      setTableForm({ number: table.number, name: table.name || '', is_active: table.is_active });
+      setTableForm({ number: table.number, name: table.name || '', is_active: table.is_active, is_preorder: !!table.is_preorder, is_delivery: !!table.is_delivery });
     } else {
       setEditingTable(null);
-      setTableForm({ number: tables.length + 1, name: '', is_active: true });
+      setTableForm({ number: tables.length + 1, name: '', is_active: true, is_preorder: false, is_delivery: false });
     }
     setTableDialogOpen(true);
   };
@@ -1212,6 +1212,22 @@ export default function SettingsPage() {
                 data-testid="table-active-switch"
               />
               <Label>Активен</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={!!tableForm.is_preorder}
+                onCheckedChange={(checked) => setTableForm({ ...tableForm, is_preorder: checked, is_delivery: checked ? false : tableForm.is_delivery })}
+                data-testid="table-preorder-switch"
+              />
+              <Label>Предзаказ (бронирование с указанием даты/времени)</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={!!tableForm.is_delivery}
+                onCheckedChange={(checked) => setTableForm({ ...tableForm, is_delivery: checked, is_preorder: checked ? false : tableForm.is_preorder })}
+                data-testid="table-delivery-switch"
+              />
+              <Label>Доставка (клиент вводит город, адрес, телефон)</Label>
             </div>
           </div>
           <DialogFooter>

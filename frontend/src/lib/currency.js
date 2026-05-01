@@ -8,6 +8,7 @@ export const SUPPORTED_CURRENCIES = [
   { code: 'PLN', symbol: 'zł', label: 'PLN — Польский злотый' },
   { code: 'KZT', symbol: '₸',  label: 'KZT — Тенге' },
   { code: 'UAH', symbol: '₴',  label: 'UAH — Гривна' },
+  { code: 'GEL', symbol: '₾',  label: 'GEL — Грузинский лари' },
 ];
 
 export function currencySymbol(code) {

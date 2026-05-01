@@ -25,6 +25,9 @@ async def get_public_menu(table_code: str):
 
     restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
     settings = await get_or_create_settings(restaurant_id)
+    # Restaurant currency is source of truth — override settings.currency
+    if isinstance(settings, dict) and restaurant and restaurant.get('currency'):
+        settings['currency'] = restaurant['currency']
     sections = await get_or_create_menu_sections(restaurant_id)
     call_types = await get_or_create_call_types(restaurant_id)
     categories = await db.categories.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(1000)
@@ -62,6 +65,8 @@ async def get_public_menu_by_slug(slug: str, table_number: int):
         raise HTTPException(status_code=404, detail="Стол не найден")
 
     settings = await get_or_create_settings(restaurant_id)
+    if isinstance(settings, dict) and restaurant.get('currency'):
+        settings['currency'] = restaurant['currency']
     sections = await get_or_create_menu_sections(restaurant_id)
     call_types = await get_or_create_call_types(restaurant_id)
     categories = await db.categories.find({"restaurant_id": restaurant_id, "is_active": True}, {"_id": 0}).sort("sort_order", 1).to_list(1000)
@@ -96,6 +101,11 @@ async def create_public_order(data: OrderCreate):
     restaurant_id = table.get('restaurant_id')
     total = sum(item.price * item.quantity for item in data.items)
     is_preorder = table.get('is_preorder', False)
+    is_delivery = table.get('is_delivery', False)
+
+    # Load restaurant currency for notifications
+    restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0, "currency": 1})
+    cur = (restaurant or {}).get('currency') or 'BYN'
 
     order = Order(
         restaurant_id=restaurant_id,
@@ -105,8 +115,11 @@ async def create_public_order(data: OrderCreate):
         total=total,
         notes=data.notes,
         is_preorder=is_preorder,
-        customer_name=data.customer_name if is_preorder else "",
-        customer_phone=data.customer_phone if is_preorder else "",
+        is_delivery=is_delivery,
+        customer_name=data.customer_name if (is_preorder or is_delivery) else "",
+        customer_phone=data.customer_phone if (is_preorder or is_delivery) else "",
+        customer_city=data.customer_city if is_delivery else "",
+        customer_address=data.customer_address if is_delivery else "",
         preorder_date=data.preorder_date if is_preorder else "",
         preorder_time=data.preorder_time if is_preorder else "",
     )
@@ -118,10 +131,20 @@ async def create_public_order(data: OrderCreate):
     # Telegram notification with inline buttons
     table_num = table.get('number', '?')
     items_text = "\n".join([f"  • {html_module.escape(i.name)} x{i.quantity}" for i in data.items])
-    if is_preorder:
-        msg = f"📋 <b>Предзаказ</b>\n👤 {html_module.escape(data.customer_name or '—')}\n📱 {html_module.escape(data.customer_phone or '—')}\n📅 {data.preorder_date or '—'} {data.preorder_time or ''}\n\n{items_text}\n\n💰 <b>Итого: {total} BYN</b>"
+    if is_delivery:
+        addr_line = f"{html_module.escape(data.customer_city or '')}, {html_module.escape(data.customer_address or '')}".strip(', ')
+        msg = (
+            f"🚚 <b>Заказ на доставку</b>\n"
+            f"👤 {html_module.escape(data.customer_name or '—')}\n"
+            f"📱 {html_module.escape(data.customer_phone or '—')}\n"
+            f"📍 {addr_line or '—'}\n\n"
+            f"{items_text}\n\n"
+            f"💰 <b>Итого: {total} {cur}</b>"
+        )
+    elif is_preorder:
+        msg = f"📋 <b>Предзаказ</b>\n👤 {html_module.escape(data.customer_name or '—')}\n📱 {html_module.escape(data.customer_phone or '—')}\n📅 {data.preorder_date or '—'} {data.preorder_time or ''}\n\n{items_text}\n\n💰 <b>Итого: {total} {cur}</b>"
     else:
-        msg = f"🍽 <b>Новый заказ</b>\n📍 Стол #{table_num}\n\n{items_text}\n\n💰 <b>Итого: {total} BYN</b>"
+        msg = f"🍽 <b>Новый заказ</b>\n📍 Стол #{table_num}\n\n{items_text}\n\n💰 <b>Итого: {total} {cur}</b>"
     if data.notes:
         msg += f"\n📝 {html_module.escape(data.notes)}"
 
