@@ -220,48 +220,50 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     }, 700);
   }, []);
 
-  // IntersectionObserver — ScrollSpy: auto-highlight active category while scrolling.
-  //   Триггер-зона — узкая полоса сразу под шапкой (≈15% высоты вьюпорта).
-  //   Активной становится та категория, чей заголовок НАХОДИТСЯ В этой полосе
-  //   (именно в неё пользователь «смотрит» сейчас), а не та, что глубоко ниже.
-  //   Отсюда — сортировка по top ПО УБЫВАНИЮ: берём ту, у которой top ближе
-  //   к нулю/положительный = только что вошла под шапку. Это исправляет старую
-  //   проблему «категория переключается, когда раздел почти пролистан».
+  // ScrollSpy — подсветка активной категории при прокрутке.
+  // Реализация через scroll-listener вместо IntersectionObserver: для каждой
+  // категории на каждом скролле берём `getBoundingClientRect().top` и выбираем
+  // ту, чей заголовок ближе всего к нижней границе шапки СВЕРХУ (т.е.
+  // только что проскроллен под шапку). Это переключает подсветку в
+  // нужный момент — как только пользователь входит в новую категорию.
   useEffect(() => {
     if (!sectionCategories.length) return;
-    const headerHeight = headerRef.current?.offsetHeight || 0;
-    const state = {}; // { [catId]: { top, isIntersecting } }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (isProgrammaticScrollRef.current) return;
-        entries.forEach((e) => {
-          const catId = e.target.dataset.categoryId;
-          if (!catId) return;
-          state[catId] = { top: e.boundingClientRect.top, isIntersecting: e.isIntersecting };
-        });
-        // Активная = та, чей заголовок ближе всего к верху триггер-зоны снизу.
-        // Сортируем по top ПО УБЫВАНИЮ (первой идёт с наибольшим top среди видимых).
-        const candidates = Object.entries(state)
-          .filter(([, v]) => v.isIntersecting)
-          .sort(([, a], [, b]) => b.top - a.top);
-        if (candidates.length > 0) {
-          const [catId] = candidates[0];
-          setSelectedCategory((prev) => (prev === catId ? prev : catId));
+    let rafId = 0;
+    const run = () => {
+      rafId = 0;
+      if (isProgrammaticScrollRef.current) return;
+      const headerHeight = (headerRef.current?.offsetHeight || 0) + 24;
+      let active = null;
+      let bestTop = -Infinity;
+      for (const cat of sectionCategories) {
+        const el = categoryRefs.current[cat.id];
+        if (!el) continue;
+        const top = el.getBoundingClientRect().top;
+        // Категория считается «активной», если её верх уже УШЁЛ под шапку
+        // (top <= headerHeight). Среди таких выбираем ту, что ушла меньше
+        // всех — то есть та, которую пользователь только что пересёк.
+        if (top <= headerHeight && top > bestTop) {
+          bestTop = top;
+          active = cat.id;
         }
-      },
-      {
-        root: null,
-        // Триггер-полоса: 15% высоты вьюпорта сразу под шапкой.
-        rootMargin: `-${headerHeight + 8}px 0px -85% 0px`,
-        threshold: 0,
       }
-    );
-    sectionCategories.forEach((cat) => {
-      const el = categoryRefs.current[cat.id];
-      if (el) observer.observe(el);
-    });
-    return () => observer.disconnect();
+      // Если ни одна ещё не доскроллилась (самый верх страницы) — первая.
+      if (!active) active = sectionCategories[0]?.id || null;
+      if (active) {
+        setSelectedCategory((prev) => (prev === active ? prev : active));
+      }
+    };
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(run);
+    };
+    run();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, [sectionCategories, data, selectedSection, normalizedQuery]);
 
   // Auto-scroll the horizontal category tabs to keep the active one centered
