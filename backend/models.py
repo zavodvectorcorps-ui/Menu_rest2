@@ -229,6 +229,10 @@ class Table(BaseModel):
     is_active: bool = True
     is_preorder: bool = False
     is_delivery: bool = False
+    # is_website=True помечает «виртуальный стол» — точку входа с корня
+    # кастомного домена / главной страницы. Гость, набравший просто домен
+    # (без кода стола), попадает в меню этого стола.
+    is_website: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class TableCreate(BaseModel):
@@ -237,6 +241,7 @@ class TableCreate(BaseModel):
     is_active: bool = True
     is_preorder: bool = False
     is_delivery: bool = False
+    is_website: bool = False
 
 
 # ============ ORDER MODELS ============

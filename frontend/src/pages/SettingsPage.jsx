@@ -44,7 +44,7 @@ export default function SettingsPage() {
   const [editingSection, setEditingSection] = useState(null);
   const [editingCallType, setEditingCallType] = useState(null);
   
-  const [tableForm, setTableForm] = useState({ number: '', name: '', is_active: true, is_preorder: false, is_delivery: false });
+  const [tableForm, setTableForm] = useState({ number: '', name: '', is_active: true, is_preorder: false, is_delivery: false, is_website: false });
   const [employeeForm, setEmployeeForm] = useState({ name: '', role: '', telegram_id: '', is_active: true });
   const [sectionForm, setSectionForm] = useState({ name: '', sort_order: 0, is_active: true });
   const [callTypeForm, setCallTypeForm] = useState({ name: '', telegram_message: '', sort_order: 0, is_active: true });
@@ -217,10 +217,10 @@ export default function SettingsPage() {
   const openTableDialog = (table = null) => {
     if (table) {
       setEditingTable(table);
-      setTableForm({ number: table.number, name: table.name || '', is_active: table.is_active, is_preorder: !!table.is_preorder, is_delivery: !!table.is_delivery });
+      setTableForm({ number: table.number, name: table.name || '', is_active: table.is_active, is_preorder: !!table.is_preorder, is_delivery: !!table.is_delivery, is_website: !!table.is_website });
     } else {
       setEditingTable(null);
-      setTableForm({ number: tables.length + 1, name: '', is_active: true, is_preorder: false, is_delivery: false });
+      setTableForm({ number: tables.length + 1, name: '', is_active: true, is_preorder: false, is_delivery: false, is_website: false });
     }
     setTableDialogOpen(true);
   };
@@ -956,7 +956,26 @@ export default function SettingsPage() {
                     {tables.map((table) => (
                       <TableRow key={table.id} data-testid={`table-row-${table.id}`}>
                         <TableCell className="font-semibold">{table.number}</TableCell>
-                        <TableCell>{table.name || `Стол ${table.number}`}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span>{table.name || `Стол ${table.number}`}</span>
+                            {table.is_website && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-mint-500/15 text-mint-700 dark:text-mint-300 border border-mint-500/30" data-testid={`table-website-badge-${table.id}`}>
+                                САЙТ
+                              </span>
+                            )}
+                            {table.is_preorder && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300">
+                                ПРЕДЗАКАЗ
+                              </span>
+                            )}
+                            {table.is_delivery && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-700 dark:text-orange-300">
+                                ДОСТАВКА
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <code className="bg-muted px-2 py-1 rounded text-sm">{table.code}</code>
                         </TableCell>
@@ -1297,6 +1316,19 @@ export default function SettingsPage() {
                 data-testid="table-delivery-switch"
               />
               <Label>Доставка (клиент вводит город, адрес, телефон)</Label>
+            </div>
+            <div className="flex items-start gap-2 rounded-lg border border-mint-500/30 bg-mint-500/5 p-2.5">
+              <Switch
+                checked={!!tableForm.is_website}
+                onCheckedChange={(checked) => setTableForm({ ...tableForm, is_website: checked })}
+                data-testid="table-website-switch"
+              />
+              <div className="flex-1">
+                <Label>Стол «Сайт» (точка входа с домена)</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Гость, набравший просто домен (например <code className="text-[11px]">catch-menu.by</code>), без кода стола — попадёт сюда. Обычно один стол на ресторан.
+                </p>
+              </div>
             </div>
           </div>
           <DialogFooter>

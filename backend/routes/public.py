@@ -158,8 +158,8 @@ async def get_public_domain_info(request: Request, host: str | None = None):
     """Lightweight endpoint used by the SPA root route to redirect a bare custom
     domain visit to the restaurant's default menu URL.
 
-    Returns the restaurant slug + a sensible default table number so the
-    frontend can do a client-side redirect.
+    Returns the restaurant slug + the table number of the «Сайт» (website)
+    table, if one is marked. Falls back to table #1 otherwise.
     """
     raw_host = (
         host
@@ -175,11 +175,19 @@ async def get_public_domain_info(request: Request, host: str | None = None):
     if not restaurant:
         raise HTTPException(status_code=404, detail=f"Домен {domain} не привязан к ресторану")
 
+    # Prefer table marked as «Сайт» (is_website=True). Otherwise default to 1.
+    website_table = await db.tables.find_one(
+        {"restaurant_id": restaurant["id"], "is_website": True, "is_active": True},
+        {"_id": 0, "number": 1},
+        sort=[("number", 1)],
+    )
+    default_table_number = website_table["number"] if website_table else 1
+
     return {
         "id": restaurant["id"],
         "name": restaurant.get("name", ""),
         "slug": restaurant.get("slug", "") or "",
-        "default_table_number": 1,
+        "default_table_number": default_table_number,
     }
 
 
