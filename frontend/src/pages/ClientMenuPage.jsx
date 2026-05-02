@@ -220,28 +220,44 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     }, 700);
   }, []);
 
-  // IntersectionObserver — ScrollSpy: auto-highlight active category while scrolling
+  // IntersectionObserver — ScrollSpy: auto-highlight active category while scrolling.
+  //   Триггер-зона — узкая полоса сразу под шапкой (≈15% высоты вьюпорта).
+  //   Активной становится та категория, чей заголовок НАХОДИТСЯ В этой полосе
+  //   (именно в неё пользователь «смотрит» сейчас), а не та, что глубоко ниже.
+  //   Отсюда — сортировка по top ПО УБЫВАНИЮ: берём ту, у которой top ближе
+  //   к нулю/положительный = только что вошла под шапку. Это исправляет старую
+  //   проблему «категория переключается, когда раздел почти пролистан».
   useEffect(() => {
     if (!sectionCategories.length) return;
     const headerHeight = headerRef.current?.offsetHeight || 0;
+    const state = {}; // { [catId]: { top, isIntersecting } }
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (isProgrammaticScrollRef.current) return;
-        const visible = entries
-          .filter(e => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length > 0) {
-          const catId = visible[0].target.dataset.categoryId;
-          if (catId) setSelectedCategory(catId);
+        entries.forEach((e) => {
+          const catId = e.target.dataset.categoryId;
+          if (!catId) return;
+          state[catId] = { top: e.boundingClientRect.top, isIntersecting: e.isIntersecting };
+        });
+        // Активная = та, чей заголовок ближе всего к верху триггер-зоны снизу.
+        // Сортируем по top ПО УБЫВАНИЮ (первой идёт с наибольшим top среди видимых).
+        const candidates = Object.entries(state)
+          .filter(([, v]) => v.isIntersecting)
+          .sort(([, a], [, b]) => b.top - a.top);
+        if (candidates.length > 0) {
+          const [catId] = candidates[0];
+          setSelectedCategory((prev) => (prev === catId ? prev : catId));
         }
       },
       {
         root: null,
-        rootMargin: `-${headerHeight + 8}px 0px -55% 0px`,
+        // Триггер-полоса: 15% высоты вьюпорта сразу под шапкой.
+        rootMargin: `-${headerHeight + 8}px 0px -85% 0px`,
         threshold: 0,
       }
     );
-    sectionCategories.forEach(cat => {
+    sectionCategories.forEach((cat) => {
       const el = categoryRefs.current[cat.id];
       if (el) observer.observe(el);
     });
