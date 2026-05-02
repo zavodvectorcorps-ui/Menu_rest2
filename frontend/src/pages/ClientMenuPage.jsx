@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ImageIcon, Clock, MapPin, Phone, ChevronDown, Loader2, Hand, Search } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ImageIcon, Clock, MapPin, Phone, ChevronDown, Loader2, Hand, Search, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -806,6 +806,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                                 <span className="font-medium text-foreground break-words">{item.name}</span>
                                 {item.is_hit && <Star className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-0.5" />}
                                 {item.is_new && <Sparkles className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />}
+                                {item.is_takeaway && <ShoppingBag className="w-3.5 h-3.5 text-sky-500 flex-shrink-0 mt-0.5" />}
                                 {(item.label_ids || []).map(lid => {
                                   const lbl = labelsMap[lid];
                                   return lbl ? (
@@ -888,6 +889,11 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                                 {item.is_spicy && (
                                   <Badge className="bg-orange-500 text-white text-[10px] px-1.5 py-0 shadow">
                                     <Flame className="w-3 h-3 mr-0.5" />Острое
+                                  </Badge>
+                                )}
+                                {item.is_takeaway && (
+                                  <Badge className="bg-sky-500 text-white text-[10px] px-1.5 py-0 shadow" data-testid={`badge-takeaway-${item.id}`}>
+                                    <ShoppingBag className="w-3 h-3 mr-0.5" />На вынос
                                   </Badge>
                                 )}
                               </div>
@@ -996,6 +1002,11 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                                     {item.is_spicy && (
                                       <Badge className="bg-orange-500 text-white text-[10px] px-1.5 py-0">
                                         <Flame className="w-3 h-3 mr-0.5" />Острое
+                                      </Badge>
+                                    )}
+                                    {item.is_takeaway && (
+                                      <Badge className="bg-sky-500 text-white text-[10px] px-1.5 py-0" data-testid={`badge-takeaway-${item.id}`}>
+                                        <ShoppingBag className="w-3 h-3 mr-0.5" />На вынос
                                       </Badge>
                                     )}
                                     {(item.label_ids || []).map(lid => {

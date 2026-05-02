@@ -63,7 +63,7 @@ export default function MenuPage() {
   const [itemForm, setItemForm] = useState({
     category_id: '', name: '', description: '', price: '', weight: '', image_url: '',
     is_available: true, is_business_lunch: false, is_promotion: false,
-    is_hit: false, is_new: false, is_spicy: false, is_banner: false,
+    is_hit: false, is_new: false, is_spicy: false, is_takeaway: false, is_banner: false,
     sort_order: 0, label_ids: [], caffesta_product_id: ''
   });
 
@@ -206,7 +206,7 @@ export default function MenuPage() {
       setItemForm({
         category_id: selectedCategory || '', name: '', description: '', price: '0', weight: '',
         image_url: '', is_available: true, is_business_lunch: false, is_promotion: false,
-        is_hit: false, is_new: false, is_spicy: false, is_banner: isBanner,
+        is_hit: false, is_new: false, is_spicy: false, is_takeaway: false, is_banner: isBanner,
         sort_order: menuItems.filter(i => i.category_id === selectedCategory).length, label_ids: [],
         caffesta_product_id: ''
       });

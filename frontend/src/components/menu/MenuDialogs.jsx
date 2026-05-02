@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Flame, Star, Sparkles, Tag, Plus, Loader2, RefreshCw, Edit2, Trash2, Check, ChevronsUpDown, X } from 'lucide-react';
+import { Flame, Star, Sparkles, Tag, Plus, Loader2, RefreshCw, Edit2, Trash2, Check, ChevronsUpDown, X, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -217,6 +217,10 @@ export function ItemDialog({ open, onOpenChange, editing, form, setForm, categor
               <div className="flex items-center gap-2">
                 <Switch checked={form.is_spicy} onCheckedChange={(checked) => setForm({ ...form, is_spicy: checked })} />
                 <Label className="flex items-center gap-1"><Flame className="w-4 h-4" /> Острое</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={!!form.is_takeaway} onCheckedChange={(checked) => setForm({ ...form, is_takeaway: checked })} />
+                <Label className="flex items-center gap-1"><ShoppingBag className="w-4 h-4" /> На вынос</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch checked={form.is_promotion} onCheckedChange={(checked) => setForm({ ...form, is_promotion: checked })} />

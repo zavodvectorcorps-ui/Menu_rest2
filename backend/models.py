@@ -158,6 +158,7 @@ class MenuItem(BaseModel):
     is_hit: bool = False
     is_new: bool = False
     is_spicy: bool = False
+    is_takeaway: bool = False
     is_banner: bool = False
     sort_order: int = 0
     label_ids: list = []
@@ -177,6 +178,7 @@ class MenuItemCreate(BaseModel):
     is_hit: bool = False
     is_new: bool = False
     is_spicy: bool = False
+    is_takeaway: bool = False
     is_banner: bool = False
     sort_order: int = 0
     label_ids: list = []
@@ -195,6 +197,7 @@ class MenuItemUpdate(BaseModel):
     is_hit: Optional[bool] = None
     is_new: Optional[bool] = None
     is_spicy: Optional[bool] = None
+    is_takeaway: Optional[bool] = None
     is_banner: Optional[bool] = None
     sort_order: Optional[int] = None
     label_ids: Optional[list] = None

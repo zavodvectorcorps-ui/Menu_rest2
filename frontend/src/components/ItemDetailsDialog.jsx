@@ -49,6 +49,9 @@ export default function ItemDetailsDialog({ open, onOpenChange, item, currency, 
             {item.is_spicy && (
               <Badge className="bg-orange-500 text-white text-xs"><Flame className="w-3 h-3 mr-0.5" />Острое</Badge>
             )}
+            {item.is_takeaway && (
+              <Badge className="bg-sky-500 text-white text-xs" data-testid="item-details-takeaway"><ShoppingBag className="w-3 h-3 mr-0.5" />На вынос</Badge>
+            )}
             {(item.label_ids || []).map((lid) => {
               const lbl = labelsMap?.[lid];
               return lbl ? (
