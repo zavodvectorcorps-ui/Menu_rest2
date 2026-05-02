@@ -815,8 +815,11 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                                   ) : null;
                                 })}
                               </div>
+                              {item.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{item.description}</p>
+                              )}
                               {item.weight && (
-                                <span className="text-xs text-muted-foreground">{item.weight}</span>
+                                <span className="text-xs text-muted-foreground mt-0.5 inline-block">{item.weight}</span>
                               )}
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0">
@@ -893,6 +896,11 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                               <h3 className="font-heading font-semibold text-foreground text-sm leading-tight line-clamp-2">
                                 {item.name}
                               </h3>
+                              {item.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-3 leading-snug">
+                                  {item.description}
+                                </p>
+                              )}
                               {(item.label_ids || []).length > 0 && (
                                 <div className="flex flex-wrap gap-1">
                                   {(item.label_ids || []).map(lid => {
@@ -1001,7 +1009,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                                   </div>
 
                                   {item.description && (
-                                    <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                                    <p className="text-xs text-muted-foreground line-clamp-3 mb-2 leading-snug">
                                       {item.description}
                                     </p>
                                   )}
