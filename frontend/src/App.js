@@ -22,6 +22,7 @@ import BackupPage from "@/pages/BackupPage";
 import PriceControlPage from "@/pages/PriceControlPage";
 import CaffestaMappingPage from "@/pages/CaffestaMappingPage";
 import FactualMarginPage from "@/pages/FactualMarginPage";
+import RootRoute from "@/pages/RootRoute";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -280,8 +281,8 @@ function App() {
               {/* Custom-domain mode: bare /:tableNumber on a tenant domain (e.g. catch.com/5) */}
               <Route path="/:tableNumber" element={<ClientMenuPage domainMode />} />
               
-              {/* Default redirect */}
-              <Route path="/" element={<Navigate to={token ? "/admin/profile" : "/login"} replace />} />
+              {/* Default redirect — на кастомных доменах ведёт в меню */}
+              <Route path="/" element={<RootRoute />} />
               <Route path="*" element={<Navigate to={token ? "/admin/profile" : "/login"} replace />} />
             </Routes>
           </BrowserRouter>

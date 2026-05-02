@@ -120,7 +120,6 @@ async def get_public_menu_by_domain(table_number: int, request: Request, host: s
     restaurant = await db.restaurants.find_one({"custom_domains": domain}, {"_id": 0})
     if not restaurant:
         raise HTTPException(status_code=404, detail=f"Домен {domain} не привязан к ресторану")
-
     restaurant_id = restaurant['id']
     table = await db.tables.find_one({"restaurant_id": restaurant_id, "number": table_number}, {"_id": 0})
     if not table:
@@ -151,6 +150,36 @@ async def get_public_menu_by_domain(table_number: int, request: Request, host: s
         "items": [serialize_doc(i) for i in items],
         "labels": labels,
         "splash_ads": [serialize_doc(s) for s in splash_ads],
+    }
+
+
+@router.get("/public/domain-info")
+async def get_public_domain_info(request: Request, host: str | None = None):
+    """Lightweight endpoint used by the SPA root route to redirect a bare custom
+    domain visit to the restaurant's default menu URL.
+
+    Returns the restaurant slug + a sensible default table number so the
+    frontend can do a client-side redirect.
+    """
+    raw_host = (
+        host
+        or request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or ""
+    )
+    domain = _normalize_host(raw_host)
+    if not domain:
+        raise HTTPException(status_code=400, detail="Не удалось определить домен")
+
+    restaurant = await db.restaurants.find_one({"custom_domains": domain}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail=f"Домен {domain} не привязан к ресторану")
+
+    return {
+        "id": restaurant["id"],
+        "name": restaurant.get("name", ""),
+        "slug": restaurant.get("slug", "") or "",
+        "default_table_number": 1,
     }
 
 
