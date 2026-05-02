@@ -796,15 +796,15 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                         ) : (
                           <div
                             key={item.id}
-                            className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/40 transition-colors ${index !== catItems.length - 1 ? 'border-b border-border/50' : ''}`}
+                            className={`flex items-start justify-between gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 transition-colors ${index !== catItems.length - 1 ? 'border-b border-border/50' : ''}`}
                             data-testid={`menu-item-${item.id}`}
                             onClick={() => setDetailsItem(item)}
                           >
-                            <div className="flex-1 min-w-0 pr-4">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-foreground truncate">{item.name}</span>
-                                {item.is_hit && <Star className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
-                                {item.is_new && <Sparkles className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start gap-2 flex-wrap">
+                                <span className="font-medium text-foreground break-words">{item.name}</span>
+                                {item.is_hit && <Star className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-0.5" />}
+                                {item.is_new && <Sparkles className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />}
                                 {(item.label_ids || []).map(lid => {
                                   const lbl = labelsMap[lid];
                                   return lbl ? (
