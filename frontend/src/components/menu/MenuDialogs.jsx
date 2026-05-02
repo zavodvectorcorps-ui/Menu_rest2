@@ -47,13 +47,16 @@ export function CategoryDialog({ open, onOpenChange, editing, form, setForm, men
               <SelectTrigger><SelectValue placeholder="Выберите режим" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="card">Карточка с картинкой</SelectItem>
+                <SelectItem value="tiles">Крупные плитки (квадраты 2×2)</SelectItem>
                 <SelectItem value="compact">Компактный список</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {form.display_mode === 'card' 
-                ? 'Позиции будут отображаться с картинками (для коктейлей, блюд)' 
-                : 'Позиции будут отображаться строкой: название, цена, объём (для виски, вина)'}
+              {form.display_mode === 'card'
+                ? 'Позиции будут отображаться с картинками (для коктейлей, блюд)'
+                : form.display_mode === 'tiles'
+                  ? 'Крупные квадратные плитки в 2 колонки — для визуально насыщенного меню (десерты, пицца)'
+                  : 'Позиции будут отображаться строкой: название, цена, объём (для виски, вина)'}
             </p>
           </div>
           <div className="flex items-center gap-2">

@@ -88,11 +88,19 @@ export function SortableCategoryItem({ category, isSelected, itemCount, sectionN
           className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
             isSelected ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground hover:bg-accent'
           }`}
-          title={category.display_mode === 'card' ? 'Режим: Карточки' : 'Режим: Список'}
+          title={
+            category.display_mode === 'card' ? 'Режим: Карточки (клик → Плитки)' :
+            category.display_mode === 'tiles' ? 'Режим: Плитки (клик → Список)' :
+            'Режим: Список (клик → Карточки)'
+          }
           data-testid={`category-display-toggle-${category.id}`}
         >
-          {category.display_mode === 'card' ? <LayoutGrid className="w-3 h-3" /> : <List className="w-3 h-3" />}
-          {category.display_mode === 'card' ? 'Карточки' : 'Список'}
+          {category.display_mode === 'card' ? <LayoutGrid className="w-3 h-3" /> :
+           category.display_mode === 'tiles' ? <Grid3x3 className="w-3 h-3" /> :
+           <List className="w-3 h-3" />}
+          {category.display_mode === 'card' ? 'Карточки' :
+           category.display_mode === 'tiles' ? 'Плитки' :
+           'Список'}
         </button>
       </div>
     </div>

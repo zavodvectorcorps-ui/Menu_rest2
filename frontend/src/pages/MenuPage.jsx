@@ -181,7 +181,10 @@ export default function MenuPage() {
 
   const quickToggleCategoryDisplay = async (category) => {
     try {
-      await axios.put(`${API}/restaurants/${currentRestaurantId}/categories/${category.id}`, { display_mode: category.display_mode === 'card' ? 'compact' : 'card' }, authHeaders);
+      // Cycle through three modes: card -> tiles -> compact -> card
+      const cycle = { card: 'tiles', tiles: 'compact', compact: 'card' };
+      const next = cycle[category.display_mode] || 'card';
+      await axios.put(`${API}/restaurants/${currentRestaurantId}/categories/${category.id}`, { display_mode: next }, authHeaders);
       fetchData();
     } catch { toast.error('Ошибка'); }
   };

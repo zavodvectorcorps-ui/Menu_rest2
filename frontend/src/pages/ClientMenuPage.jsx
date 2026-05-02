@@ -836,6 +836,97 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                         )
                       ))}
                     </div>
+                  ) : mode === 'tiles' ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      {catItems.map((item) => (
+                        item.is_banner ? (
+                          <div
+                            key={item.id}
+                            className="col-span-2 rounded-2xl overflow-hidden shadow-md"
+                            data-testid={`banner-${item.id}`}
+                          >
+                            {item.image_url && (
+                              <img src={item.image_url} alt={item.name} className="w-full h-auto object-cover" />
+                            )}
+                            {(item.name || item.description) && (
+                              <div className="p-3 bg-card">
+                                {item.name && <h3 className="font-heading font-semibold text-foreground">{item.name}</h3>}
+                                {item.description && <p className="text-sm text-muted-foreground mt-1">{item.description}</p>}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            key={item.id}
+                            className="bg-card rounded-2xl shadow-md overflow-hidden menu-item-tile cursor-pointer hover:shadow-lg transition-shadow flex flex-col"
+                            data-testid={`menu-item-${item.id}`}
+                            onClick={() => setDetailsItem(item)}
+                          >
+                            <div className="aspect-square w-full bg-muted relative">
+                              {item.image_url ? (
+                                <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <ImageIcon className="w-10 h-10 text-muted-foreground/30" />
+                                </div>
+                              )}
+                              <div className="absolute top-2 left-2 flex flex-col gap-1">
+                                {item.is_hit && (
+                                  <Badge className="bg-red-500 text-white text-[10px] px-1.5 py-0 shadow">
+                                    <Star className="w-3 h-3 mr-0.5" />Хит
+                                  </Badge>
+                                )}
+                                {item.is_new && (
+                                  <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0 shadow">
+                                    <Sparkles className="w-3 h-3 mr-0.5" />Новинка
+                                  </Badge>
+                                )}
+                                {item.is_spicy && (
+                                  <Badge className="bg-orange-500 text-white text-[10px] px-1.5 py-0 shadow">
+                                    <Flame className="w-3 h-3 mr-0.5" />Острое
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="p-3 flex flex-col gap-2 flex-1">
+                              <h3 className="font-heading font-semibold text-foreground text-sm leading-tight line-clamp-2">
+                                {item.name}
+                              </h3>
+                              {(item.label_ids || []).length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {(item.label_ids || []).map(lid => {
+                                    const lbl = labelsMap[lid];
+                                    return lbl ? (
+                                      <Badge key={lid} className="text-white text-[9px] px-1.5 py-0" style={{ backgroundColor: lbl.color }}>
+                                        {lbl.name}
+                                      </Badge>
+                                    ) : null;
+                                  })}
+                                </div>
+                              )}
+                              <div className="mt-auto flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="font-bold text-mint-500 text-base whitespace-nowrap">{item.price} {currency}</div>
+                                  {item.weight && (
+                                    <div className="text-[11px] text-muted-foreground">{item.weight}</div>
+                                  )}
+                                </div>
+                                {cartEnabled && (
+                                  <Button
+                                    size="sm"
+                                    className="h-8 w-8 p-0 rounded-full bg-mint-500 hover:bg-mint-600 text-white shrink-0"
+                                    onClick={(e) => { e.stopPropagation(); addToCart(item); }}
+                                    data-testid={`add-to-cart-${item.id}`}
+                                  >
+                                    <Plus className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      ))}
+                    </div>
                   ) : (
                     <div className="space-y-4">
                       {catItems.map((item) => (
