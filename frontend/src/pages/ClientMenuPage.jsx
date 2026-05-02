@@ -973,7 +973,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             onClick={() => setDetailsItem(item)}
                           >
                             <div className="flex">
-                              <div className="w-28 h-28 flex-shrink-0 bg-muted">
+                              <div className="w-28 h-28 flex-shrink-0 bg-muted relative">
                                 {item.image_url ? (
                                   <MenuImage src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
                                 ) : (
@@ -981,6 +981,28 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                                     <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
                                   </div>
                                 )}
+                                <div className="absolute top-1 left-1 flex flex-col gap-1">
+                                  {item.is_hit && (
+                                    <Badge className="bg-red-500 text-white text-[9px] px-1 py-0 shadow">
+                                      <Star className="w-2.5 h-2.5 mr-0.5" />Хит
+                                    </Badge>
+                                  )}
+                                  {item.is_new && (
+                                    <Badge className="bg-emerald-500 text-white text-[9px] px-1 py-0 shadow">
+                                      <Sparkles className="w-2.5 h-2.5 mr-0.5" />Новинка
+                                    </Badge>
+                                  )}
+                                  {item.is_spicy && (
+                                    <Badge className="bg-orange-500 text-white text-[9px] px-1 py-0 shadow">
+                                      <Flame className="w-2.5 h-2.5 mr-0.5" />Острое
+                                    </Badge>
+                                  )}
+                                  {item.is_takeaway && (
+                                    <Badge className="bg-sky-500 text-white text-[9px] px-1 py-0 shadow" data-testid={`badge-takeaway-${item.id}`}>
+                                      <ShoppingBag className="w-2.5 h-2.5 mr-0.5" />На вынос
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
 
                               <div className="flex-1 p-3 flex flex-col">
@@ -989,26 +1011,6 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                                     <h3 className="font-heading font-semibold text-foreground text-sm leading-tight">
                                       {item.name}
                                     </h3>
-                                    {item.is_hit && (
-                                      <Badge className="bg-red-500 text-white text-[10px] px-1.5 py-0">
-                                        <Star className="w-3 h-3 mr-0.5" />Хит
-                                      </Badge>
-                                    )}
-                                    {item.is_new && (
-                                      <Badge className="bg-emerald-500 text-white text-[10px] px-1.5 py-0">
-                                        <Sparkles className="w-3 h-3 mr-0.5" />Новинка
-                                      </Badge>
-                                    )}
-                                    {item.is_spicy && (
-                                      <Badge className="bg-orange-500 text-white text-[10px] px-1.5 py-0">
-                                        <Flame className="w-3 h-3 mr-0.5" />Острое
-                                      </Badge>
-                                    )}
-                                    {item.is_takeaway && (
-                                      <Badge className="bg-sky-500 text-white text-[10px] px-1.5 py-0" data-testid={`badge-takeaway-${item.id}`}>
-                                        <ShoppingBag className="w-3 h-3 mr-0.5" />На вынос
-                                      </Badge>
-                                    )}
                                     {(item.label_ids || []).map(lid => {
                                       const lbl = labelsMap[lid];
                                       return lbl ? (
