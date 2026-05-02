@@ -820,7 +820,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0">
                               <span className="font-bold text-mint-500 whitespace-nowrap">{item.price} {currency}</span>
-                              {settings.online_orders_enabled && (
+                              {cartEnabled && (
                                 <Button
                                   size="sm"
                                   variant="ghost"
