@@ -2,6 +2,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Star, Sparkles, Flame, Image as ImageIcon, X } from 'lucide-react';
+import MenuImage from '@/components/MenuImage';
 
 export default function ItemDetailsDialog({ open, onOpenChange, item, currency, labelsMap, ordersEnabled, onAdd }) {
   if (!item) return null;
@@ -12,7 +13,7 @@ export default function ItemDetailsDialog({ open, onOpenChange, item, currency, 
         {/* Image */}
         <div className="relative w-full bg-muted">
           {item.image_url ? (
-            <img
+            <MenuImage
               src={item.image_url}
               alt={item.name}
               className="w-full h-auto object-cover max-h-[55vh]"

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import axios from 'axios';
 import ItemDetailsDialog from '@/components/ItemDetailsDialog';
+import MenuImage from '@/components/MenuImage';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -788,7 +789,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             data-testid={`banner-${item.id}`}
                           >
                             {item.image_url && (
-                              <img src={item.image_url} alt={item.name} className="w-full h-auto rounded-lg mb-2" />
+                              <MenuImage src={item.image_url} alt={item.name} className="w-full h-auto rounded-lg mb-2" />
                             )}
                             {item.name && <h3 className="font-heading font-semibold text-foreground">{item.name}</h3>}
                             {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
@@ -846,7 +847,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             data-testid={`banner-${item.id}`}
                           >
                             {item.image_url && (
-                              <img src={item.image_url} alt={item.name} className="w-full h-auto object-cover" />
+                              <MenuImage src={item.image_url} alt={item.name} className="w-full h-auto object-cover" />
                             )}
                             {(item.name || item.description) && (
                               <div className="p-3 bg-card">
@@ -864,7 +865,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                           >
                             <div className="aspect-square w-full bg-muted relative">
                               {item.image_url ? (
-                                <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                                <MenuImage src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
                                   <ImageIcon className="w-10 h-10 text-muted-foreground/30" />
@@ -937,7 +938,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             data-testid={`banner-${item.id}`}
                           >
                             {item.image_url && (
-                              <img src={item.image_url} alt={item.name} className="w-full h-auto object-cover" />
+                              <MenuImage src={item.image_url} alt={item.name} className="w-full h-auto object-cover" />
                             )}
                             {(item.name || item.description) && (
                               <div className="p-4 bg-card">
@@ -960,7 +961,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             <div className="flex">
                               <div className="w-28 h-28 flex-shrink-0 bg-muted">
                                 {item.image_url ? (
-                                  <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                                  <MenuImage src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
                                     <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
