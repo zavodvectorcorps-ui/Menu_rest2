@@ -1,4 +1,4 @@
-import { Edit2, Trash2, GripVertical, Eye, EyeOff, LayoutGrid, List } from 'lucide-react';
+import { Edit2, Trash2, GripVertical, Eye, EyeOff, LayoutGrid, List, LayoutList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -95,8 +95,8 @@ export function SortableCategoryItem({ category, isSelected, itemCount, sectionN
           }
           data-testid={`category-display-toggle-${category.id}`}
         >
-          {category.display_mode === 'card' ? <LayoutGrid className="w-3 h-3" /> :
-           category.display_mode === 'tiles' ? <Grid3x3 className="w-3 h-3" /> :
+          {category.display_mode === 'card' ? <LayoutList className="w-3 h-3" /> :
+           category.display_mode === 'tiles' ? <LayoutGrid className="w-3 h-3" /> :
            <List className="w-3 h-3" />}
           {category.display_mode === 'card' ? 'Карточки' :
            category.display_mode === 'tiles' ? 'Плитки' :
