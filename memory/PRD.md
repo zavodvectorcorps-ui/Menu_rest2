@@ -10,6 +10,10 @@
   - SEO meta-теги: title, description, keywords, og:title, og:description, og:image, twitter:card, canonical link — устанавливаются через useEffect при монтировании, очищаются при unmount.
   - Tailwind config: добавлены оттенки `mint-200/300/400` для поддержки градиентов.
   - Роут зарегистрирован в `App.js` перед `/:tableNumber` (статический приоритет).
+- **Демо-доступ + Telegram-контакт на DemoPage (P1, DONE)**:
+  - Новый seed-хелпер `create_demo_user()` в `backend/helpers.py` создаёт пользователя `demo/demo2026` с ролью `administrator`, привязанного к двум посевным ресторанам. Вызывается из `/api/seed` после создания ресторанов.
+  - При пере-сиде список ресторанов на `demo` обновляется — данные остаются актуальными.
+  - DemoPage: финальный CTA переработан в двухколоночный блок — слева данные для входа (login/password с кнопками copy-to-clipboard), справа Telegram-контакт с `@king_saas` (брендовый цвет #229ED9, SVG-логотип Telegram, open in new tab).
 
 ### Изменения 2026-05-02 (часть 4)
 - **Полуавтоматическая привязка кастомных доменов (P1, DONE)**:

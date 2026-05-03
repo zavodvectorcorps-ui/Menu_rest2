@@ -34,6 +34,30 @@ async def create_superadmin():
     return admin
 
 
+async def create_demo_user():
+    """Read-only-ish demo account for public portfolio visitors.
+    Role ADMINISTRATOR — видит все рестораны из restaurant_ids, но не трогает системные настройки.
+    Привязывается к первым двум посевным ресторанам (если они есть)."""
+    existing = await db.users.find_one({"username": "demo"}, {"_id": 0})
+    # Собираем список доступных ресторанов
+    restaurants = await db.restaurants.find({}, {"_id": 0, "id": 1}).to_list(10)
+    rids = [r['id'] for r in restaurants][:2]  # первые 2
+    if not existing:
+        user = User(
+            username="demo",
+            password_hash=get_password_hash("demo2026"),
+            role=UserRole.ADMINISTRATOR,
+            restaurant_ids=rids,
+        )
+        doc = user.model_dump()
+        doc['created_at'] = doc['created_at'].isoformat()
+        await db.users.insert_one(doc)
+        print(f"Demo user created: demo/demo2026 (restaurants: {len(rids)})")
+    elif rids and set(existing.get('restaurant_ids') or []) != set(rids):
+        # Поддерживаем актуальный список ресторанов на случай пере-сида
+        await db.users.update_one({"username": "demo"}, {"$set": {"restaurant_ids": rids}})
+
+
 async def migrate_enabled_modules():
     """One-shot migration: existing restaurants get ALL modules enabled,
     so behaviour is preserved for current customers. New restaurants will have empty list

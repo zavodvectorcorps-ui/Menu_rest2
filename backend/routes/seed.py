@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from database import db
 from models import Restaurant, Table
 from helpers import (
-    create_superadmin, get_or_create_settings,
+    create_superadmin, create_demo_user, get_or_create_settings,
     get_or_create_menu_sections, get_or_create_call_types
 )
 
@@ -59,5 +59,9 @@ async def seed_data():
                 tdoc = table.model_dump()
                 tdoc['created_at'] = tdoc['created_at'].isoformat()
                 await db.tables.insert_one(tdoc)
+
+    # Demo-аккаунт для публичного лендинга (/demo) — создаётся после ресторанов,
+    # чтобы получить привязку к реальным restaurant_ids.
+    await create_demo_user()
 
     return {"message": "Data seeded successfully"}

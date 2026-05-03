@@ -4,7 +4,7 @@ import {
   Sparkles, Smartphone, Globe, QrCode, Bell, BarChart3, Bot, Wallet,
   Shield, Layers, Building2, ArrowRight, Check, Zap, Languages,
   ChefHat, ShoppingBag, MessageSquare, Lock, Rocket, Star, Github,
-  Server, Code2, Database, Cloud, FileText, ExternalLink,
+  Server, Code2, Database, Cloud, FileText, ExternalLink, Copy, User,
 } from 'lucide-react';
 
 /**
@@ -414,33 +414,80 @@ export default function DemoPage() {
         </div>
       </section>
 
-      {/* ===== Final CTA ===== */}
+      {/* ===== Final CTA — Demo access + Contact ===== */}
       <section className="py-32">
-        <div className="max-w-4xl mx-auto px-5">
-          <div className="relative rounded-3xl overflow-hidden border border-white/10 p-10 sm:p-16 text-center bg-gradient-to-br from-mint-500/10 via-purple-500/10 to-transparent">
+        <div className="max-w-5xl mx-auto px-5">
+          <div className="relative rounded-3xl overflow-hidden border border-white/10 p-10 sm:p-14 bg-gradient-to-br from-mint-500/10 via-purple-500/10 to-transparent">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(93,169,164,0.2),transparent_60%)]" />
-            <div className="relative">
-              <Rocket className="w-12 h-12 text-mint-300 mx-auto mb-5" />
-              <h2 className="text-3xl sm:text-5xl font-bold leading-tight">Хотите посмотреть систему вживую?</h2>
-              <p className="mt-4 text-white/60 max-w-xl mx-auto">
-                Доступ к админке по запросу — есть демо-аккаунт с реальными данными по нескольким ресторанам.
-              </p>
-              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <div className="relative grid md:grid-cols-2 gap-10 items-center">
+              {/* LEFT: Demo access */}
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-mint-500/20 border border-mint-500/40 text-mint-300 text-xs font-medium mb-5">
+                  <Rocket className="w-3.5 h-3.5" />
+                  Открытый демо-доступ
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-bold leading-tight">
+                  Зайдите в админку<br />с тестовым аккаунтом
+                </h2>
+                <p className="mt-4 text-white/60 leading-relaxed">
+                  Роль «Администратор» на двух демо-ресторанах. Можно потыкать меню, заказы,
+                  аналитику, Telegram-бот — настройки не сбрасываются.
+                </p>
+
+                <CredentialBox login="demo" password="demo2026" />
+
                 <Link
                   to="/login"
-                  className="px-6 h-12 inline-flex items-center gap-2 rounded-full bg-white text-[#0a0e1a] font-semibold hover:bg-mint-300 transition-colors"
+                  className="mt-6 px-6 h-12 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-mint-400 to-emerald-500 text-[#0a0e1a] font-semibold hover:shadow-2xl hover:shadow-mint-500/30 transition-all hover:-translate-y-0.5"
                   data-testid="demo-final-cta"
                 >
                   Открыть админку <ArrowRight className="w-5 h-5" />
                 </Link>
+              </div>
+
+              {/* RIGHT: Contact */}
+              <div className="md:border-l md:border-white/10 md:pl-10">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-500/40 text-sky-300 text-xs font-medium mb-5">
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  Связаться
+                </div>
+                <h3 className="text-2xl sm:text-3xl font-bold leading-tight">
+                  Хотите такую же<br />платформу для себя?
+                </h3>
+                <p className="mt-4 text-white/60 leading-relaxed">
+                  Обсудим кастомизацию под ваш ресторан или сеть — модули, интеграции, дизайн,
+                  поддержка деплоя на вашем VPS.
+                </p>
+
                 <a
-                  href="#top"
-                  className="px-6 h-12 inline-flex items-center gap-2 rounded-full border border-white/15 hover:bg-white/5 transition-colors text-sm"
+                  href="https://t.me/king_saas"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-6 px-6 h-12 inline-flex items-center gap-2 rounded-full bg-[#229ED9] hover:bg-[#1c8ec3] text-white font-semibold transition-all hover:-translate-y-0.5 shadow-lg shadow-sky-500/30"
+                  data-testid="demo-telegram-contact"
                 >
-                  Наверх
+                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
+                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
+                  </svg>
+                  @king_saas
+                  <ExternalLink className="w-4 h-4 opacity-60" />
                 </a>
+
+                <div className="mt-6 text-sm text-white/40 flex items-center gap-2">
+                  <Zap className="w-4 h-4" />
+                  Обычно отвечаю в течение часа
+                </div>
               </div>
             </div>
+          </div>
+
+          <div className="text-center mt-10">
+            <a
+              href="#top"
+              className="px-6 h-11 inline-flex items-center gap-2 rounded-full border border-white/15 hover:bg-white/5 transition-colors text-sm text-white/70"
+            >
+              Наверх
+            </a>
           </div>
         </div>
       </section>
@@ -529,6 +576,51 @@ function Highlight({ n, title, desc }) {
       <div>
         <h3 className="text-xl font-bold mb-2">{title}</h3>
         <p className="text-white/60 leading-relaxed">{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+function CredentialBox({ login, password }) {
+  const [copied, setCopied] = useState(null);
+  const copy = async (text, field) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(field);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      /* noop */
+    }
+  };
+  return (
+    <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 backdrop-blur-sm p-5 font-mono">
+      <Row label="login" value={login} copied={copied === 'login'} onCopy={() => copy(login, 'login')} icon={<User className="w-3.5 h-3.5" />} testid="demo-cred-login" />
+      <div className="h-px bg-white/5 my-3" />
+      <Row label="password" value={password} copied={copied === 'password'} onCopy={() => copy(password, 'password')} icon={<Lock className="w-3.5 h-3.5" />} testid="demo-cred-password" />
+    </div>
+  );
+}
+
+function Row({ label, value, copied, onCopy, icon, testid }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-white/40">
+        {icon}
+        {label}
+      </div>
+      <div className="flex items-center gap-2">
+        <code className="text-mint-300 text-sm sm:text-base" data-testid={testid}>{value}</code>
+        <button
+          type="button"
+          onClick={onCopy}
+          className="w-8 h-8 rounded-lg border border-white/10 hover:border-mint-500/40 hover:bg-white/5 flex items-center justify-center transition-colors"
+          aria-label={`Copy ${label}`}
+          data-testid={`${testid}-copy`}
+        >
+          {copied
+            ? <Check className="w-3.5 h-3.5 text-mint-400" />
+            : <Copy className="w-3.5 h-3.5 text-white/50" />}
+        </button>
       </div>
     </div>
   );
