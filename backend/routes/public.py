@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 import html as html_module
+from datetime import datetime, timezone, timedelta
 
 from database import db
 from models import (
@@ -186,6 +187,46 @@ async def get_demo_menu_info():
         "restaurant_name": restaurant.get('name', ''),
         "table_number": table['number'],
         "path": path,
+    }
+
+
+@router.get("/public/demo-stats")
+async def get_demo_stats():
+    """Aggregated «live» stats across demo-restaurants for the /demo landing page.
+    Counts orders, menu views and staff calls over the last 24h, plus static totals
+    (menu items, active tables). Demo-restaurants = restaurants attached to the `demo` user."""
+    demo_user = await db.users.find_one({"username": "demo"}, {"_id": 0})
+    rids = (demo_user or {}).get('restaurant_ids') or []
+    if not rids:
+        return {
+            "restaurants": 0, "tables": 0, "menu_items": 0,
+            "orders_total": 0, "orders_24h": 0,
+            "menu_views_total": 0, "menu_views_24h": 0,
+            "staff_calls_total": 0,
+        }
+
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    base_q = {"restaurant_id": {"$in": rids}}
+    window_q = {**base_q, "created_at": {"$gte": cutoff_iso}}
+
+    # Run counts in parallel-ish (Motor coroutines)
+    tables_total = await db.tables.count_documents({**base_q, "is_active": True, "number": {"$gte": 1}})
+    menu_items_total = await db.menu_items.count_documents({**base_q, "is_available": True})
+    orders_total = await db.orders.count_documents(base_q)
+    orders_24h = await db.orders.count_documents(window_q)
+    menu_views_total = await db.menu_views.count_documents(base_q)
+    menu_views_24h = await db.menu_views.count_documents(window_q)
+    staff_calls_total = await db.staff_calls.count_documents(base_q)
+
+    return {
+        "restaurants": len(rids),
+        "tables": tables_total,
+        "menu_items": menu_items_total,
+        "orders_total": orders_total,
+        "orders_24h": orders_24h,
+        "menu_views_total": menu_views_total,
+        "menu_views_24h": menu_views_24h,
+        "staff_calls_total": staff_calls_total,
     }
 
 

@@ -27,10 +27,15 @@ export default function DemoPage() {
 
   // Demo client-menu link — fetched from public API so we don't hard-code table codes
   const [demoMenu, setDemoMenu] = useState(null);
+  const [liveStats, setLiveStats] = useState(null);
   useEffect(() => {
     axios
       .get(`${API}/public/demo-menu-info`)
       .then((r) => setDemoMenu(r.data))
+      .catch(() => {});
+    axios
+      .get(`${API}/public/demo-stats`)
+      .then((r) => setLiveStats(r.data))
       .catch(() => {});
   }, []);
 
@@ -204,22 +209,37 @@ export default function DemoPage() {
         </div>
       </section>
 
-      {/* ===== Metrics ===== */}
+      {/* ===== Metrics (live) ===== */}
       <section id="metrics" className="py-20 border-y border-white/5 bg-white/[0.015]">
         <div className="max-w-6xl mx-auto px-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { v: '8+', l: 'модулей с feature-flag' },
-              { v: '3', l: 'режима отображения меню' },
-              { v: '1 клик', l: 'привязка домена' },
-              { v: '< 2 мин', l: 'на нового клиента' },
-            ].map((m, i) => (
-              <div key={i} className="text-center">
-                <div className="text-4xl sm:text-5xl font-bold bg-gradient-to-br from-white to-white/40 bg-clip-text text-transparent">{m.v}</div>
-                <div className="text-sm text-white/50 mt-2">{m.l}</div>
-              </div>
-            ))}
+          <div className="flex items-end justify-between flex-wrap gap-4 mb-10">
+            <div>
+              <div className="text-mint-400 text-sm font-semibold tracking-wider uppercase mb-2">Живые цифры</div>
+              <h2 className="text-3xl sm:text-4xl font-bold leading-tight">
+                Настоящие данные с demo-ресторанов
+              </h2>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+              </span>
+              live
+            </div>
           </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <LiveMetric value={liveStats?.restaurants} label="Ресторанов в демо" icon={<Building2 />} testid="stat-restaurants" />
+            <LiveMetric value={liveStats?.tables} label="Активных столов" icon={<QrCode />} testid="stat-tables" />
+            <LiveMetric value={liveStats?.menu_items} label="Позиций в меню" icon={<ChefHat />} testid="stat-menu-items" />
+            <LiveMetric value={liveStats?.menu_views_total} delta={liveStats?.menu_views_24h} label="Просмотров меню" icon={<BarChart3 />} testid="stat-menu-views" />
+            <LiveMetric value={liveStats?.orders_total} delta={liveStats?.orders_24h} label="Оформлено заказов" icon={<ShoppingBag />} testid="stat-orders" />
+            <LiveMetric value={liveStats?.staff_calls_total} label="Вызовов официанта" icon={<Bell />} testid="stat-staff-calls" />
+          </div>
+
+          <p className="mt-6 text-xs text-white/40">
+            Обновляется при каждой загрузке страницы. Дельта (+N) — прирост за последние 24&nbsp;часа.
+          </p>
         </div>
       </section>
 
@@ -594,6 +614,52 @@ export default function DemoPage() {
 }
 
 // ============ Sub-components ============
+
+function LiveMetric({ value, delta, label, icon, testid }) {
+  // Count-up animation: 0 → value over ~900ms
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    if (typeof value !== 'number') return;
+    const start = performance.now();
+    const duration = 900;
+    let raf;
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(value * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+
+  const loading = typeof value !== 'number';
+
+  return (
+    <div
+      className="relative rounded-2xl border border-white/10 bg-white/[0.02] p-4 hover:border-mint-500/30 hover:bg-white/[0.04] transition-all group"
+      data-testid={testid}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center [&>svg]:w-4 [&>svg]:h-4 text-mint-300 group-hover:scale-110 transition-transform">
+          {icon}
+        </div>
+        {!!delta && delta > 0 && (
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">
+            +{delta} / 24ч
+          </span>
+        )}
+      </div>
+      <div className="text-2xl sm:text-3xl font-bold tracking-tight">
+        {loading
+          ? <span className="inline-block w-12 h-7 rounded bg-white/5 animate-pulse" />
+          : display.toLocaleString('ru-RU')}
+      </div>
+      <div className="text-xs text-white/50 mt-1">{label}</div>
+    </div>
+  );
+}
 
 function FakeMetric({ icon, label, value, trend }) {
   return (
