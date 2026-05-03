@@ -56,6 +56,6 @@
   "seed_data_creation": "Test suite temporarily attaches rest-menu.by / nonexistent-test-xyz.example.invalid to Мята restaurant (aa25189d-d668-4838-915a-c5d936547f3f) and restores custom_domains=[] in a try/finally. Catch (d433dc80-...) was NOT modified. Final DB state = clean.",
   "retest_needed": false,
   "should_main_agent_self_test": true,
-  "context_for_next_testing_agent": "Iteration 19 is fully green. Reusable pytest: /app/backend/tests/test_iter19_domain_check.py (~4s, idempotent, self-restoring). For frontend retest, credentials admin/220066, MYATA_ID=aa25189d-d668-4838-915a-c5d936547f3f, test domain=rest-menu.by (resolves + is reachable from container). Do NOT permanently bind rest-menu.by outside tests; always clean up. Backend add-domain.sh not tested at runtime (needs real VPS root+certbot).",
+  "context_for_next_testing_agent": "Iteration 19 is fully green. Reusable pytest: /app/backend/tests/test_iter19_domain_check.py (~4s, idempotent, self-restoring). For frontend retest, credentials admin/220066, MYATA_ID=menu-management-hub-2, test domain=rest-menu.by (resolves + is reachable from container). Do NOT permanently bind rest-menu.by outside tests; always clean up. Backend add-domain.sh not tested at runtime (needs real VPS root+certbot).",
   "rca of the issue": "N/A — no defects. Two soft observations: (a) admin_test user isn't seeded so the 'non-super 403' test is skipped (pre-existing from iter18); (b) clipboard toast shows failure inside headless Chromium due to browser permissions, irrelevant for real users."
 }
