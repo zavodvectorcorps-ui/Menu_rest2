@@ -28,6 +28,7 @@ from routes.cost_control import router as cost_router
 from routes.cost_control import run_margin_check_job
 from routes.caffesta_mapping import router as caffesta_mapping_router
 from routes.digest import router as digest_router
+from routes.admin import router as admin_router
 from services.digest import run_daily_digest_job
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -48,7 +49,7 @@ for r in [
     auth_router, restaurants_router, menu_router, tables_router,
     orders_router, settings_router, public_router, telegram_router,
     caffesta_router, backup_router, seed_router, ws_router, faq_router, splash_router, cost_router,
-    caffesta_mapping_router, digest_router,
+    caffesta_mapping_router, digest_router, admin_router,
 ]:
     app.include_router(r, prefix="/api")
 

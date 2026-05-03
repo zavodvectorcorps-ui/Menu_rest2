@@ -22,7 +22,8 @@ import {
   Database,
   Wrench,
   Volume2,
-  VolumeX
+  VolumeX,
+  Globe
 } from 'lucide-react';
 import { useApp, useTheme } from '@/App';
 import { Button } from '@/components/ui/button';
@@ -452,6 +453,25 @@ export default function AdminLayout() {
               <Building2 className="w-5 h-5" />
               <span className="font-medium">Модули ресторанов</span>
               {location.pathname === '/admin/restaurant-modules' && <ChevronRight className="w-4 h-4 ml-auto" />}
+            </NavLink>
+          )}
+
+          {/* Domains status (superadmin only) */}
+          {user?.role === 'superadmin' && (
+            <NavLink
+              to="/admin/domains-status"
+              onClick={() => setSidebarOpen(false)}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+                location.pathname === '/admin/domains-status'
+                  ? "bg-mint-500 text-white shadow-lg shadow-mint-500/30"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              data-testid="nav-domains-status"
+            >
+              <Globe className="w-5 h-5" />
+              <span className="font-medium">Статус доменов</span>
+              {location.pathname === '/admin/domains-status' && <ChevronRight className="w-4 h-4 ml-auto" />}
             </NavLink>
           )}
 

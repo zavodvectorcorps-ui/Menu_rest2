@@ -26,6 +26,10 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
     volumes:
       - ./backend/uploads:/app/uploads
+      # Read-only доступ для страницы «Статус доменов» — backend перечисляет
+      # подключённые .conf-файлы и читает срок действия сертификатов.
+      - ./nginx/custom-domains:/etc/nginx/custom-domains:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       - mongo
 

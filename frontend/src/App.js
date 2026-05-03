@@ -13,6 +13,7 @@ import OrdersPage from "@/pages/OrdersPage";
 import SettingsPage from "@/pages/SettingsPage";
 import HelpCenterPage from "@/pages/HelpCenterPage";
 import RestaurantModulesPage from "@/pages/RestaurantModulesPage";
+import DomainsStatusPage from "@/pages/DomainsStatusPage";
 import ClientMenuPage from "@/pages/ClientMenuPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import UsersPage from "@/pages/UsersPage";
@@ -271,6 +272,7 @@ function App() {
                 <Route path="factual-margin" element={<FactualMarginPage />} />
                 <Route path="users" element={user?.role === 'superadmin' ? <UsersPage /> : <Navigate to="/admin/profile" replace />} />
                 <Route path="restaurant-modules" element={user?.role === 'superadmin' ? <RestaurantModulesPage /> : <Navigate to="/admin/profile" replace />} />
+                <Route path="domains-status" element={user?.role === 'superadmin' ? <DomainsStatusPage /> : <Navigate to="/admin/profile" replace />} />
                 <Route path="backup" element={user?.role === 'superadmin' ? <BackupPage /> : <Navigate to="/admin/profile" replace />} />
                 <Route path="help" element={<HelpCenterPage />} />
               </Route>
