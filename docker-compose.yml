@@ -51,6 +51,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/custom-domains:/etc/nginx/custom-domains:ro
       - certbot_data:/var/www/certbot:ro
     depends_on:
       - frontend

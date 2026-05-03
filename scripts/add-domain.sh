@@ -8,19 +8,17 @@
 #
 # What it does:
 #   1. Verifies that DNS A-record of the domain points to THIS server.
-#      If not — exits early with a clear error (no point asking certbot).
-#   2. Adds an HTTPS server-block to nginx/nginx.conf (idempotent — skips
-#      if the block already exists).
-#   3. Issues a Let's Encrypt certificate via the certbot container.
-#   4. Reloads nginx so the new domain is picked up.
+#   2. Issues a Let's Encrypt certificate via certbot (webroot HTTP-01).
+#   3. Writes an HTTPS server-block to nginx/custom-domains/DOMAIN.conf.
+#      Files in this directory are OUTSIDE git (see .gitignore), so
+#      `update.sh` (`git reset --hard`) никогда их не перетрёт — тенант-
+#      домены остаются привязанными независимо от деплоев.
+#   4. Validates full nginx config, then reloads nginx.
 #
 # Prerequisites:
 #   - Run from the project root (where docker-compose.yml lives).
-#   - The client must have already pointed the domain (A-record OR CNAME) to
-#     this VPS. DNS propagation usually takes 5–30 minutes.
-#   - In admin panel («Модули ресторанов» → «Кастомные домены») the same
-#     domain must be added to the target restaurant. Otherwise the menu
-#     endpoint won't know which restaurant the domain belongs to.
+#   - DNS A-record must already point to this VPS (5–30 min propagation).
+#   - In admin panel the same domain must be added to the target restaurant.
 # ============================================================
 
 set -e
@@ -34,11 +32,13 @@ fi
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
+CUSTOM_DIR="$PROJECT_DIR/nginx/custom-domains"
 NGINX_CONF="$PROJECT_DIR/nginx/nginx.conf"
 DOMAIN="$1"
 shift
 EXTRA_DOMAINS="$@"
 ALL_DOMAINS="$DOMAIN $EXTRA_DOMAINS"
+DOMAIN_CONF="$CUSTOM_DIR/${DOMAIN}.conf"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; BLUE='\033[0;34m'; NC='\033[0m'
 log()  { echo -e "${BLUE}▶${NC} $1"; }
@@ -46,7 +46,14 @@ ok()   { echo -e "${GREEN}✓${NC} $1"; }
 warn() { echo -e "${YELLOW}!${NC} $1"; }
 err()  { echo -e "${RED}✗${NC} $1"; exit 1; }
 
-# -------- 0. Verify DNS points to this server --------
+mkdir -p "$CUSTOM_DIR"
+
+# -------- 0. One-time migration: ensure nginx.conf has the include directive --------
+if ! grep -q "include /etc/nginx/custom-domains" "$NGINX_CONF"; then
+    err "В nginx.conf отсутствует директива 'include /etc/nginx/custom-domains/*.conf;'. Запустите git pull — нужен свежий nginx.conf."
+fi
+
+# -------- 1. Verify DNS points to this server --------
 log "Проверяю DNS-запись для ${DOMAIN}..."
 SERVER_IP=$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || \
             curl -fsS --max-time 5 https://ifconfig.me 2>/dev/null || \
@@ -66,14 +73,11 @@ else
     ok "DNS корректно указывает на этот сервер"
 fi
 
-# -------- 1. Make sure nginx is up so certbot HTTP-01 challenge works --------
-# (Existing nginx already has a port-80 catch-all server with location
-#  /.well-known/acme-challenge/ that catches any Host, so we can issue a cert
-#  for the new domain BEFORE adding any HTTPS server-block for it.)
-log "Поднимаю nginx (для ACME challenge на порту 80)"
+# -------- 2. Make sure nginx is up (for ACME challenge on port 80) --------
+log "Поднимаю nginx"
 docker compose up -d nginx >/dev/null
 
-# -------- 2. Issue Let's Encrypt certificate FIRST --------
+# -------- 3. Issue certificate FIRST (so nginx -t later can find the files) --------
 DOMAIN_ARGS=""
 for d in $ALL_DOMAINS; do DOMAIN_ARGS="$DOMAIN_ARGS -d $d"; done
 
@@ -89,89 +93,64 @@ else
     ok "Сертификат получен"
 fi
 
-# -------- 3. Add nginx HTTPS server-block (idempotent, cert уже на месте) --------
-if grep -qE "server_name[^;]*\b${DOMAIN}\b" "$NGINX_CONF"; then
-    warn "Домен ${DOMAIN} уже есть в nginx.conf. Пропускаю шаг добавления конфига."
-else
-    log "Добавляю server-блок для ${DOMAIN} в nginx.conf"
-    SERVER_BLOCK=$(cat <<'BLOCK_EOF'
-
-    # ============ Custom tenant domain: __DOMAIN__ ============
-    server {
-        listen 443 ssl;
-        listen [::]:443 ssl;
-        server_name __ALL_DOMAINS__;
-
-        ssl_certificate /etc/nginx/ssl/live/__DOMAIN__/fullchain.pem;
-        ssl_certificate_key /etc/nginx/ssl/live/__DOMAIN__/privkey.pem;
-        ssl_protocols TLSv1.2 TLSv1.3;
-
-        client_max_body_size 20M;
-
-        location /api/ {
-            limit_req zone=api burst=20 nodelay;
-            set $backend_upstream "backend:8001";
-            proxy_pass http://$backend_upstream;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header X-Forwarded-Host $host;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_read_timeout 86400;
-        }
-
-        location / {
-            set $frontend_upstream "frontend:80";
-            proxy_pass http://$frontend_upstream;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-        }
-    }
-BLOCK_EOF
-)
-    SERVER_BLOCK=${SERVER_BLOCK//__DOMAIN__/$DOMAIN}
-    SERVER_BLOCK=${SERVER_BLOCK//__ALL_DOMAINS__/$ALL_DOMAINS}
-
-    # Backup current valid config in case we need to roll back manually
-    cp "$NGINX_CONF" "${NGINX_CONF}.bak.$(date +%s)"
-
-    # Insert before the LAST closing '}' of the file (closer of http {}).
-    # Naive "first ^}$ wins" inserts after events {} — that's how rest-menu.by
-    # went down on 2026-05-02.
-    BLOCK_FILE=$(mktemp)
-    printf '%s\n' "$SERVER_BLOCK" > "$BLOCK_FILE"
-    TMP_FILE=$(mktemp)
-    python3 - "$NGINX_CONF" "$TMP_FILE" "$BLOCK_FILE" <<'PYEOF'
-import sys, pathlib
-src = pathlib.Path(sys.argv[1]).read_text().splitlines(keepends=True)
-block = pathlib.Path(sys.argv[3]).read_text()
-last_close = max(i for i, line in enumerate(src) if line.rstrip() == "}")
-src.insert(last_close, block if block.endswith("\n") else block + "\n")
-pathlib.Path(sys.argv[2]).write_text("".join(src))
-PYEOF
-    rm -f "$BLOCK_FILE"
-    mv "$TMP_FILE" "$NGINX_CONF"
-
-    # Validate before reloading nginx. Mount BOTH the conf AND the SSL dir so
-    # the cert files are visible to nginx -t (otherwise it fails on missing
-    # ssl_certificate path).
-    log "Проверяю nginx -t..."
-    NGINX_TEST_OUTPUT=$(docker run --rm \
-        -v "$NGINX_CONF":/etc/nginx/nginx.conf:ro \
-        -v "$PROJECT_DIR/nginx/ssl":/etc/nginx/ssl:ro \
-        nginx:alpine nginx -t -c /etc/nginx/nginx.conf 2>&1) || {
-        echo "$NGINX_TEST_OUTPUT" | sed 's/^/  /'
-        warn "Конфиг nginx после вставки невалиден — откатываюсь к git."
-        git checkout HEAD -- "$NGINX_CONF" 2>/dev/null || true
-        err "Не удалось безопасно вставить server-блок. nginx.conf откачен."
-    }
-    ok "Server-блок добавлен и проверен (nginx -t)"
+# -------- 4. Write per-domain nginx config --------
+if [ -f "$DOMAIN_CONF" ]; then
+    warn "Конфиг ${DOMAIN_CONF} уже существует. Перезаписываю."
 fi
 
-# -------- 4. Reload nginx --------
+log "Пишу конфиг ${DOMAIN_CONF}"
+cat > "$DOMAIN_CONF" <<CONFEOF
+# Auto-generated by scripts/add-domain.sh — не отслеживается git'ом.
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name ${ALL_DOMAINS};
+
+    ssl_certificate /etc/nginx/ssl/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/live/${DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    client_max_body_size 20M;
+
+    location /api/ {
+        limit_req zone=api burst=20 nodelay;
+        set \$backend_upstream "backend:8001";
+        proxy_pass http://\$backend_upstream;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 86400;
+    }
+
+    location / {
+        set \$frontend_upstream "frontend:80";
+        proxy_pass http://\$frontend_upstream;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+    }
+}
+CONFEOF
+
+# -------- 5. Validate full nginx config --------
+log "Проверяю nginx -t..."
+NGINX_TEST_OUTPUT=$(docker run --rm \
+    -v "$NGINX_CONF":/etc/nginx/nginx.conf:ro \
+    -v "$CUSTOM_DIR":/etc/nginx/custom-domains:ro \
+    -v "$PROJECT_DIR/nginx/ssl":/etc/nginx/ssl:ro \
+    nginx:alpine nginx -t -c /etc/nginx/nginx.conf 2>&1) || {
+    echo "$NGINX_TEST_OUTPUT" | sed 's/^/  /'
+    warn "Конфиг nginx после добавления ${DOMAIN} невалиден — удаляю файл."
+    rm -f "$DOMAIN_CONF"
+    err "Не удалось безопасно добавить домен. Конфиг откачен."
+}
+ok "Конфиг валиден"
+
+# -------- 6. Reload nginx --------
 log "Перезапускаю Nginx"
 docker compose restart nginx >/dev/null
 
@@ -179,7 +158,10 @@ ok "Готово! Домен ${DOMAIN} подключён."
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "Что проверить:"
-echo "  1. Откройте https://${DOMAIN}/api/health — должен вернуть {\"status\":\"ok\"}"
+echo "  1. https://${DOMAIN}/api/health → {\"status\":\"ok\"}"
 echo "  2. В админке нажмите «Проверить» рядом с этим доменом"
-echo "  3. Откройте QR-код стола — он автоматически использует новый домен"
+echo "  3. QR-код стола будет работать через новый домен"
+echo ""
+echo "Список подключённых доменов:"
+ls -1 "$CUSTOM_DIR"/*.conf 2>/dev/null | xargs -n1 basename -s .conf 2>/dev/null || echo "  (пусто)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

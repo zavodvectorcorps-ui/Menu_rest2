@@ -1,0 +1,3 @@
+# Per-tenant domain configs are created at runtime on each VPS.
+# Do NOT commit them — otherwise they'd clash between deployments.
+*.conf
