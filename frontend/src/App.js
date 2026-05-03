@@ -24,6 +24,7 @@ import PriceControlPage from "@/pages/PriceControlPage";
 import CaffestaMappingPage from "@/pages/CaffestaMappingPage";
 import FactualMarginPage from "@/pages/FactualMarginPage";
 import RootRoute from "@/pages/RootRoute";
+import DemoPage from "@/pages/DemoPage";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
@@ -276,6 +277,9 @@ function App() {
                 <Route path="backup" element={user?.role === 'superadmin' ? <BackupPage /> : <Navigate to="/admin/profile" replace />} />
                 <Route path="help" element={<HelpCenterPage />} />
               </Route>
+              
+              {/* Public Demo / Portfolio page */}
+              <Route path="/demo" element={<DemoPage />} />
               
               {/* Client Menu Route (Public) */}
               <Route path="/menu/:tableCode" element={<ClientMenuPage />} />

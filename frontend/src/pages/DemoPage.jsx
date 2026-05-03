@@ -20,6 +20,60 @@ export default function DemoPage() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // SEO meta tags
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = 'REST-MENU — Multi-tenant SaaS для ресторанов | Цифровое меню, QR, POS, Telegram';
+
+    const metas = [
+      { name: 'description', content: 'SaaS платформа цифрового меню для ресторанов: мультитенантность, онлайн-меню по QR-коду, заказы в зале и на доставку, интеграция с Caffesta POS и Telegram-ботом, аналитика и кастомные домены.' },
+      { name: 'keywords', content: 'рестораны, цифровое меню, QR меню, SaaS, multi-tenant, Caffesta, Telegram бот, онлайн заказы, POS интеграция, аналитика ресторана' },
+      { name: 'author', content: 'REST-MENU' },
+      { name: 'robots', content: 'index, follow' },
+      { property: 'og:type', content: 'website' },
+      { property: 'og:title', content: 'REST-MENU — SaaS платформа цифрового меню для ресторанов' },
+      { property: 'og:description', content: 'Мультитенантная SaaS платформа: меню по QR, заказы, Telegram-бот, интеграция с Caffesta POS, аналитика продаж — всё в одной админке.' },
+      { property: 'og:image', content: `${window.location.origin}/og-image.png` },
+      { property: 'og:url', content: `${window.location.origin}/demo` },
+      { property: 'og:site_name', content: 'REST-MENU' },
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:title', content: 'REST-MENU — SaaS для ресторанов' },
+      { name: 'twitter:description', content: 'Цифровое меню, QR, POS, Telegram-бот и аналитика в одной платформе.' },
+      { name: 'twitter:image', content: `${window.location.origin}/og-image.png` },
+      { name: 'theme-color', content: '#0a0e1a' },
+    ];
+
+    const createdNodes = [];
+    metas.forEach(({ name, property, content }) => {
+      const selector = name ? `meta[name="${name}"]` : `meta[property="${property}"]`;
+      let node = document.head.querySelector(selector);
+      if (!node) {
+        node = document.createElement('meta');
+        if (name) node.setAttribute('name', name);
+        if (property) node.setAttribute('property', property);
+        document.head.appendChild(node);
+        createdNodes.push(node);
+      }
+      node.setAttribute('content', content);
+    });
+
+    // Canonical link
+    let canonical = document.head.querySelector('link[rel="canonical"]');
+    const canonicalCreated = !canonical;
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute('href', `${window.location.origin}/demo`);
+
+    return () => {
+      document.title = prevTitle;
+      createdNodes.forEach((n) => n.remove());
+      if (canonicalCreated && canonical) canonical.remove();
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#0a0e1a] text-white overflow-x-hidden font-sans" data-testid="demo-page">
 
