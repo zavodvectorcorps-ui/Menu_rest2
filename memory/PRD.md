@@ -18,6 +18,13 @@
   - Новый публичный endpoint `GET /api/public/demo-menu-info` возвращает путь к клиентскому меню (`/slug/N` или `/menu/{code}`) первого активного стола (№≥1) первого демо-ресторана.
   - На DemoPage добавлена секция с phone-mockup (notch, рамка), внутри QR-код (`qrcode.react`) с ссылкой на живое клиентское меню. Справа — 4 преимущества и кнопка «Открыть меню в новой вкладке».
   - QR-код генерится на клиенте (SVG) — не зависит от внешних API, работает offline после загрузки страницы.
+- **Мультиязычность клиентского меню RU↔EN (P2, DONE)**:
+  - **Backend**: новый сервис `services/translation.py` (Gemini 2.5 Flash через `emergentintegrations`, система-промпт = «menu translator»). Добавлены поля `name_en`/`description_en` в модели `MenuItem`, `MenuSection`, `Category`, `CallType`. Endpoint'ы создания/обновления menu-items/categories/sections ставят фоновую задачу перевода через `BackgroundTasks` — пользователь админки получает ответ мгновенно, EN-поля заполняются через секунду.
+  - Bulk endpoint `POST /api/restaurants/{rid}/translate-all[?force=true]` — фоновая задача, которая дотранслирует все существующие блюда/категории ресторана (возвращает estimate сразу, перевод идёт в фоне, `asyncio.sleep(0.1)` между блюдами чтобы не блокировать event loop).
+  - EN-перевод автоматически сбрасывается при редактировании RU-текста (next hit бэкенда перегенерит).
+  - **Frontend**: новый `lib/i18n.js` (Map RU/EN, auto-detect `navigator.language`, persist в `localStorage`), компонент `LanguageSwitcher.jsx` (пилл-переключатель RU/EN с флагами в хедере клиентского меню). `ClientMenuPage` использует `t(key)` для UI-строк и `getLocalized(doc, 'name'|'description', lang)` для контента (fallback на RU если `*_en` пустое).
+  - Проверено: на демо-ресторане `Мята Спортивная` переведено 135+/213 блюд и 50/50 категорий. EN-меню показывает «Breakfasts until 4 PM», «Syrniki with sour cream and Rosemary Cherry sauce», «Call waiter» и т.д. Админка намеренно оставлена на русском (для сотрудников).
+
 - **Live-метрики на DemoPage (P1, DONE)**:
   - Новый публичный endpoint `GET /api/public/demo-stats` агрегирует 6 метрик по демо-ресторанам: количество ресторанов, активных столов, позиций в меню, просмотров меню (total + 24h delta), заказов (total + 24h), вызовов официанта.
   - Статичный блок «Metrics» на DemoPage заменён на динамический с «live» пульсирующей точкой, иконками Lucide и count-up анимацией (requestAnimationFrame, ease-out cubic 900ms).

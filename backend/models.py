@@ -109,6 +109,7 @@ class MenuSection(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     restaurant_id: str
     name: str
+    name_en: Optional[str] = ""
     sort_order: int = 0
     is_active: bool = True
 
@@ -122,6 +123,7 @@ class Category(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     restaurant_id: str
     name: str
+    name_en: Optional[str] = ""
     section_id: Optional[str] = None
     display_mode: str = "card"
     sort_order: int = 0
@@ -148,7 +150,9 @@ class MenuItem(BaseModel):
     restaurant_id: str
     category_id: str
     name: str
+    name_en: Optional[str] = ""
     description: Optional[str] = ""
+    description_en: Optional[str] = ""
     price: float = 0
     weight: Optional[str] = ""
     image_url: Optional[str] = ""
@@ -297,6 +301,7 @@ class CallType(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     restaurant_id: str
     name: str
+    name_en: Optional[str] = ""
     telegram_message: str = ""
     sort_order: int = 0
     is_active: bool = True

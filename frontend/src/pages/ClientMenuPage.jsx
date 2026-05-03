@@ -10,11 +10,16 @@ import { Toaster } from '@/components/ui/sonner';
 import axios from 'axios';
 import ItemDetailsDialog from '@/components/ItemDetailsDialog';
 import MenuImage from '@/components/MenuImage';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import { useI18n, getLocalized } from '@/lib/i18n';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 export default function ClientMenuPage({ domainMode = false } = {}) {
+  const { lang, setLang, t } = useI18n();
+  const localizedName = (d) => getLocalized(d, 'name', lang);
+  const localizedDescription = (d) => getLocalized(d, 'description', lang);
   const { tableCode, slug, tableNumber } = useParams();
   const isSlugMode = !!slug && !!tableNumber;
   const isDomainMode = !!domainMode && !!tableNumber && !slug;
@@ -288,7 +293,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     } else {
       setCart([...cart, { ...item, quantity: 1 }]);
     }
-    toast.success(`${item.name} добавлен в корзину`);
+    toast.success(`${localizedName(item)} ${lang === 'en' ? 'added to cart' : 'добавлен в корзину'}`);
   };
 
   const updateCartQuantity = (itemId, delta) => {
@@ -409,7 +414,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
           <div className="w-16 h-16 rounded-full bg-mint-500/20 flex items-center justify-center">
             <div className="w-10 h-10 rounded-full bg-mint-500 animate-ping" />
           </div>
-          <p className="text-muted-foreground font-medium">Загрузка меню...</p>
+          <p className="text-muted-foreground font-medium">{t('loading')}</p>
         </div>
       </div>
     );
@@ -513,10 +518,12 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
               )}
               <div>
                 <h1 className="font-heading font-bold text-foreground">{restaurant.name}</h1>
-                <p className="text-xs text-muted-foreground">Стол №{table.number}</p>
+                <p className="text-xs text-muted-foreground">{t('table_label')} №{table.number}</p>
               </div>
             </div>
-            
+
+            <div className="flex items-center gap-2">
+              <LanguageSwitcher lang={lang} setLang={setLang} />
             {settings.staff_call_enabled && call_types && call_types.length > 0 && (
               <div className="flex items-center gap-1.5">
                 <button
@@ -531,7 +538,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                       ? 'bg-mint-500 text-white'
                       : 'border border-border text-foreground/70 hover:bg-muted'
                   }`}
-                  aria-label="Поиск"
+                  aria-label={t('search_placeholder')}
                   data-testid="toggle-search-btn"
                 >
                   <Search className="w-4 h-4" />
@@ -544,7 +551,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                   data-testid="call-staff-btn"
                 >
                   <Bell className="w-4 h-4 mr-1" />
-                  Вызов
+                  {t('call_waiter')}
                 </Button>
               </div>
             )}
@@ -561,12 +568,13 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                     ? 'bg-mint-500 text-white'
                     : 'border border-border text-foreground/70 hover:bg-muted'
                 }`}
-                aria-label="Поиск"
+                aria-label={t('search_placeholder')}
                 data-testid="toggle-search-btn"
               >
                 <Search className="w-4 h-4" />
               </button>
             )}
+            </div>
           </div>
 
           {restaurant.slogan && (
@@ -588,7 +596,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                 }`}
                 data-testid={`section-tab-${section.id}`}
               >
-                {section.name}
+                {localizedName(section)}
               </button>
             ))}
           </div>
@@ -677,7 +685,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                       }`}
                       data-testid={`category-tab-${cat.id}`}
                     >
-                      {cat.name}
+                      {localizedName(cat)}
                     </button>
                   ))}
                 </div>
@@ -692,7 +700,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
         {/* Order status tracker */}
         {activeOrderId && orderStatus && (
           <div className="mb-6 p-4 rounded-xl bg-card border border-border shadow-sm" data-testid="order-tracker">
-            <h3 className="font-heading font-semibold text-foreground mb-3">Статус заказа</h3>
+            <h3 className="font-heading font-semibold text-foreground mb-3">{t('order_status')}</h3>
             <div className="flex items-center gap-2">
               {['new', 'in_progress', 'completed'].map((step, idx) => {
                 const isCancelled = orderStatus === 'cancelled';
@@ -701,7 +709,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                   (step === 'new' && ['in_progress', 'completed'].includes(orderStatus)) ||
                   (step === 'in_progress' && orderStatus === 'completed')
                 );
-                const labels = { new: 'Принят', in_progress: 'Готовится', completed: 'Готов' };
+                const labels = { new: t('order_status_pending'), in_progress: t('order_status_in_progress'), completed: t('order_status_completed') };
                 const icons = { new: '📝', in_progress: '👨‍🍳', completed: '✅' };
                 return (
                   <div key={step} className="flex items-center gap-2 flex-1">
@@ -768,7 +776,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
           ) : normalizedQuery && totalMatches === 0 ? (
             <div className="text-center py-12" data-testid="menu-search-empty">
               <Search className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">Ничего не найдено по запросу «{searchQuery}»</p>
+              <p className="text-muted-foreground">{t('search_no_results')} «{searchQuery}»</p>
               <Button
                 variant="outline"
                 size="sm"
@@ -794,7 +802,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                 >
                   <h2 className="font-heading font-bold text-base text-foreground mb-3 px-1 flex items-center gap-2">
                     <span className="w-1 h-5 rounded-full bg-mint-500" />
-                    {cat.name}
+                    {localizedName(cat)}
                   </h2>
 
                   {mode === 'compact' ? (
@@ -807,10 +815,10 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             data-testid={`banner-${item.id}`}
                           >
                             {item.image_url && (
-                              <MenuImage src={item.image_url} alt={item.name} className="w-full h-auto rounded-lg mb-2" />
+                              <MenuImage src={item.image_url} alt={localizedName(item)} className="w-full h-auto rounded-lg mb-2" />
                             )}
-                            {item.name && <h3 className="font-heading font-semibold text-foreground">{item.name}</h3>}
-                            {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
+                            {item.name && <h3 className="font-heading font-semibold text-foreground">{localizedName(item)}</h3>}
+                            {item.description && <p className="text-sm text-muted-foreground">{localizedDescription(item)}</p>}
                           </div>
                         ) : (
                           <div
@@ -821,7 +829,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                           >
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start gap-2 flex-wrap">
-                                <span className="font-medium text-foreground break-words">{item.name}</span>
+                                <span className="font-medium text-foreground break-words">{localizedName(item)}</span>
                                 {item.is_hit && <Star className="w-3.5 h-3.5 text-red-500 flex-shrink-0 mt-0.5" />}
                                 {item.is_new && <Sparkles className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />}
                                 {item.is_takeaway && <ShoppingBag className="w-3.5 h-3.5 text-sky-500 flex-shrink-0 mt-0.5" />}
@@ -835,7 +843,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                                 })}
                               </div>
                               {item.description && (
-                                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{item.description}</p>
+                                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{localizedDescription(item)}</p>
                               )}
                               {item.weight && (
                                 <span className="text-xs text-muted-foreground mt-0.5 inline-block">{item.weight}</span>
@@ -869,12 +877,12 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             data-testid={`banner-${item.id}`}
                           >
                             {item.image_url && (
-                              <MenuImage src={item.image_url} alt={item.name} className="w-full h-auto object-cover" />
+                              <MenuImage src={item.image_url} alt={localizedName(item)} className="w-full h-auto object-cover" />
                             )}
                             {(item.name || item.description) && (
                               <div className="p-3 bg-card">
-                                {item.name && <h3 className="font-heading font-semibold text-foreground">{item.name}</h3>}
-                                {item.description && <p className="text-sm text-muted-foreground mt-1">{item.description}</p>}
+                                {item.name && <h3 className="font-heading font-semibold text-foreground">{localizedName(item)}</h3>}
+                                {item.description && <p className="text-sm text-muted-foreground mt-1">{localizedDescription(item)}</p>}
                               </div>
                             )}
                           </div>
@@ -887,7 +895,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                           >
                             <div className="aspect-square w-full bg-muted relative">
                               {item.image_url ? (
-                                <MenuImage src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                                <MenuImage src={item.image_url} alt={localizedName(item)} className="w-full h-full object-cover" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
                                   <ImageIcon className="w-10 h-10 text-muted-foreground/30" />
@@ -918,11 +926,11 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             </div>
                             <div className="p-3 flex flex-col gap-2 flex-1">
                               <h3 className="font-heading font-semibold text-foreground text-sm leading-tight line-clamp-2">
-                                {item.name}
+                                {localizedName(item)}
                               </h3>
                               {item.description && (
                                 <p className="text-xs text-muted-foreground line-clamp-3 leading-snug">
-                                  {item.description}
+                                  {localizedDescription(item)}
                                 </p>
                               )}
                               {(item.label_ids || []).length > 0 && (
@@ -970,15 +978,15 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             data-testid={`banner-${item.id}`}
                           >
                             {item.image_url && (
-                              <MenuImage src={item.image_url} alt={item.name} className="w-full h-auto object-cover" />
+                              <MenuImage src={item.image_url} alt={localizedName(item)} className="w-full h-auto object-cover" />
                             )}
                             {(item.name || item.description) && (
                               <div className="p-4 bg-card">
                                 {item.name && (
-                                  <h3 className="font-heading font-semibold text-foreground">{item.name}</h3>
+                                  <h3 className="font-heading font-semibold text-foreground">{localizedName(item)}</h3>
                                 )}
                                 {item.description && (
-                                  <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
+                                  <p className="text-sm text-muted-foreground mt-1">{localizedDescription(item)}</p>
                                 )}
                               </div>
                             )}
@@ -993,7 +1001,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             <div className="flex">
                               <div className="w-28 h-28 flex-shrink-0 bg-muted relative">
                                 {item.image_url ? (
-                                  <MenuImage src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                                  <MenuImage src={item.image_url} alt={localizedName(item)} className="w-full h-full object-cover" />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
                                     <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
@@ -1027,7 +1035,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                                 <div className="flex-1">
                                   <div className="flex items-start gap-1 flex-wrap mb-1">
                                     <h3 className="font-heading font-semibold text-foreground text-sm leading-tight">
-                                      {item.name}
+                                      {localizedName(item)}
                                     </h3>
                                     {(item.label_ids || []).map(lid => {
                                       const lbl = labelsMap[lid];
@@ -1041,7 +1049,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
 
                                   {item.description && (
                                     <p className="text-xs text-muted-foreground line-clamp-3 mb-2 leading-snug">
-                                      {item.description}
+                                      {localizedDescription(item)}
                                     </p>
                                   )}
                                 </div>
@@ -1125,7 +1133,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
       <Dialog open={callModalOpen} onOpenChange={setCallModalOpen}>
         <DialogContent className="max-w-sm" data-testid="call-modal">
           <DialogHeader>
-            <DialogTitle className="font-heading text-center">Выберите действие</DialogTitle>
+            <DialogTitle className="font-heading text-center">{t('call_choose_reason')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-4">
             {call_types?.map((callType) => (
@@ -1138,7 +1146,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                 data-testid={`call-type-${callType.id}`}
               >
                 <Bell className="w-5 h-5 mr-3 text-mint-500" />
-                <span className="font-medium">{callType.name}</span>
+                <span className="font-medium">{localizedName(callType)}</span>
               </Button>
             ))}
           </div>
@@ -1150,11 +1158,11 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
         <DialogContent className="max-w-md max-h-[90vh] overflow-hidden flex flex-col" data-testid="cart-dialog">
           <DialogHeader>
             <DialogTitle className="font-heading">
-              {isCartOnly ? 'Покажите заказ официанту' : 'Ваш заказ'}
+              {isCartOnly ? t('cart_show_waiter') : t('cart_title')}
             </DialogTitle>
             {isCartOnly && data?.table?.number && (
               <p className="text-sm text-muted-foreground" data-testid="cart-only-table-info">
-                Стол №<span className="font-semibold text-foreground">{data.table.number}</span>
+                {t('table_label')} №<span className="font-semibold text-foreground">{data.table.number}</span>
               </p>
             )}
           </DialogHeader>
@@ -1163,7 +1171,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
             {cart.map((item) => (
               <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/50" data-testid={`cart-item-${item.id}`}>
                 <div className="flex-1">
-                  <h4 className="font-medium text-foreground text-sm">{item.name}</h4>
+                  <h4 className="font-medium text-foreground text-sm">{localizedName(item)}</h4>
                   <p className="text-sm text-mint-500 font-semibold">{item.price} {currency}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1276,7 +1284,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
               )}
               {!isCartOnly && (
                 <Textarea
-                  placeholder="Комментарий к заказу (аллергии, пожелания...)"
+                  placeholder={t('order_notes_placeholder')}
                   value={orderNotes}
                   onChange={(e) => setOrderNotes(e.target.value)}
                   rows={2}
@@ -1287,9 +1295,11 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
               {isCartOnly && (
                 <div className="rounded-xl bg-mint-500/10 border border-mint-500/30 p-4 text-center">
                   <Hand className="w-8 h-8 text-mint-500 mx-auto mb-2" />
-                  <p className="text-sm font-semibold text-foreground">Покажите этот заказ официанту</p>
+                  <p className="text-sm font-semibold text-foreground">{t('cart_show_waiter')}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Это просто черновик — он не отправлен на кухню. Оформите его лично у официанта.
+                    {lang === 'en'
+                      ? "It's just a draft — nothing was sent to the kitchen. Place it in person with the waiter."
+                      : 'Это просто черновик — он не отправлен на кухню. Оформите его лично у официанта.'}
                   </p>
                 </div>
               )}
@@ -1298,7 +1308,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
 
           <div className="border-t border-border pt-4 space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-lg font-heading font-semibold">Итого:</span>
+              <span className="text-lg font-heading font-semibold">{t('cart_subtotal')}:</span>
               <span className="text-2xl font-bold text-mint-500">{cartTotal} {currency}</span>
             </div>
 
@@ -1307,12 +1317,12 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                 <Button
                   variant="outline"
                   className="flex-1 h-12 rounded-xl"
-                  onClick={() => { setCart([]); toast.success('Корзина очищена'); }}
+                  onClick={() => { setCart([]); toast.success(t('cart_empty')); }}
                   disabled={cart.length === 0}
                   data-testid="clear-cart-btn"
                 >
                   <X className="w-4 h-4 mr-2" />
-                  Очистить
+                  {t('cart_clear')}
                 </Button>
                 <Button
                   className="flex-1 h-12 rounded-xl bg-mint-500 hover:bg-mint-600 text-white font-semibold"
@@ -1320,7 +1330,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                   data-testid="cart-only-close-btn"
                 >
                   <Check className="w-5 h-5 mr-2" />
-                  Готово
+                  {t('cart_done')}
                 </Button>
               </div>
             ) : (
@@ -1333,12 +1343,12 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                 {submittingOrder ? (
                   <>
                     <div className="spinner mr-2" />
-                    Оформление...
+                    {t('submitting')}
                   </>
                 ) : (
                   <>
                     <Send className="w-5 h-5 mr-2" />
-                    Оформить заказ
+                    {t('submit_order')}
                   </>
                 )}
               </Button>

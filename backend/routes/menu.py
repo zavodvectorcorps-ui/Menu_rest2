@@ -13,12 +13,45 @@ from models import (
 from auth import get_current_user, check_restaurant_access
 from helpers import serialize_doc, get_or_create_menu_sections
 from services.images import download_images_task
+from services.translation import translate_ru_to_en
 
 UPLOADS_DIR = Path(__file__).parent.parent / "uploads"
 ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
 MAX_FILE_SIZE = 5 * 1024 * 1024
 
 router = APIRouter()
+
+
+# ============ Background translation helpers ============
+
+async def _translate_menu_item_bg(item_id: str, name: str, description: str):
+    update = {}
+    if name:
+        tr = await translate_ru_to_en(name)
+        if tr:
+            update["name_en"] = tr
+    if description:
+        tr = await translate_ru_to_en(description)
+        if tr:
+            update["description_en"] = tr
+    if update:
+        await db.menu_items.update_one({"id": item_id}, {"$set": update})
+
+
+async def _translate_category_bg(category_id: str, name: str):
+    if not name:
+        return
+    tr = await translate_ru_to_en(name)
+    if tr:
+        await db.categories.update_one({"id": category_id}, {"$set": {"name_en": tr}})
+
+
+async def _translate_section_bg(section_id: str, name: str):
+    if not name:
+        return
+    tr = await translate_ru_to_en(name)
+    if tr:
+        await db.menu_sections.update_one({"id": section_id}, {"$set": {"name_en": tr}})
 
 
 # ============ MENU SECTIONS ============
@@ -30,21 +63,26 @@ async def get_menu_sections(restaurant_id: str, current_user: dict = Depends(get
 
 
 @router.post("/restaurants/{restaurant_id}/menu-sections")
-async def create_menu_section(restaurant_id: str, data: MenuSectionCreate, current_user: dict = Depends(get_current_user)):
+async def create_menu_section(restaurant_id: str, data: MenuSectionCreate, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
     section = MenuSection(restaurant_id=restaurant_id, **data.model_dump())
     doc = section.model_dump()
     await db.menu_sections.insert_one(doc)
     doc.pop('_id', None)
+    background_tasks.add_task(_translate_section_bg, doc['id'], doc.get('name', ''))
     return doc
 
 
 @router.put("/restaurants/{restaurant_id}/menu-sections/{section_id}")
-async def update_menu_section(restaurant_id: str, section_id: str, data: MenuSectionCreate, current_user: dict = Depends(get_current_user)):
+async def update_menu_section(restaurant_id: str, section_id: str, data: MenuSectionCreate, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
-    result = await db.menu_sections.update_one({"id": section_id, "restaurant_id": restaurant_id}, {"$set": data.model_dump()})
+    # Reset EN name on every edit so background task re-translates fresh
+    payload = data.model_dump()
+    payload['name_en'] = ''
+    result = await db.menu_sections.update_one({"id": section_id, "restaurant_id": restaurant_id}, {"$set": payload})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Section not found")
+    background_tasks.add_task(_translate_section_bg, section_id, payload.get('name', ''))
     return await db.menu_sections.find_one({"id": section_id}, {"_id": 0})
 
 
@@ -68,24 +106,30 @@ async def get_categories(restaurant_id: str, current_user: dict = Depends(get_cu
 
 
 @router.post("/restaurants/{restaurant_id}/categories")
-async def create_category(restaurant_id: str, data: CategoryCreate, current_user: dict = Depends(get_current_user)):
+async def create_category(restaurant_id: str, data: CategoryCreate, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
     category = Category(restaurant_id=restaurant_id, **data.model_dump())
     doc = category.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.categories.insert_one(doc)
     doc.pop('_id', None)
+    background_tasks.add_task(_translate_category_bg, doc['id'], doc.get('name', ''))
     return doc
 
 
 @router.put("/restaurants/{restaurant_id}/categories/{category_id}")
-async def update_category(restaurant_id: str, category_id: str, data: CategoryUpdate, current_user: dict = Depends(get_current_user)):
+async def update_category(restaurant_id: str, category_id: str, data: CategoryUpdate, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
     if update_data:
+        # Reset EN translation so next request re-translates
+        if 'name' in update_data:
+            update_data['name_en'] = ''
         result = await db.categories.update_one({"id": category_id, "restaurant_id": restaurant_id}, {"$set": update_data})
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Category not found")
+        if 'name' in update_data:
+            background_tasks.add_task(_translate_category_bg, category_id, update_data['name'])
     return await db.categories.find_one({"id": category_id}, {"_id": 0})
 
 
@@ -120,20 +164,28 @@ async def get_menu_items(restaurant_id: str, category_id: Optional[str] = None, 
 
 
 @router.post("/restaurants/{restaurant_id}/menu-items")
-async def create_menu_item(restaurant_id: str, data: MenuItemCreate, current_user: dict = Depends(get_current_user)):
+async def create_menu_item(restaurant_id: str, data: MenuItemCreate, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
     item = MenuItem(restaurant_id=restaurant_id, **data.model_dump())
     doc = item.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.menu_items.insert_one(doc)
     doc.pop('_id', None)
+    background_tasks.add_task(
+        _translate_menu_item_bg, doc['id'], doc.get('name', ''), doc.get('description', '')
+    )
     return doc
 
 
 @router.put("/restaurants/{restaurant_id}/menu-items/{item_id}")
-async def update_menu_item(restaurant_id: str, item_id: str, data: MenuItemUpdate, current_user: dict = Depends(get_current_user)):
+async def update_menu_item(restaurant_id: str, item_id: str, data: MenuItemUpdate, background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    # Reset EN translations if the RU text changed — caller may edit only one
+    if 'name' in update_data:
+        update_data['name_en'] = ''
+    if 'description' in update_data:
+        update_data['description_en'] = ''
     if update_data:
         await db.menu_items.update_one({"id": item_id, "restaurant_id": restaurant_id}, {"$set": update_data})
     # If price changed, re-evaluate margin alerts for this restaurant
@@ -143,6 +195,13 @@ async def update_menu_item(restaurant_id: str, item_id: str, data: MenuItemUpdat
             await _send_margin_alerts(restaurant_id)
         except Exception:
             pass
+    if 'name' in update_data or 'description' in update_data:
+        background_tasks.add_task(
+            _translate_menu_item_bg,
+            item_id,
+            update_data.get('name', ''),
+            update_data.get('description', ''),
+        )
     return await db.menu_items.find_one({"id": item_id}, {"_id": 0})
 
 
@@ -161,6 +220,98 @@ async def reorder_items(restaurant_id: str, order: List[str], current_user: dict
     for idx, item_id in enumerate(order):
         await db.menu_items.update_one({"id": item_id, "restaurant_id": restaurant_id}, {"$set": {"sort_order": idx}})
     return {"message": "Reordered"}
+
+
+# ============ I18N / BULK TRANSLATION ============
+
+@router.post("/restaurants/{restaurant_id}/translate-all")
+async def translate_all_menu_to_en(restaurant_id: str, background_tasks: BackgroundTasks, force: bool = False, current_user: dict = Depends(get_current_user)):
+    """Kick off a background job that translates sections, categories and items
+    of a restaurant to English. Returns immediately with the count of items
+    that will be processed. Pass `?force=true` to re-translate everything."""
+    await check_restaurant_access(current_user, restaurant_id)
+
+    # Build the filters once to report an estimate
+    if force:
+        q_filter = {"restaurant_id": restaurant_id}
+        sect_count = await db.menu_sections.count_documents(q_filter)
+        cat_count = await db.categories.count_documents(q_filter)
+        item_count = await db.menu_items.count_documents(q_filter)
+    else:
+        missing_name = {"$or": [{"name_en": {"$exists": False}}, {"name_en": ""}]}
+        base = {"restaurant_id": restaurant_id}
+        sect_count = await db.menu_sections.count_documents({**base, **missing_name})
+        cat_count = await db.categories.count_documents({**base, **missing_name})
+        item_count = await db.menu_items.count_documents({
+            **base,
+            "$or": [
+                {"name_en": {"$exists": False}}, {"name_en": ""},
+                {"description_en": {"$exists": False}}, {"description_en": ""},
+            ],
+        })
+
+    background_tasks.add_task(_bulk_translate_restaurant, restaurant_id, force)
+    return {
+        "message": "Translation started in background",
+        "estimate": {"sections": sect_count, "categories": cat_count, "items": item_count},
+    }
+
+
+async def _bulk_translate_restaurant(restaurant_id: str, force: bool):
+    """Actual long-running worker. Translates in sequence; logs stats at end.
+    Yields to the event loop between items so other HTTP requests keep serving."""
+    import logging
+    import asyncio
+    log = logging.getLogger(__name__)
+    stats = {"sections": 0, "categories": 0, "items": 0}
+
+    # Sections
+    sect_q = {"restaurant_id": restaurant_id} if force else {
+        "restaurant_id": restaurant_id, "$or": [{"name_en": {"$exists": False}}, {"name_en": ""}],
+    }
+    async for s in db.menu_sections.find(sect_q, {"_id": 0, "id": 1, "name": 1}):
+        if s.get('name'):
+            tr = await translate_ru_to_en(s['name'])
+            if tr:
+                await db.menu_sections.update_one({"id": s['id']}, {"$set": {"name_en": tr}})
+                stats["sections"] += 1
+
+    # Categories
+    cat_q = {"restaurant_id": restaurant_id} if force else {
+        "restaurant_id": restaurant_id, "$or": [{"name_en": {"$exists": False}}, {"name_en": ""}],
+    }
+    async for c in db.categories.find(cat_q, {"_id": 0, "id": 1, "name": 1}):
+        if c.get('name'):
+            tr = await translate_ru_to_en(c['name'])
+            if tr:
+                await db.categories.update_one({"id": c['id']}, {"$set": {"name_en": tr}})
+                stats["categories"] += 1
+
+    # Items
+    item_q = {"restaurant_id": restaurant_id} if force else {
+        "restaurant_id": restaurant_id,
+        "$or": [
+            {"name_en": {"$exists": False}}, {"name_en": ""},
+            {"description_en": {"$exists": False}}, {"description_en": ""},
+        ],
+    }
+    async for it in db.menu_items.find(item_q, {"_id": 0, "id": 1, "name": 1, "description": 1, "name_en": 1, "description_en": 1}):
+        update = {}
+        if (force or not it.get('name_en')) and it.get('name'):
+            tr = await translate_ru_to_en(it['name'])
+            if tr:
+                update['name_en'] = tr
+        if (force or not it.get('description_en')) and it.get('description'):
+            tr = await translate_ru_to_en(it['description'])
+            if tr:
+                update['description_en'] = tr
+        if update:
+            await db.menu_items.update_one({"id": it['id']}, {"$set": update})
+            stats["items"] += 1
+        # Yield to the event loop so concurrent requests (e.g. /api/health) keep serving
+        await asyncio.sleep(0.1)
+
+    log.info("translate-all finished for %s: %s", restaurant_id, stats)
 
 
 # ============ LABELS ============
