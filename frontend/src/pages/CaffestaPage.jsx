@@ -14,7 +14,8 @@ import { API, useApp } from '@/App';
 import axios from 'axios';
 
 export default function CaffestaPage() {
-  const { token, currentRestaurantId } = useApp();
+  const { token, currentRestaurantId, restaurant } = useApp();
+  const cur = restaurant?.currency || 'BYN';
   const [searchParams, setSearchParams] = useSearchParams();
   const validTabs = ['settings', 'analytics', 'time-window', 'report', 'digest'];
   const initialTab = validTabs.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'settings';
@@ -560,10 +561,10 @@ export default function CaffestaPage() {
                 <>
                   {/* Summary cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <SummaryCard title="Выручка" value={`${analytics.totals.revenue} BYN`} icon={DollarSign} color="bg-green-500" />
+                    <SummaryCard title="Выручка" value={`${analytics.totals.revenue} ${cur}`} icon={DollarSign} color="bg-green-500" />
                     <SummaryCard title="Продажи (шт)" value={analytics.totals.quantity} icon={ShoppingCart} color="bg-blue-500" />
-                    <SummaryCard title="Средний чек" value={`${analytics.totals.avg_check} BYN`} icon={TrendingUp} color="bg-amber-500" />
-                    <SummaryCard title="Скидки" value={`${analytics.totals.discount} BYN`} icon={Award} color="bg-purple-500" />
+                    <SummaryCard title="Средний чек" value={`${analytics.totals.avg_check} ${cur}`} icon={TrendingUp} color="bg-amber-500" />
+                    <SummaryCard title="Скидки" value={`${analytics.totals.discount} ${cur}`} icon={Award} color="bg-purple-500" />
                   </div>
 
                   {/* Payment breakdown */}
@@ -578,7 +579,7 @@ export default function CaffestaPage() {
                           {analytics.payments.map((p, i) => (
                             <div key={i} className="p-3 rounded-lg bg-muted/50" data-testid={`payment-type-${i}`}>
                               <p className="text-xs text-muted-foreground truncate">{p.name}</p>
-                              <p className="text-xl font-bold">{p.amount} BYN</p>
+                              <p className="text-xl font-bold">{p.amount} {cur}</p>
                               <p className="text-xs text-muted-foreground">{p.count} чек.</p>
                             </div>
                           ))}
@@ -587,11 +588,11 @@ export default function CaffestaPage() {
                         <div className="grid grid-cols-2 gap-4">
                           <div className="p-3 rounded-lg bg-muted/50">
                             <p className="text-xs text-muted-foreground">Наличные</p>
-                            <p className="text-xl font-bold">{analytics.totals.cash} BYN</p>
+                            <p className="text-xl font-bold">{analytics.totals.cash} {cur}</p>
                           </div>
                           <div className="p-3 rounded-lg bg-muted/50">
                             <p className="text-xs text-muted-foreground">Карта</p>
-                            <p className="text-xl font-bold">{analytics.totals.card} BYN</p>
+                            <p className="text-xl font-bold">{analytics.totals.card} {cur}</p>
                           </div>
                         </div>
                       )}
@@ -615,7 +616,7 @@ export default function CaffestaPage() {
                               </div>
                               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                 <span>{p.qty} шт</span>
-                                <span className="font-medium text-foreground">{p.revenue} BYN</span>
+                                <span className="font-medium text-foreground">{p.revenue} {cur}</span>
                               </div>
                             </div>
                           ))}
@@ -734,10 +735,10 @@ export default function CaffestaPage() {
               ) : twData ? (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <SummaryCard title="Выручка" value={`${twData.totals.revenue} BYN`} icon={DollarSign} color="bg-green-500" />
+                    <SummaryCard title="Выручка" value={`${twData.totals.revenue} ${cur}`} icon={DollarSign} color="bg-green-500" />
                     <SummaryCard title="Чеков" value={twData.totals.receipts} icon={FileText} color="bg-blue-500" />
-                    <SummaryCard title="Скидки за период" value={`${Math.abs(twData.totals.discount || 0).toFixed(2)} BYN`} icon={Percent} color="bg-rose-500" />
-                    <SummaryCard title="Средний чек" value={`${twData.totals.avg_check} BYN`} icon={TrendingUp} color="bg-purple-500" />
+                    <SummaryCard title="Скидки за период" value={`${Math.abs(twData.totals.discount || 0).toFixed(2)} ${cur}`} icon={Percent} color="bg-rose-500" />
+                    <SummaryCard title="Средний чек" value={`${twData.totals.avg_check} ${cur}`} icon={TrendingUp} color="bg-purple-500" />
                   </div>
 
                   {(twData.totals.first_receipt_at || twData.totals.last_receipt_at) && (
@@ -755,7 +756,7 @@ export default function CaffestaPage() {
                                 <span className="text-muted-foreground">Первый чек</span>
                                 <span className="font-medium">{twData.totals.first_receipt_at}</span>
                               </div>
-                              <span className="font-semibold whitespace-nowrap">{twData.totals.first_receipt_total} BYN</span>
+                              <span className="font-semibold whitespace-nowrap">{twData.totals.first_receipt_total} {cur}</span>
                             </div>
                           )}
                           {twData.totals.last_receipt_at && (
@@ -765,7 +766,7 @@ export default function CaffestaPage() {
                                 <span className="text-muted-foreground">Последний чек</span>
                                 <span className="font-medium">{twData.totals.last_receipt_at}</span>
                               </div>
-                              <span className="font-semibold whitespace-nowrap">{twData.totals.last_receipt_total} BYN</span>
+                              <span className="font-semibold whitespace-nowrap">{twData.totals.last_receipt_total} {cur}</span>
                             </div>
                           )}
                         </div>
@@ -781,7 +782,7 @@ export default function CaffestaPage() {
                           {twData.payments.map((p, i) => (
                             <div key={i} className="p-3 rounded-lg bg-muted/50">
                               <p className="text-xs text-muted-foreground truncate">{p.name}</p>
-                              <p className="text-xl font-bold">{p.amount} BYN</p>
+                              <p className="text-xl font-bold">{p.amount} {cur}</p>
                               <p className="text-xs text-muted-foreground">{p.count} чек.</p>
                             </div>
                           ))}
@@ -805,7 +806,7 @@ export default function CaffestaPage() {
                               </div>
                               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                                 <span>{p.qty} шт</span>
-                                <span className="font-medium text-foreground">{p.revenue} BYN</span>
+                                <span className="font-medium text-foreground">{p.revenue} {cur}</span>
                               </div>
                             </div>
                           ))}
@@ -836,7 +837,7 @@ export default function CaffestaPage() {
                                   <td className="py-2 pr-4 font-medium">{d.date}</td>
                                   <td className="py-2 px-3 text-muted-foreground">{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][d.weekday]}</td>
                                   <td className="text-right py-2 px-3">{d.receipts}</td>
-                                  <td className="text-right py-2 pl-3 font-semibold">{d.revenue} BYN</td>
+                                  <td className="text-right py-2 pl-3 font-semibold">{d.revenue} {cur}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -946,8 +947,8 @@ export default function CaffestaPage() {
                                   <td className="py-2.5 pr-4 font-medium">{c.cashier}</td>
                                   <td className="text-right py-2.5 px-3 text-muted-foreground">{c.receipts}</td>
                                   <td className="text-right py-2.5 px-3 text-muted-foreground">{c.items}</td>
-                                  <td className="text-right py-2.5 px-3 text-muted-foreground">{c.discount} BYN</td>
-                                  <td className="text-right py-2.5 pl-3 font-semibold">{c.revenue} BYN</td>
+                                  <td className="text-right py-2.5 px-3 text-muted-foreground">{c.discount} {cur}</td>
+                                  <td className="text-right py-2.5 pl-3 font-semibold">{c.revenue} {cur}</td>
                                 </tr>
                               ))}
                             </tbody>

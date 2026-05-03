@@ -101,13 +101,13 @@ export default function AdminLayout() {
       setUnreadCount(c => c + 1);
       if (order.is_preorder) {
         toast.info(`Новый предзаказ от ${order.customer_name || 'Гость'}`, {
-          description: `${order.items?.length || 0} поз. — ${order.total?.toFixed(2)} BYN`,
+          description: `${order.items?.length || 0} поз. — ${order.total?.toFixed(2)} ${restaurant?.currency || 'BYN'}`,
           action: { label: 'Открыть', onClick: () => navigate('/admin/orders') },
           duration: 8000,
         });
       } else {
         toast.info(`Новый заказ — Стол #${order.table_number}`, {
-          description: `${order.items?.length || 0} поз. — ${order.total?.toFixed(2)} BYN`,
+          description: `${order.items?.length || 0} поз. — ${order.total?.toFixed(2)} ${restaurant?.currency || 'BYN'}`,
           action: { label: 'Открыть', onClick: () => navigate('/admin/orders') },
           duration: 8000,
         });

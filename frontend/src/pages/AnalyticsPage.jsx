@@ -6,7 +6,8 @@ import { useApp, API } from '@/App';
 import axios from 'axios';
 
 export default function AnalyticsPage() {
-  const { currentRestaurantId, token } = useApp();
+  const { currentRestaurantId, token, restaurant } = useApp();
+  const cur = restaurant?.currency || 'BYN';
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('30');
   const [data, setData] = useState(null);
@@ -107,7 +108,7 @@ export default function AnalyticsPage() {
           color="bg-green-500"
         />
         <StatCard 
-          title="Выручка (BYN)" 
+          title={`Выручка (${cur})`} 
           value={data.revenue.total.toFixed(2)}
           today={data.revenue.today.toFixed(2)}
           icon={DollarSign}
@@ -205,7 +206,7 @@ export default function AnalyticsPage() {
                   <div className="flex-1">
                     <p className="font-medium">{item.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      Заказано: {item.count} шт. • Выручка: {item.revenue.toFixed(2)} BYN
+                      Заказано: {item.count} шт. • Выручка: {item.revenue.toFixed(2)} {cur}
                     </p>
                   </div>
                   <Utensils className="w-5 h-5 text-muted-foreground" />
@@ -231,7 +232,7 @@ export default function AnalyticsPage() {
             <p className="text-3xl font-bold">
               {data.orders.total > 0 ? (data.revenue.total / data.orders.total).toFixed(2) : '0.00'}
             </p>
-            <p className="text-sm text-muted-foreground">Средний чек (BYN)</p>
+            <p className="text-sm text-muted-foreground">Средний чек ({cur})</p>
           </CardContent>
         </Card>
         <Card>

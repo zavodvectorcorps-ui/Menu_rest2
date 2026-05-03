@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 
 export default function FactualMarginPage() {
-  const { token, currentRestaurantId } = useApp();
+  const { token, currentRestaurantId, restaurant } = useApp();
+  const cur = restaurant?.currency || 'BYN';
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
   const [loading, setLoading] = useState(false);
@@ -50,7 +51,7 @@ export default function FactualMarginPage() {
   const exportCsv = () => {
     if (!data) return;
     const rows = [
-      ['Товар', 'ID', 'Продано шт', 'Выручка', 'Себестоимость', 'Маржа (BYN)', 'Маржа %', 'Ср. цена', 'Ср. себест.'],
+      ['Товар', 'ID', 'Продано шт', 'Выручка', 'Себестоимость', `Маржа (${cur})`, 'Маржа %', 'Ср. цена', 'Ср. себест.'],
       ...filtered.map(i => [
         (i.title || '').replace(/"/g, '""'),
         i.product_id,
@@ -112,9 +113,9 @@ export default function FactualMarginPage() {
       {data && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <StatCard icon={<Package className="w-4 h-4" />} label="Товаров продано" value={data.summary.products_count} />
-          <StatCard icon={<DollarSign className="w-4 h-4" />} label="Выручка" value={`${data.summary.total_revenue} BYN`} />
-          <StatCard icon={<TrendingDown className="w-4 h-4" />} label="Себестоимость" value={`${data.summary.total_cost} BYN`} />
-          <StatCard icon={<TrendingUp className="w-4 h-4 text-emerald-500" />} label="Маржа абс." value={`${data.summary.total_margin_abs} BYN`} accent="emerald" />
+          <StatCard icon={<DollarSign className="w-4 h-4" />} label="Выручка" value={`${data.summary.total_revenue} ${cur}`} />
+          <StatCard icon={<TrendingDown className="w-4 h-4" />} label="Себестоимость" value={`${data.summary.total_cost} ${cur}`} />
+          <StatCard icon={<TrendingUp className="w-4 h-4 text-emerald-500" />} label="Маржа абс." value={`${data.summary.total_margin_abs} ${cur}`} accent="emerald" />
           <StatCard icon={<TrendingUp className={`w-4 h-4 ${data.summary.total_margin_pct >= 30 ? 'text-emerald-500' : 'text-amber-500'}`} />} label="Маржа %" value={`${data.summary.total_margin_pct}%`} accent={data.summary.total_margin_pct >= 30 ? 'emerald' : 'amber'} />
         </div>
       )}
@@ -187,7 +188,7 @@ export default function FactualMarginPage() {
                   <th className="p-3 font-semibold text-right">Продано</th>
                   <th className="p-3 font-semibold text-right">Выручка</th>
                   <th className="p-3 font-semibold text-right">Себест.</th>
-                  <th className="p-3 font-semibold text-right">Маржа BYN</th>
+                  <th className="p-3 font-semibold text-right">Маржа ({cur})</th>
                   <th className="p-3 font-semibold text-right">Маржа %</th>
                 </tr>
               </thead>

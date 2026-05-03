@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function CaffestaMappingPage() {
-  const { token, currentRestaurantId } = useApp();
+  const { token, currentRestaurantId, restaurant } = useApp();
+  const cur = restaurant?.currency || 'BYN';
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
   const [loading, setLoading] = useState(false);
@@ -242,7 +243,7 @@ export default function CaffestaMappingPage() {
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="font-medium truncate">{c.title}</span>
                                   <div className="flex items-center gap-2 flex-shrink-0">
-                                    <span className="text-xs text-muted-foreground">#{c.product_id} · {c.price} BYN</span>
+                                    <span className="text-xs text-muted-foreground">#{c.product_id} · {c.price} {cur}</span>
                                     <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                                       c.score >= 85 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' :
                                       c.score >= 70 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
@@ -315,7 +316,7 @@ export default function CaffestaMappingPage() {
                     data-testid={`picker-product-${p.product_id}`}
                   >
                     <span className="font-medium truncate">{p.title}</span>
-                    <span className="text-xs text-muted-foreground flex-shrink-0">#{p.product_id} · {p.price} BYN · {p.type}</span>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">#{p.product_id} · {p.price} {cur} · {p.type}</span>
                   </button>
                 ));
               })()

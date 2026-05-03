@@ -19,7 +19,8 @@ const STATUS_MAP = {
 };
 
 export default function OrdersPage() {
-  const { token, currentRestaurantId } = useApp();
+  const { token, currentRestaurantId, restaurant } = useApp();
+  const cur = restaurant?.currency || 'BYN';
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
   const [orders, setOrders] = useState([]);
@@ -148,7 +149,7 @@ export default function OrdersPage() {
             </div>
           ))}
           <div className="flex justify-between font-bold border-t border-border pt-1 mt-2">
-            <span>Итого</span><span>{order.total?.toFixed(2)} BYN</span>
+            <span>Итого</span><span>{order.total?.toFixed(2)} {cur}</span>
           </div>
         </div>
 

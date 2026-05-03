@@ -22,6 +22,14 @@
   - Новый публичный endpoint `GET /api/public/demo-stats` агрегирует 6 метрик по демо-ресторанам: количество ресторанов, активных столов, позиций в меню, просмотров меню (total + 24h delta), заказов (total + 24h), вызовов официанта.
   - Статичный блок «Metrics» на DemoPage заменён на динамический с «live» пульсирующей точкой, иконками Lucide и count-up анимацией (requestAnimationFrame, ease-out cubic 900ms).
   - Дельта «+N / 24ч» бейджем для метрик с реальным трафиком (заказы, просмотры).
+- **OG-image для шер-карточек (P1, DONE)**:
+  - Сгенерирована через Gemini Nano Banana (`gemini-3.1-flash-image-preview`) — dark hero 1200×630, бренд REST-MENU + phone-mockup + QR-код. Финальный size: 100 KB JPEG, crop до точного aspect 1200×630.
+  - Сохранена в `/app/frontend/public/og-image.jpg`. Meta-теги на DemoPage обновлены: `og:image`, `og:image:width=1200`, `og:image:height=630`, `og:image:type=image/jpeg`, `twitter:image`.
+  - `EMERGENT_LLM_KEY` добавлен в `backend/.env`.
+- **Динамическая валюта в админ-дашбордах (P1, DONE)**:
+  - Убран хардкод `BYN` из `CaffestaPage.jsx`, `FactualMarginPage.jsx`, `AnalyticsPage.jsx`, `OrdersPage.jsx`, `CaffestaMappingPage.jsx`, `AdminLayout.jsx` (toasts). Теперь валюта берётся из `restaurant.currency` через `useApp()` (fallback `'BYN'`).
+  - Шаблон: `const cur = restaurant?.currency || 'BYN';` + замены ``` ${revenue} BYN` ``` → ``` ${revenue} ${cur}` ``` и `{x} BYN` → `{x} {cur}` (JSX text). Особый случай — JSX-атрибут string → template literal: `title="Выручка ({cur})"` → `` title={`Выручка (${cur})`} ``.
+  - CSV-экспорт в FactualMargin теперь тоже использует актуальную валюту в заголовке столбца.
 
 ### Изменения 2026-05-02 (часть 4)
 - **Полуавтоматическая привязка кастомных доменов (P1, DONE)**:

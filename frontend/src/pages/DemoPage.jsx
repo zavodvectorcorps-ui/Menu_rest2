@@ -54,13 +54,16 @@ export default function DemoPage() {
       { property: 'og:type', content: 'website' },
       { property: 'og:title', content: 'REST-MENU — SaaS платформа цифрового меню для ресторанов' },
       { property: 'og:description', content: 'Мультитенантная SaaS платформа: меню по QR, заказы, Telegram-бот, интеграция с Caffesta POS, аналитика продаж — всё в одной админке.' },
-      { property: 'og:image', content: `${window.location.origin}/og-image.png` },
+      { property: 'og:image', content: `${window.location.origin}/og-image.jpg` },
+      { property: 'og:image:width', content: '1200' },
+      { property: 'og:image:height', content: '630' },
+      { property: 'og:image:type', content: 'image/jpeg' },
       { property: 'og:url', content: `${window.location.origin}/demo` },
       { property: 'og:site_name', content: 'REST-MENU' },
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: 'REST-MENU — SaaS для ресторанов' },
       { name: 'twitter:description', content: 'Цифровое меню, QR, POS, Telegram-бот и аналитика в одной платформе.' },
-      { name: 'twitter:image', content: `${window.location.origin}/og-image.png` },
+      { name: 'twitter:image', content: `${window.location.origin}/og-image.jpg` },
       { name: 'theme-color', content: '#0a0e1a' },
     ];
 
