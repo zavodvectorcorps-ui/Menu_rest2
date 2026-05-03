@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCw, Globe, CheckCircle2, AlertTriangle, AlertCircle, Copy, ExternalLink, Building2 } from 'lucide-react';
+import { Loader2, RefreshCw, Globe, CheckCircle2, AlertTriangle, AlertCircle, Copy, ExternalLink, Building2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { API, useApp } from '@/App';
 
@@ -30,6 +30,25 @@ export default function DomainsStatusPage() {
   const copyCmd = async (text) => {
     try { await navigator.clipboard.writeText(text); toast.success('Скопировано'); }
     catch { toast.error('Не удалось скопировать'); }
+  };
+
+  // Per-domain "renewing" state: { [domain]: boolean }
+  const [renewing, setRenewing] = useState({});
+
+  const renewCert = async (domain) => {
+    if (!window.confirm(`Принудительно продлить сертификат для ${domain}?\n\nЭто обратится к Let's Encrypt и перезапишет файлы сертификата. Соблюдается лимит Let's Encrypt (≤5 обновлений/неделю на домен).`)) return;
+    setRenewing((s) => ({ ...s, [domain]: true }));
+    try {
+      const r = await axios.post(`${API}/admin/domains-status/${encodeURIComponent(domain)}/renew`, {}, auth);
+      toast.success(`Сертификат продлён до ${r.data.renewed_expires_at?.slice(0, 10)}`);
+      fetchData();
+    } catch (e) {
+      const msg = e.response?.data?.detail || 'Не удалось продлить сертификат';
+      // Keep full error visible — user likely needs tail from certbot
+      toast.error(msg, { duration: 10000 });
+    } finally {
+      setRenewing((s) => ({ ...s, [domain]: false }));
+    }
   };
 
   const iconFor = (verdict) =>
@@ -164,6 +183,26 @@ export default function DomainsStatusPage() {
                   >
                     <Copy className="w-3 h-3 mr-1" /> Скопировать
                   </Button>
+                </div>
+              )}
+
+              {/* Renew button — только если сертификат есть на диске */}
+              {row.cert?.expires_at && (
+                <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border/40">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => renewCert(row.domain)}
+                    disabled={!!renewing[row.domain]}
+                    data-testid={`btn-renew-${row.domain}`}
+                  >
+                    {renewing[row.domain] ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
+                    {renewing[row.domain] ? 'Продление...' : 'Продлить сертификат'}
+                  </Button>
+                  <span className="text-[11px] text-muted-foreground">
+                    Принудительный renew у Let's Encrypt (лимит ≤5/нед).
+                  </span>
                 </div>
               )}
             </CardContent>

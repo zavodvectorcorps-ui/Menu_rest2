@@ -30,6 +30,9 @@ services:
       # подключённые .conf-файлы и читает срок действия сертификатов.
       - ./nginx/custom-domains:/etc/nginx/custom-domains:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
+      # Docker socket — нужен для кнопки «Продлить сертификат» (суперадмин),
+      # которая exec'ает в запущенный certbot-контейнер.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - mongo
 

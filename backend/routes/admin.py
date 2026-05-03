@@ -111,3 +111,86 @@ async def get_domains_status(_: dict = Depends(require_superadmin)):
         "dir_exists": CUSTOM_DOMAINS_DIR.exists(),
         "rows": rows,
     }
+
+
+@router.post("/admin/domains-status/{domain}/renew")
+async def renew_domain_cert(domain: str, _: dict = Depends(require_superadmin)):
+    """Force-renew Let's Encrypt cert for a specific domain by exec'ing into
+    the running certbot container. Requires docker.sock mount.
+
+    Returns stdout/stderr of the certbot run + new cert expiry on success.
+    """
+    domain = (domain or "").strip().lower()
+    if not domain or "/" in domain or ".." in domain:
+        raise HTTPException(status_code=400, detail="Некорректный домен")
+
+    if not (SSL_LIVE_DIR / domain / "cert.pem").exists():
+        raise HTTPException(status_code=404, detail=f"Сертификат для {domain} не найден (сначала ./scripts/add-domain.sh)")
+
+    try:
+        import docker as docker_sdk
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Библиотека docker не установлена в backend. Пересоберите образ: docker compose build --no-cache backend")
+
+    try:
+        client = docker_sdk.from_env()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Нет доступа к docker.sock: {e}. Проверьте mount в docker-compose.yml")
+
+    # Find the certbot container (regardless of project name prefix)
+    containers = client.containers.list(filters={"status": "running"})
+    certbot_container = None
+    for c in containers:
+        img = c.image.tags[0] if c.image.tags else ""
+        if img.startswith("certbot/certbot") or "certbot" in c.name:
+            certbot_container = c
+            break
+
+    if not certbot_container:
+        raise HTTPException(status_code=500, detail="Контейнер certbot не запущен. docker compose up -d certbot")
+
+    cmd = [
+        "certbot", "renew",
+        "--force-renewal",
+        "--cert-name", domain,
+        "--webroot", "-w", "/var/www/certbot",
+        "--non-interactive",
+    ]
+    try:
+        exit_code, output = certbot_container.exec_run(cmd, demux=True)
+        stdout, stderr = output
+        stdout_s = (stdout or b"").decode("utf-8", errors="replace")
+        stderr_s = (stderr or b"").decode("utf-8", errors="replace")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка запуска certbot: {e}")
+
+    if exit_code != 0:
+        # Show tail so user sees actual reason (rate limit / DNS / etc.)
+        tail = (stderr_s or stdout_s).strip().splitlines()[-20:]
+        raise HTTPException(status_code=500, detail="Certbot вернул ошибку:\n" + "\n".join(tail))
+
+    # Reload nginx to pick up the new cert
+    nginx_container = None
+    for c in containers:
+        img = c.image.tags[0] if c.image.tags else ""
+        if img.startswith("nginx") or "nginx" in c.name:
+            nginx_container = c
+            break
+    reload_msg = ""
+    if nginx_container:
+        try:
+            nginx_container.exec_run(["nginx", "-s", "reload"])
+            reload_msg = "nginx reloaded"
+        except Exception as e:
+            reload_msg = f"nginx reload failed: {e}"
+
+    new_cert = _read_cert_expiry(domain)
+
+    return {
+        "ok": True,
+        "domain": domain,
+        "renewed_expires_at": new_cert.get("expires_at"),
+        "renewed_days_left": new_cert.get("days_left"),
+        "nginx": reload_msg,
+        "stdout_tail": "\n".join(stdout_s.strip().splitlines()[-15:]),
+    }
