@@ -153,6 +153,42 @@ async def get_public_menu_by_domain(table_number: int, request: Request, host: s
     }
 
 
+@router.get("/public/demo-menu-info")
+async def get_demo_menu_info():
+    """Returns a public link to the customer-facing menu of one of the demo
+    restaurants, so the portfolio landing page (/demo) can offer a «try it as a guest»
+    button without requiring a login."""
+    demo_user = await db.users.find_one({"username": "demo"}, {"_id": 0})
+    rids = (demo_user or {}).get('restaurant_ids') or []
+    if not rids:
+        raise HTTPException(status_code=404, detail="Демо-ресторан ещё не посеян")
+
+    restaurant = await db.restaurants.find_one({"id": rids[0]}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Демо-ресторан не найден")
+
+    # Prefer table #1 for demo; skip 0 (reserved for website-root mode)
+    table = await db.tables.find_one(
+        {"restaurant_id": restaurant["id"], "is_active": True, "number": {"$gte": 1}},
+        {"_id": 0},
+        sort=[("number", 1)],
+    )
+    if not table:
+        raise HTTPException(status_code=404, detail="У демо-ресторана нет столов")
+
+    slug = (restaurant.get('slug') or '').strip()
+    if slug:
+        path = f"/{slug}/{table['number']}"
+    else:
+        path = f"/menu/{table['code']}"
+
+    return {
+        "restaurant_name": restaurant.get('name', ''),
+        "table_number": table['number'],
+        "path": path,
+    }
+
+
 @router.get("/public/domain-info")
 async def get_public_domain_info(request: Request, host: str | None = None):
     """Lightweight endpoint used by the SPA root route to redirect a bare custom

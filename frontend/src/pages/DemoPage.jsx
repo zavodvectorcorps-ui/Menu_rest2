@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   Sparkles, Smartphone, Globe, QrCode, Bell, BarChart3, Bot, Wallet,
   Shield, Layers, Building2, ArrowRight, Check, Zap, Languages,
   ChefHat, ShoppingBag, MessageSquare, Lock, Rocket, Star, Github,
   Server, Code2, Database, Cloud, FileText, ExternalLink, Copy, User,
+  Smartphone as PhoneIcon, Eye,
 } from 'lucide-react';
+
+import { API } from '@/App';
 
 /**
  * Public marketing/demo page — accessible at /demo without auth.
@@ -19,6 +24,17 @@ export default function DemoPage() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // Demo client-menu link — fetched from public API so we don't hard-code table codes
+  const [demoMenu, setDemoMenu] = useState(null);
+  useEffect(() => {
+    axios
+      .get(`${API}/public/demo-menu-info`)
+      .then((r) => setDemoMenu(r.data))
+      .catch(() => {});
+  }, []);
+
+  const demoMenuUrl = demoMenu ? `${window.location.origin}${demoMenu.path}` : null;
 
   // SEO meta tags
   useEffect(() => {
@@ -414,6 +430,78 @@ export default function DemoPage() {
         </div>
       </section>
 
+      {/* ===== Try client menu as a guest ===== */}
+      <section className="py-28 border-t border-white/5 bg-gradient-to-b from-transparent to-white/[0.015]">
+        <div className="max-w-6xl mx-auto px-5">
+          <div className="text-mint-400 text-sm font-semibold tracking-wider uppercase mb-3">Глазами гостя</div>
+          <h2 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
+            Попробуйте меню как гость
+          </h2>
+          <p className="text-white/55 max-w-2xl leading-relaxed">
+            Отсканируйте QR-код телефоном или откройте ссылку — это настоящее клиентское меню
+            ресторана «{demoMenu?.restaurant_name || 'Мята'}», стол №{demoMenu?.table_number || 1}.
+            Листайте категории, добавляйте блюда в корзину, оформляйте заказ — всё работает.
+          </p>
+
+          <div className="mt-12 grid md:grid-cols-2 gap-10 items-center">
+            {/* LEFT: Phone mockup with QR */}
+            <div className="relative mx-auto md:ml-0">
+              <div className="absolute -inset-6 bg-gradient-to-tr from-mint-500/20 via-cyan-500/10 to-purple-500/20 blur-3xl rounded-full" />
+              <div className="relative w-[280px] h-[560px] rounded-[44px] border-[10px] border-[#1a1f2e] bg-[#0d1424] shadow-2xl overflow-hidden">
+                {/* Notch */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-[#1a1f2e] rounded-b-2xl z-10" />
+                {/* Screen */}
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 pt-10 bg-gradient-to-b from-[#0d1424] to-[#141b2e]">
+                  <div className="text-[10px] uppercase tracking-widest text-white/40 mb-3">Меню ресторана</div>
+                  <div className="font-bold text-lg mb-4 text-white leading-tight">
+                    {demoMenu?.restaurant_name || 'Мята Спортивная'}
+                  </div>
+                  <div className="p-4 rounded-2xl bg-white shadow-inner">
+                    {demoMenuUrl ? (
+                      <QRCodeSVG
+                        value={demoMenuUrl}
+                        size={180}
+                        level="M"
+                        includeMargin={false}
+                        data-testid="demo-guest-qr"
+                      />
+                    ) : (
+                      <div className="w-[180px] h-[180px] rounded-lg bg-slate-200 animate-pulse" />
+                    )}
+                  </div>
+                  <div className="mt-4 text-xs text-white/50">Стол №{demoMenu?.table_number || 1}</div>
+                  <div className="mt-6 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-mint-500/20 border border-mint-500/30 text-mint-300 text-[11px]">
+                    <Zap className="w-3 h-3" /> Наведите камеру телефона
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT: Description + CTA */}
+            <div>
+              <div className="space-y-4">
+                <GuestFeature icon={<Eye />} title="Реальный UI клиента" desc="Не превью и не моковые картинки — тот же код, что отдаётся гостям настоящих ресторанов." />
+                <GuestFeature icon={<ShoppingBag />} title="Живая корзина и заказ" desc="Добавьте блюда, оформите заказ — он попадёт в админку демо-ресторана (можно посмотреть после входа)." />
+                <GuestFeature icon={<Layers />} title="3 режима меню" desc="Карточки, крупные плитки и компактный список — все настройки применяются сразу." />
+                <GuestFeature icon={<PhoneIcon />} title="Mobile-first" desc="Оптимизировано под телефон: sticky-категории, быстрая подгрузка картинок, плавный скролл." />
+              </div>
+
+              {demoMenuUrl && (
+                <a
+                  href={demoMenuUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-8 px-6 h-12 inline-flex items-center gap-2 rounded-full bg-white text-[#0a0e1a] font-semibold hover:bg-mint-300 transition-colors"
+                  data-testid="demo-guest-open-link"
+                >
+                  Открыть меню в новой вкладке <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ===== Final CTA — Demo access + Contact ===== */}
       <section className="py-32">
         <div className="max-w-5xl mx-auto px-5">
@@ -621,6 +709,20 @@ function Row({ label, value, copied, onCopy, icon, testid }) {
             ? <Check className="w-3.5 h-3.5 text-mint-400" />
             : <Copy className="w-3.5 h-3.5 text-white/50" />}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function GuestFeature({ icon, title, desc }) {
+  return (
+    <div className="flex gap-4">
+      <div className="w-10 h-10 rounded-lg bg-white/[0.04] border border-white/10 flex items-center justify-center flex-shrink-0 [&>svg]:w-5 [&>svg]:h-5 text-mint-300">
+        {icon}
+      </div>
+      <div>
+        <h4 className="font-semibold text-white">{title}</h4>
+        <p className="text-sm text-white/55 mt-0.5 leading-relaxed">{desc}</p>
       </div>
     </div>
   );
