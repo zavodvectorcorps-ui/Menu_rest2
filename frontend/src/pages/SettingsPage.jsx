@@ -1759,7 +1759,13 @@ function I18nTranslateActions({ restaurantId, token }) {
         );
       }
     } catch (e) {
-      toast.error('Не удалось запустить перевод');
+      const detail = e?.response?.data?.detail;
+      if (typeof detail === 'string') {
+        toast.error(detail, { duration: 10000 });
+        setLastResult({ error: detail });
+      } else {
+        toast.error('Не удалось запустить перевод');
+      }
     } finally {
       setRunning(false);
     }
@@ -1800,6 +1806,18 @@ function I18nTranslateActions({ restaurantId, token }) {
           Перезаписать существующие переводы
         </label>
       </div>
+
+      {lastResult?.error && (
+        <div className="rounded-lg border bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/40 p-4">
+          <div className="flex items-start gap-2">
+            <Languages className="w-5 h-5 text-rose-600 dark:text-rose-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-rose-900 dark:text-rose-100">Перевод не запустился</p>
+              <p className="text-sm text-rose-700 dark:text-rose-300 mt-1 whitespace-pre-line">{lastResult.error}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {est && (
         <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/40 p-4">

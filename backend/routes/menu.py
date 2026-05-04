@@ -231,7 +231,38 @@ async def translate_all_menu_to_en(restaurant_id: str, background_tasks: Backgro
     that will be processed. Pass `?force=true` to re-translate everything."""
     await check_restaurant_access(current_user, restaurant_id)
 
-    # Build the filters once to report an estimate
+    # 1. Pre-flight: verify the AI key is available (otherwise the background
+    # job would silently produce empty results — confusing for the operator).
+    import os
+    if not os.environ.get("EMERGENT_LLM_KEY"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "AI-перевод недоступен: EMERGENT_LLM_KEY не задан в backend/.env "
+                "на сервере. Получите ключ в Emergent → Profile → Universal Key, "
+                "пропишите его в .env, перезапустите backend и попробуйте снова."
+            ),
+        )
+
+    # 2. Quick smoke-test: make sure the model actually replies before kicking off
+    # a long background job. This catches expired keys / network issues early.
+    try:
+        smoke = await translate_ru_to_en("Тест")
+        if not smoke:
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "AI-перевод не ответил. Проверьте баланс ключа "
+                    "(Emergent → Profile → Universal Key → Add Balance) "
+                    "и доступность интернета у backend-контейнера."
+                ),
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"AI-перевод недоступен: {e}")
+
+    # 3. Build the filters once to report an estimate
     if force:
         q_filter = {"restaurant_id": restaurant_id}
         sect_count = await db.menu_sections.count_documents(q_filter)
