@@ -27,11 +27,16 @@
 
 - **DemoPage переориентирована на владельцев ресторанов (P1, DONE)**:
   - Полный рерайт страницы: убраны технические разделы («Архитектура», «Технические находки», SVG-диаграммы стека), оставлены маркетинговые блоки.
-  - **Hero**: OG-картинка (`/og-image.jpg`) встроена справа от заголовка с floating-чипами «Новый заказ» / «+12% к выручке» (CSS-анимация floating).
+  - **Hero**: заменён на autoplay-видео `/demo.mp4` (записан Playwright-screencast'ом, 22 сек, 1 МБ). Poster — OG-картинка для fallback. Floating-чипы «Новый заказ» / «+12% к выручке».
   - **Benefits**: 6 цветных карточек с конкретными выгодами для владельца («Гости заказывают сами», «Уведомления в Telegram», «Понятная аналитика», «Доставка и предзаказ», «Меню для туристов», «Свой домен и бренд»).
   - **Screenshots**: реальные скриншоты живого сервиса в `/app/frontend/public/demo-shots/` (admin orders / analytics / menu management — desktop, client menu EN — mobile в phone-frame'ах). Каждый скриншот в «browser chrome» обрамлении.
   - Live-метрики и блок «Попробуйте меню как гость» с QR-кодом сохранены, перенесены в логичные секции.
   - Финальный CTA: данные для входа `demo/demo2026` + Telegram `@king_saas` для подключения своего ресторана.
+
+- **Production-ready доводки (P1, DONE)**:
+  - **OG-теги в `frontend/public/index.html`** — статичные мета-теги (`og:title/description/image`, `twitter:card`) попадают в исходный HTML, поэтому Telegram, WhatsApp, Facebook и Discord корректно показывают превью при шере ссылки. Динамический `useEffect` на DemoPage перезаписывает их для пользователей-людей.
+  - **Кнопка «Перевести всё меню на английский»** добавлена в Settings → новая вкладка «Переводы» (`tab-i18n`). Вызывает `POST /api/restaurants/{rid}/translate-all`, опция `force=true` доступна чекбоксом, после запуска показывает estimate (количество разделов/категорий/блюд).
+  - **Скрипт `scripts/record_demo_video.py`** — Playwright-screencast 1280×720, проходит по клиентскому меню (RU+EN), админке (заказы, аналитика). Конвертация WebM → MP4 через ffmpeg. Output: `frontend/public/demo.{webm,mp4}`.
 
 - **Live-метрики на DemoPage (P1, DONE)**:
   - Новый публичный endpoint `GET /api/public/demo-stats` агрегирует 6 метрик по демо-ресторанам: количество ресторанов, активных столов, позиций в меню, просмотров меню (total + 24h delta), заказов (total + 24h), вызовов официанта.

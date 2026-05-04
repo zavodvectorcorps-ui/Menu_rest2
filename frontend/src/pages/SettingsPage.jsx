@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Palette, Building2, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2, Link, Megaphone, Upload as UploadIcon, Image as ImageIcon, FileDown } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Building2, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2, Link, Megaphone, Upload as UploadIcon, Image as ImageIcon, FileDown, Languages, Sparkles, CheckCircle2 } from 'lucide-react';
 import ImageCropDialog from '@/components/ImageCropDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -535,6 +535,10 @@ export default function SettingsPage() {
           <TabsTrigger value="splash" className="gap-2" data-testid="tab-splash">
             <Megaphone className="w-4 h-4" />
             Заставка
+          </TabsTrigger>
+          <TabsTrigger value="i18n" className="gap-2" data-testid="tab-i18n">
+            <Languages className="w-4 h-4" />
+            Переводы
           </TabsTrigger>
         </TabsList>
 
@@ -1264,6 +1268,43 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* I18N — Multilingual menu */}
+        <TabsContent value="i18n" className="mt-6">
+          <Card className="border-none shadow-md" data-testid="i18n-card">
+            <CardHeader>
+              <CardTitle className="font-heading flex items-center gap-2">
+                <Languages className="w-5 h-5 text-mint-500" />
+                Мультиязычность меню
+              </CardTitle>
+              <CardDescription>
+                Гость в клиентском меню видит флажок RU / EN в шапке и может переключить язык.
+                Переводы названий и описаний блюд генерируются автоматически через ИИ.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="rounded-lg border bg-muted/30 p-4 text-sm space-y-2">
+                <div className="flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-mint-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-muted-foreground">
+                    <span className="font-semibold text-foreground">Когда срабатывает автоматически:</span>{' '}
+                    при создании или редактировании блюда, категории или раздела меню — английский перевод
+                    обновляется в фоне через несколько секунд.
+                  </p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <RefreshCw className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-muted-foreground">
+                    <span className="font-semibold text-foreground">Кнопка ниже</span> — для разового
+                    запуска перевода всего меню (полезно сразу после импорта или для существующего ресторана).
+                  </p>
+                </div>
+              </div>
+
+              <I18nTranslateActions restaurantId={currentRestaurantId} token={token} />
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Table Dialog */}
@@ -1686,6 +1727,110 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+
+// ============ Inline sub-component: bulk translation panel ============
+
+function I18nTranslateActions({ restaurantId, token }) {
+  const [running, setRunning] = useState(false);
+  const [lastResult, setLastResult] = useState(null);
+  const [force, setForce] = useState(false);
+
+  const trigger = async () => {
+    if (!restaurantId) return;
+    setRunning(true);
+    try {
+      const r = await axios.post(
+        `${API}/restaurants/${restaurantId}/translate-all${force ? '?force=true' : ''}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setLastResult(r.data);
+      const est = r.data?.estimate || {};
+      const total = (est.sections || 0) + (est.categories || 0) + (est.items || 0);
+      if (total === 0) {
+        toast.success('Всё уже переведено');
+      } else {
+        toast.success(
+          `Перевод запущен в фоне — ${total} объектов (≈${Math.ceil(total * 1.5)} сек.)`,
+        );
+      }
+    } catch (e) {
+      toast.error('Не удалось запустить перевод');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const est = lastResult?.estimate;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <Button
+          onClick={trigger}
+          disabled={running || !restaurantId}
+          className="bg-mint-500 hover:bg-mint-600 text-white gap-2"
+          data-testid="translate-all-btn"
+        >
+          {running ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Запускаем...
+            </>
+          ) : (
+            <>
+              <Languages className="w-4 h-4" />
+              Перевести всё меню на английский
+            </>
+          )}
+        </Button>
+
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer pt-2.5">
+          <input
+            type="checkbox"
+            checked={force}
+            onChange={(e) => setForce(e.target.checked)}
+            className="rounded"
+            data-testid="translate-force-checkbox"
+          />
+          Перезаписать существующие переводы
+        </label>
+      </div>
+
+      {est && (
+        <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/40 p-4">
+          <div className="flex items-start gap-2 mb-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-emerald-900 dark:text-emerald-100">
+                Перевод запущен в фоне
+              </p>
+              <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-0.5">
+                Можно закрыть страницу — перевод продолжится. Через минуту обновите клиентское
+                меню (`/menu/...`) — английские названия появятся.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <Stat label="Разделы" value={est.sections} />
+            <Stat label="Категории" value={est.categories} />
+            <Stat label="Блюда" value={est.items} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value }) {
+  return (
+    <div className="rounded-md bg-white dark:bg-slate-900/50 px-3 py-2 border border-emerald-200/60 dark:border-emerald-800/30">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-lg font-semibold tabular-nums">{value ?? 0}</div>
     </div>
   );
 }

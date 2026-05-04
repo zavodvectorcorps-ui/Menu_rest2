@@ -141,17 +141,29 @@ export default function DemoPage() {
             </div>
           </div>
 
-          {/* Hero image — generated OG card with subtle frame */}
+          {/* Hero media — autoplay screencast (with OG image as poster fallback) */}
           <div className="relative" style={{ transform: `translateY(${scrollY * 0.05}px)` }}>
             <div className="absolute -inset-6 bg-gradient-to-tr from-mint-500/20 via-purple-500/20 to-cyan-500/20 blur-3xl rounded-full" />
-            <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-              <img
-                src="/og-image.jpg"
-                alt="REST-MENU — цифровое меню, QR, POS, Telegram"
-                className="w-full h-auto block"
-                data-testid="demo-hero-image"
-                loading="eager"
+            <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black aspect-[16/9]">
+              <video
+                src="/demo.mp4"
+                poster="/og-image.jpg"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                className="w-full h-full object-cover block"
+                data-testid="demo-hero-video"
               />
+              {/* Subtle live indicator */}
+              <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[11px] font-semibold">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                </span>
+                <span className="text-white/90">Демо</span>
+              </div>
             </div>
             {/* Floating badges */}
             <div className="absolute -left-4 top-8 hidden md:block">
