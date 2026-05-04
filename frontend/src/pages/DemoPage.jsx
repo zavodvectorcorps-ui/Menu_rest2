@@ -6,7 +6,7 @@ import {
   Sparkles, Globe, QrCode, BarChart3, Bot, Wallet,
   ShoppingBag, ArrowRight, Zap, Languages, ChefHat, MessageSquare,
   Lock, Rocket, Star, ExternalLink, Copy, User, Eye, Clock,
-  CheckCircle2, TrendingUp, Smartphone, Bell, RefreshCcw,
+  CheckCircle2, TrendingUp, Smartphone, Bell, RefreshCcw, ChevronRight,
 } from 'lucide-react';
 
 import { API } from '@/App';
@@ -420,26 +420,52 @@ export default function DemoPage() {
             Отсканируйте QR с телефона или откройте по ссылке — добавляйте блюда в корзину, всё работает.
           </p>
 
-          <div className="mt-12 grid md:grid-cols-2 gap-10 items-center">
-            <div className="relative mx-auto md:ml-0">
-              <div className="absolute -inset-6 bg-gradient-to-tr from-mint-500/20 via-cyan-500/10 to-purple-500/20 blur-3xl rounded-full" />
-              <div className="relative w-[280px] h-[560px] rounded-[44px] border-[10px] border-[#1a1f2e] bg-[#0d1424] shadow-2xl overflow-hidden">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-[#1a1f2e] rounded-b-2xl z-10" />
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 pt-10 bg-gradient-to-b from-[#0d1424] to-[#141b2e]">
-                  <div className="text-[10px] uppercase tracking-widest text-white/40 mb-3">Меню ресторана</div>
-                  <div className="font-bold text-lg mb-4 text-white leading-tight">
-                    {demoMenu?.restaurant_name || 'Мята Спортивная'}
+          <div className="mt-12 grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+            <div className="relative mx-auto lg:ml-0 flex items-center justify-center gap-3 sm:gap-5">
+              {/* QR Phone */}
+              <div className="relative shrink-0">
+                <div className="absolute -inset-6 bg-gradient-to-tr from-mint-500/20 via-cyan-500/10 to-purple-500/20 blur-3xl rounded-full" />
+                <div className="relative w-[200px] sm:w-[220px] h-[400px] sm:h-[440px] rounded-[36px] border-[8px] border-[#1a1f2e] bg-[#0d1424] shadow-2xl overflow-hidden">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-4 bg-[#1a1f2e] rounded-b-2xl z-10" />
+                  <div className="h-full flex flex-col items-center justify-center text-center p-5 pt-8 bg-gradient-to-b from-[#0d1424] to-[#141b2e]">
+                    <div className="text-[10px] uppercase tracking-widest text-white/40 mb-2">Меню ресторана</div>
+                    <div className="font-bold text-sm mb-3 text-white leading-tight">
+                      {demoMenu?.restaurant_name || 'Demo Restaurant'}
+                    </div>
+                    <div className="p-3 rounded-xl bg-white shadow-inner">
+                      {demoMenuUrl ? (
+                        <QRCodeSVG value={demoMenuUrl} size={130} level="M" includeMargin={false} data-testid="demo-guest-qr" />
+                      ) : (
+                        <div className="w-[130px] h-[130px] rounded-lg bg-slate-200 animate-pulse" />
+                      )}
+                    </div>
+                    <div className="mt-3 text-xs text-white/50">Стол №{demoMenu?.table_number || 1}</div>
+                    <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-mint-500/20 border border-mint-500/30 text-mint-300 text-[10px]">
+                      <Zap className="w-3 h-3" /> Наведите камеру
+                    </div>
                   </div>
-                  <div className="p-4 rounded-2xl bg-white shadow-inner">
-                    {demoMenuUrl ? (
-                      <QRCodeSVG value={demoMenuUrl} size={180} level="M" includeMargin={false} data-testid="demo-guest-qr" />
-                    ) : (
-                      <div className="w-[180px] h-[180px] rounded-lg bg-slate-200 animate-pulse" />
-                    )}
-                  </div>
-                  <div className="mt-4 text-xs text-white/50">Стол №{demoMenu?.table_number || 1}</div>
-                  <div className="mt-6 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-mint-500/20 border border-mint-500/30 text-mint-300 text-[11px]">
-                    <Zap className="w-3 h-3" /> Наведите камеру телефона
+                </div>
+              </div>
+
+              {/* Arrow connector */}
+              <div className="flex flex-col items-center gap-1 text-mint-300/70 shrink-0" aria-hidden="true">
+                <div className="hidden sm:block text-[9px] uppercase tracking-widest text-white/40">Откроется</div>
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 animate-pulse" />
+              </div>
+
+              {/* Menu preview phone — tilted */}
+              <div className="relative shrink-0 rotate-3 hover:rotate-0 transition-transform duration-500" data-testid="demo-guest-preview">
+                <div className="absolute -inset-4 bg-gradient-to-tr from-mint-500/15 to-purple-500/15 blur-2xl rounded-full" />
+                <div className="relative w-[160px] sm:w-[190px] h-[340px] sm:h-[395px] rounded-[28px] sm:rounded-[32px] border-[6px] sm:border-[7px] border-[#1a1f2e] bg-black shadow-2xl overflow-hidden">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-14 sm:w-16 h-3 sm:h-3.5 bg-[#1a1f2e] rounded-b-xl z-10" />
+                  <img
+                    src="/demo-shots/client_menu_en.jpg"
+                    alt="Превью клиентского меню"
+                    className="w-full h-full object-cover object-top"
+                    loading="lazy"
+                  />
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur text-[9px] text-white/80 border border-white/10 whitespace-nowrap">
+                    Так видит гость
                   </div>
                 </div>
               </div>
