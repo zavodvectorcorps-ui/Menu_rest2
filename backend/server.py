@@ -9,6 +9,7 @@ import logging
 
 from database import client
 from helpers import create_superadmin, migrate_enabled_modules
+from db_indexes import ensure_indexes
 
 from routes.auth import router as auth_router
 from routes.restaurants import router as restaurants_router
@@ -72,6 +73,9 @@ async def startup():
     logging.info("Starting up...")
     await create_superadmin()
     await migrate_enabled_modules()
+    # MongoDB indexes on hot fields (restaurant_id, slug, code, created_at).
+    # Idempotent — re-runs are no-ops. Critical for response time as data grows.
+    await ensure_indexes()
     # Daily digest at 08:00 Europe/Minsk (UTC+3, no DST)
     try:
         minsk_tz = ZoneInfo("Europe/Minsk")
