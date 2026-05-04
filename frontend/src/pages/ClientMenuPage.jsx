@@ -450,7 +450,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
   };
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden" data-testid="client-menu-page">
+    <div className="min-h-screen bg-background overflow-x-clip" data-testid="client-menu-page">
       {/* Splash / promo overlay */}
       {showSplash && (
         <div
@@ -505,7 +505,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
       )}
 
       {/* Header */}
-      <header ref={headerRef} className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border overflow-x-hidden">
+      <header ref={headerRef} className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border overflow-x-clip">
         <div className="px-4 pt-4 pb-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0 flex-1">
