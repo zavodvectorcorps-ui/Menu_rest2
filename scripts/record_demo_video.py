@@ -47,7 +47,20 @@ async def main():
         page = await ctx.new_page()
 
         # ---------- Scene 1: Client menu (gosti) ----------
-        await page.goto(f"{BASE}/myata/1", wait_until="domcontentloaded", timeout=30000)
+        await page.goto(f"{BASE}/myata/1", wait_until="networkidle", timeout=30000)
+        # Wait for menu images to actually load (otherwise dish photos appear black)
+        try:
+            await page.wait_for_function(
+                """() => {
+                    const imgs = Array.from(document.querySelectorAll('img'));
+                    if (imgs.length < 3) return false;
+                    const top = imgs.slice(0, 6);
+                    return top.every(i => i.complete && i.naturalWidth > 0);
+                }""",
+                timeout=15000,
+            )
+        except Exception:
+            pass
         await page.wait_for_timeout(1500)
         # Slow scroll through menu
         await slow_scroll(page, 800, steps=40, delay=40)
@@ -55,7 +68,7 @@ async def main():
         # Try toggling language to EN
         try:
             await page.click('[data-testid="lang-btn-en"]', timeout=3000)
-            await page.wait_for_timeout(800)
+            await page.wait_for_timeout(1200)
             await slow_scroll(page, 1400, steps=30, delay=40)
         except Exception:
             pass
