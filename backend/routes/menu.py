@@ -13,7 +13,7 @@ from models import (
 from auth import get_current_user, check_restaurant_access
 from helpers import serialize_doc, get_or_create_menu_sections
 from services.images import download_images_task
-from services.translation import translate_ru_to_en, translate_ru_to_en_strict
+from services.translation import translate_ru_to_en, translate_ru_to_en_strict, get_cache_stats
 
 UPLOADS_DIR = Path(__file__).parent.parent / "uploads"
 ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
@@ -241,13 +241,20 @@ async def translation_status(current_user: dict = Depends(get_current_user)):
         out["error"] = "EMERGENT_LLM_KEY is not set in backend env. Add it to backend/.env or docker-compose.yml."
         return out
     try:
-        result = await translate_ru_to_en_strict("Привет")
+        result = await translate_ru_to_en_strict("Привет", use_cache=False)
         out["smoke_test"] = result
         if not result:
             out["error"] = "LLM returned empty response (possibly out of credits)"
     except Exception as e:
         out["error"] = f"{type(e).__name__}: {e}"
     return out
+
+
+@router.get("/translation-cache-stats")
+async def translation_cache_stats(current_user: dict = Depends(get_current_user)):
+    """Cache hit/miss diagnostic. Lets the admin see how many translations
+    are served from cache vs the LLM."""
+    return await get_cache_stats()
 
 
 @router.post("/restaurants/{restaurant_id}/translate-all")
@@ -273,7 +280,7 @@ async def translate_all_menu_to_en(restaurant_id: str, background_tasks: Backgro
     # 2. Quick smoke-test: make sure the model actually replies before kicking off
     # a long background job. This catches expired keys / network issues early.
     try:
-        smoke = await translate_ru_to_en_strict("Тест")
+        smoke = await translate_ru_to_en_strict("Тест", use_cache=False)
         if not smoke:
             raise HTTPException(
                 status_code=502,

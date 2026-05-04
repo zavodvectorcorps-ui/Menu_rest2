@@ -34,14 +34,19 @@ async def create_superadmin():
     return admin
 
 
-async def create_demo_user():
+async def create_demo_user(demo_restaurant_id: str | None = None):
     """Read-only-ish demo account for public portfolio visitors.
-    Role ADMINISTRATOR — видит все рестораны из restaurant_ids, но не трогает системные настройки.
-    Привязывается к первым двум посевным ресторанам (если они есть)."""
+    Role ADMINISTRATOR — видит только изолированный демо-ресторан (slug=`demo`),
+    чтобы посетители портфолио не имели доступа к реальным данным клиентов."""
     existing = await db.users.find_one({"username": "demo"}, {"_id": 0})
-    # Собираем список доступных ресторанов
-    restaurants = await db.restaurants.find({}, {"_id": 0, "id": 1}).to_list(10)
-    rids = [r['id'] for r in restaurants][:2]  # первые 2
+
+    # Привязываем строго к demo-ресторану (slug='demo'), если он есть
+    if not demo_restaurant_id:
+        demo_r = await db.restaurants.find_one({"slug": "demo"}, {"_id": 0, "id": 1})
+        demo_restaurant_id = demo_r["id"] if demo_r else None
+
+    rids = [demo_restaurant_id] if demo_restaurant_id else []
+
     if not existing:
         user = User(
             username="demo",
@@ -53,9 +58,9 @@ async def create_demo_user():
         doc['created_at'] = doc['created_at'].isoformat()
         await db.users.insert_one(doc)
         print(f"Demo user created: demo/demo2026 (restaurants: {len(rids)})")
-    elif rids and set(existing.get('restaurant_ids') or []) != set(rids):
-        # Поддерживаем актуальный список ресторанов на случай пере-сида
+    elif set(existing.get('restaurant_ids') or []) != set(rids):
         await db.users.update_one({"username": "demo"}, {"$set": {"restaurant_ids": rids}})
+        print(f"Demo user updated: now bound to {len(rids)} restaurant(s)")
 
 
 async def migrate_enabled_modules():

@@ -225,7 +225,8 @@ async def ensure_demo_tables(rid: str) -> List[dict]:
     for i in range(1, 9):
         already = await db.tables.find_one({"restaurant_id": rid, "number": i}, {"_id": 0})
         if already:
-            out.append(already); continue
+            out.append(already)
+            continue
         t = Table(restaurant_id=rid, number=i, name=f"Стол {i}")
         d = t.model_dump()
         d["created_at"] = d["created_at"].isoformat()
@@ -299,7 +300,7 @@ async def ensure_demo_orders_and_calls(rid: str, tables: List[dict]):
             table_id=table["id"], table_number=table["number"],
             call_type_id=ct["id"] if ct else None,
             call_type_name=ct["name"] if ct else None,
-            status=StaffCallStatus.RESOLVED if rng.random() < 0.8 else StaffCallStatus.PENDING,
+            status=StaffCallStatus.COMPLETED if rng.random() < 0.8 else StaffCallStatus.PENDING,
         )
         d = sc.model_dump()
         d["created_at"] = ts.isoformat()

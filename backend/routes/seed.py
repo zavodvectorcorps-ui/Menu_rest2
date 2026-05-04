@@ -7,6 +7,7 @@ from helpers import (
     create_superadmin, create_demo_user, get_or_create_settings,
     get_or_create_menu_sections, get_or_create_call_types
 )
+from services.demo_seed import seed_demo_restaurant
 
 router = APIRouter()
 
@@ -20,7 +21,7 @@ async def health_check():
 async def seed_data():
     await create_superadmin()
 
-    count = await db.restaurants.count_documents({})
+    count = await db.restaurants.count_documents({"slug": {"$ne": "demo"}})
     if count == 0:
         r1 = Restaurant(
             name="Мята Спортивная",
@@ -60,8 +61,13 @@ async def seed_data():
                 tdoc['created_at'] = tdoc['created_at'].isoformat()
                 await db.tables.insert_one(tdoc)
 
-    # Demo-аккаунт для публичного лендинга (/demo) — создаётся после ресторанов,
-    # чтобы получить привязку к реальным restaurant_ids.
-    await create_demo_user()
+    # Изолированный demo-ресторан для публичного лендинга /demo.
+    # Идемпотентно создаёт ресторан со slug='demo', меню, столы и
+    # фейковые заказы/вызовы/просмотры для красивых графиков в Analytics.
+    demo_rid = await seed_demo_restaurant()
 
-    return {"message": "Data seeded successfully"}
+    # Demo-аккаунт привязан строго к demo-ресторану — посетители портфолио
+    # никогда не увидят реальные данные клиентов.
+    await create_demo_user(demo_rid)
+
+    return {"message": "Data seeded successfully", "demo_restaurant_id": demo_rid}
