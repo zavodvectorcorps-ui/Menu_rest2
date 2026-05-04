@@ -14,5 +14,6 @@
 - Username: `demo`
 - Password: `demo2026`
 - Role: `administrator`
-- Привязан к двум посевным ресторанам («Мята Спортивная», «Мята Центральная»)
-- Создаётся автоматически в `/api/seed` через `helpers.create_demo_user()`
+- Привязан **только** к изолированному демо-ресторану (slug=`demo`, имя `Demo Restaurant`).
+- Доступ к реальным ресторанам («Мята Спортивная»/«Мята Центральная») закрыт.
+- Создаётся автоматически в `/api/seed` через `helpers.create_demo_user(demo_restaurant_id)` после `services.demo_seed.seed_demo_restaurant()`.
