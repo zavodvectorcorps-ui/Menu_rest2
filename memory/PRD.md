@@ -25,6 +25,14 @@
   - **Frontend**: новый `lib/i18n.js` (Map RU/EN, auto-detect `navigator.language`, persist в `localStorage`), компонент `LanguageSwitcher.jsx` (пилл-переключатель RU/EN с флагами в хедере клиентского меню). `ClientMenuPage` использует `t(key)` для UI-строк и `getLocalized(doc, 'name'|'description', lang)` для контента (fallback на RU если `*_en` пустое).
   - Проверено: на демо-ресторане `Мята Спортивная` переведено 135+/213 блюд и 50/50 категорий. EN-меню показывает «Breakfasts until 4 PM», «Syrniki with sour cream and Rosemary Cherry sauce», «Call waiter» и т.д. Админка намеренно оставлена на русском (для сотрудников).
 
+- **DemoPage переориентирована на владельцев ресторанов (P1, DONE)**:
+  - Полный рерайт страницы: убраны технические разделы («Архитектура», «Технические находки», SVG-диаграммы стека), оставлены маркетинговые блоки.
+  - **Hero**: OG-картинка (`/og-image.jpg`) встроена справа от заголовка с floating-чипами «Новый заказ» / «+12% к выручке» (CSS-анимация floating).
+  - **Benefits**: 6 цветных карточек с конкретными выгодами для владельца («Гости заказывают сами», «Уведомления в Telegram», «Понятная аналитика», «Доставка и предзаказ», «Меню для туристов», «Свой домен и бренд»).
+  - **Screenshots**: реальные скриншоты живого сервиса в `/app/frontend/public/demo-shots/` (admin orders / analytics / menu management — desktop, client menu EN — mobile в phone-frame'ах). Каждый скриншот в «browser chrome» обрамлении.
+  - Live-метрики и блок «Попробуйте меню как гость» с QR-кодом сохранены, перенесены в логичные секции.
+  - Финальный CTA: данные для входа `demo/demo2026` + Telegram `@king_saas` для подключения своего ресторана.
+
 - **Live-метрики на DemoPage (P1, DONE)**:
   - Новый публичный endpoint `GET /api/public/demo-stats` агрегирует 6 метрик по демо-ресторанам: количество ресторанов, активных столов, позиций в меню, просмотров меню (total + 24h delta), заказов (total + 24h), вызовов официанта.
   - Статичный блок «Metrics» на DemoPage заменён на динамический с «live» пульсирующей точкой, иконками Lucide и count-up анимацией (requestAnimationFrame, ease-out cubic 900ms).
