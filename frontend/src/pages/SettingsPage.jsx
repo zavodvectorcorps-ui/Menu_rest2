@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Settings as SettingsIcon, Palette, Building2, QrCode, Plus, Trash2, RefreshCw, Copy, ExternalLink, Users, Save, Moon, Sun, Bell, Layers, Edit2, Download, Loader2, Link, Megaphone, Upload as UploadIcon, Image as ImageIcon, FileDown, Languages, Sparkles, CheckCircle2 } from 'lucide-react';
 import ImageCropDialog from '@/components/ImageCropDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -1895,6 +1895,57 @@ function I18nTranslateActions({ restaurantId, token }) {
   const [lastResult, setLastResult] = useState(null);
   const [force, setForce] = useState(false);
   const [targetLang, setTargetLang] = useState('all');
+  // Polling: latest job from /translate-status, refreshed every 2s while running
+  const [job, setJob] = useState(null);
+  const pollRef = useRef(null);
+
+  // Bootstrap: load latest job on mount so a refresh keeps showing progress
+  useEffect(() => {
+    if (!restaurantId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(
+          `${API}/restaurants/${restaurantId}/translate-status`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (cancelled) return;
+        if (r.data && r.data.id) {
+          setJob(r.data);
+          if (r.data.status === 'running') startPolling();
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; stopPolling(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurantId, token]);
+
+  const stopPolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  };
+
+  const startPolling = () => {
+    stopPolling();
+    pollRef.current = setInterval(async () => {
+      try {
+        const r = await axios.get(
+          `${API}/restaurants/${restaurantId}/translate-status`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const j = r.data;
+        setJob(j);
+        if (j?.status !== 'running') {
+          stopPolling();
+          if (j?.status === 'done') {
+            const total = j.stats ? (j.stats.sections + j.stats.categories + j.stats.items) : 0;
+            toast.success(`Перевод завершён — обработано ${total} объектов`);
+          } else if (j?.status === 'error') {
+            toast.error(`Ошибка перевода: ${j.error || 'unknown'}`, { duration: 10000 });
+          }
+        }
+      } catch { /* keep polling */ }
+    }, 2000);
+  };
 
   const trigger = async () => {
     if (!restaurantId) return;
@@ -1916,8 +1967,18 @@ function I18nTranslateActions({ restaurantId, token }) {
         toast.success(`Всё уже переведено (${langs})`);
       } else {
         toast.success(
-          `Перевод запущен (${langs}) — ${total} объектов (≈${Math.ceil(total * 1.5 * (r.data?.languages?.length || 1))} сек.)`,
+          `Перевод запущен (${langs}) — ${total} объектов`,
         );
+        // Reset job from previous run so the bar shows 0/N immediately
+        setJob({
+          status: 'running', phase: 'sections',
+          total, done: 0,
+          stats: { sections: 0, categories: 0, items: 0 },
+          totals: est,
+          languages: r.data?.languages || [],
+          started_at: new Date().toISOString(),
+        });
+        startPolling();
       }
     } catch (e) {
       const detail = e?.response?.data?.detail;
@@ -1931,8 +1992,6 @@ function I18nTranslateActions({ restaurantId, token }) {
       setRunning(false);
     }
   };
-
-  const est = lastResult?.estimate;
 
   return (
     <div className="space-y-4">
@@ -1953,7 +2012,7 @@ function I18nTranslateActions({ restaurantId, token }) {
 
         <Button
           onClick={trigger}
-          disabled={running || !restaurantId}
+          disabled={running || !restaurantId || job?.status === 'running'}
           className="bg-mint-500 hover:bg-mint-600 text-white gap-2"
           data-testid="translate-all-btn"
         >
@@ -1961,6 +2020,11 @@ function I18nTranslateActions({ restaurantId, token }) {
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
               Запускаем...
+            </>
+          ) : job?.status === 'running' ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Идёт перевод...
             </>
           ) : (
             <>
@@ -1994,26 +2058,115 @@ function I18nTranslateActions({ restaurantId, token }) {
         </div>
       )}
 
-      {est && (
-        <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/40 p-4">
-          <div className="flex items-start gap-2 mb-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-emerald-900 dark:text-emerald-100">
-                Перевод запущен в фоне
-              </p>
-              <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-0.5">
-                Можно закрыть страницу — перевод продолжится. Через минуту обновите клиентское
-                меню (`/menu/...`) — английские названия появятся.
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3 text-sm">
-            <Stat label="Разделы" value={est.sections} />
-            <Stat label="Категории" value={est.categories} />
-            <Stat label="Блюда" value={est.items} />
+      {job && (job.status === 'running' || job.status === 'done' || job.status === 'error') && (
+        <TranslateProgress job={job} />
+      )}
+    </div>
+  );
+}
+
+const PHASE_LABEL = {
+  sections: 'Разделы',
+  categories: 'Категории',
+  items: 'Блюда',
+  done: 'Готово',
+};
+
+function TranslateProgress({ job }) {
+  const total = job.total || 1;
+  const done = Math.min(job.done || 0, total);
+  const pct = Math.round((done / total) * 100);
+  const isRunning = job.status === 'running';
+  const isDone = job.status === 'done';
+  const isError = job.status === 'error';
+
+  // Elapsed time
+  const [elapsed, setElapsed] = useState('');
+  useEffect(() => {
+    if (!job.started_at) return;
+    const startTs = new Date(job.started_at).getTime();
+    const tick = () => {
+      const endTs = job.finished_at ? new Date(job.finished_at).getTime() : Date.now();
+      const sec = Math.max(0, Math.round((endTs - startTs) / 1000));
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      setElapsed(m > 0 ? `${m}м ${s}с` : `${s}с`);
+    };
+    tick();
+    if (isRunning) {
+      const id = setInterval(tick, 1000);
+      return () => clearInterval(id);
+    }
+  }, [job.started_at, job.finished_at, isRunning]);
+
+  // ETA — naive: assume ~1.5s per remaining item (cache will accelerate)
+  const remaining = Math.max(0, total - done);
+  const etaSec = isRunning ? Math.ceil(remaining * 1.5 * (job.languages?.length || 1)) : 0;
+  const etaText = etaSec > 60 ? `≈${Math.ceil(etaSec / 60)} мин` : `≈${etaSec} сек`;
+
+  const colors = isError
+    ? 'bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/40'
+    : isDone
+      ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/40'
+      : 'bg-mint-50 dark:bg-mint-900/10 border-mint-200 dark:border-mint-800/40';
+
+  return (
+    <div className={`rounded-lg border p-4 space-y-3 ${colors}`} data-testid="translate-progress">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          {isRunning && <Loader2 className="w-5 h-5 animate-spin text-mint-600" />}
+          {isDone && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+          {isError && <Languages className="w-5 h-5 text-rose-600" />}
+          <div>
+            <p className="font-semibold">
+              {isRunning && `Идёт перевод — фаза «${PHASE_LABEL[job.phase] || job.phase}»`}
+              {isDone && 'Перевод завершён'}
+              {isError && 'Перевод прерван с ошибкой'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {(job.languages || []).map((l) => l.toUpperCase()).join(', ') || 'EN'}
+              {' · '}
+              прошло {elapsed}
+              {isRunning && remaining > 0 && ` · осталось ${etaText}`}
+            </p>
           </div>
         </div>
+        <div className="text-2xl font-semibold tabular-nums" data-testid="translate-progress-pct">
+          {pct}%
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-3 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+        <div
+          className={`h-full transition-all duration-500 ${isError ? 'bg-rose-500' : isDone ? 'bg-emerald-500' : 'bg-mint-500'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 text-sm">
+        <Stat
+          label="Разделы"
+          value={`${job.stats?.sections ?? 0} / ${job.totals?.sections ?? 0}`}
+        />
+        <Stat
+          label="Категории"
+          value={`${job.stats?.categories ?? 0} / ${job.totals?.categories ?? 0}`}
+        />
+        <Stat
+          label="Блюда"
+          value={`${job.stats?.items ?? 0} / ${job.totals?.items ?? 0}`}
+        />
+      </div>
+
+      {isError && job.error && (
+        <p className="text-sm text-rose-700 dark:text-rose-300 whitespace-pre-line">{job.error}</p>
+      )}
+
+      {isRunning && (
+        <p className="text-xs text-muted-foreground">
+          Можно закрыть страницу — прогресс восстановится при следующем входе.
+        </p>
       )}
     </div>
   );

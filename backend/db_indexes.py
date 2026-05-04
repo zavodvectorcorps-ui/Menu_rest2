@@ -34,6 +34,8 @@ INDEXES: list[tuple[str, list, dict]] = [
     ("orders", [("restaurant_id", 1), ("status", 1)], {}),
     ("staff_calls", [("restaurant_id", 1), ("created_at", -1)], {}),
     ("staff_calls", [("restaurant_id", 1), ("status", 1)], {}),
+    # Translation job progress (admin polls latest by restaurant)
+    ("translation_jobs", [("restaurant_id", 1), ("started_at", -1)], {}),
     # Auth
     ("users", [("username", 1)], {"unique": True}),
     # Translation cache uses compound (key_ru, lang) — handled in services/translation.py

@@ -387,7 +387,8 @@ async def translate_all_menu(
         cat_count = await db.categories.count_documents({**base, **name_missing})
         item_count = await db.menu_items.count_documents({**base, **item_missing})
 
-    background_tasks.add_task(_bulk_translate_restaurant, restaurant_id, force, targets)
+    background_tasks.add_task(_bulk_translate_restaurant, restaurant_id, force, targets,
+                              {"sections": sect_count, "categories": cat_count, "items": item_count})
     return {
         "message": "Translation started in background",
         "languages": targets,
@@ -395,68 +396,138 @@ async def translate_all_menu(
     }
 
 
-async def _bulk_translate_restaurant(restaurant_id: str, force: bool, targets: list[str]):
-    """Actual long-running worker. Translates each doc into every target language.
+@router.get("/restaurants/{restaurant_id}/translate-status")
+async def get_translate_status(
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return the latest translation job for this restaurant. Used by the
+    admin UI to render a progress bar while bulk translation runs."""
+    await check_restaurant_access(current_user, restaurant_id)
+    job = await db.translation_jobs.find_one(
+        {"restaurant_id": restaurant_id},
+        {"_id": 0},
+        sort=[("started_at", -1)],
+    )
+    return job or {"status": "idle"}
+
+
+async def _bulk_translate_restaurant(restaurant_id: str, force: bool, targets: list[str], totals: dict):
+    """Long-running worker. Writes incremental progress to `translation_jobs`
+    so the admin UI can poll and render a progress bar.
+
     Yields to the event loop between items so other HTTP requests keep serving."""
     import logging
     import asyncio
+    import uuid
+    from datetime import datetime, timezone
     log = logging.getLogger(__name__)
+    job_id = str(uuid.uuid4())
+    started_at = datetime.now(timezone.utc).isoformat()
+    total_planned = (totals.get("sections", 0) + totals.get("categories", 0) + totals.get("items", 0))
+
+    # Initial job doc — picked up immediately by the polling UI
+    await db.translation_jobs.insert_one({
+        "id": job_id,
+        "restaurant_id": restaurant_id,
+        "languages": targets,
+        "force": force,
+        "status": "running",
+        "phase": "sections",
+        "total": total_planned,
+        "totals": totals,
+        "done": 0,
+        "stats": {"sections": 0, "categories": 0, "items": 0},
+        "started_at": started_at,
+        "finished_at": None,
+        "error": None,
+    })
+
     stats = {"sections": 0, "categories": 0, "items": 0}
+    done = 0
 
-    # Sections
-    async for s in db.menu_sections.find({"restaurant_id": restaurant_id}, {"_id": 0, "id": 1, "name": 1, "name_en": 1, "name_zh": 1}):
-        if not s.get('name'):
-            continue
-        update = {}
-        for t in targets:
-            field = f"name_{t}"
-            if force or not s.get(field):
-                tr = await translate_ru_to(s['name'], t)
-                if tr:
-                    update[field] = tr
-        if update:
-            await db.menu_sections.update_one({"id": s['id']}, {"$set": update})
-            stats["sections"] += 1
-        await asyncio.sleep(0.05)
+    async def bump(phase: str):
+        nonlocal done
+        done += 1
+        stats[phase] += 1
+        # Update every doc — cheap (small collection, single query)
+        await db.translation_jobs.update_one(
+            {"id": job_id},
+            {"$set": {"phase": phase, "done": done, "stats": stats}},
+        )
 
-    # Categories
-    async for c in db.categories.find({"restaurant_id": restaurant_id}, {"_id": 0, "id": 1, "name": 1, "name_en": 1, "name_zh": 1}):
-        if not c.get('name'):
-            continue
-        update = {}
-        for t in targets:
-            field = f"name_{t}"
-            if force or not c.get(field):
-                tr = await translate_ru_to(c['name'], t)
-                if tr:
-                    update[field] = tr
-        if update:
-            await db.categories.update_one({"id": c['id']}, {"$set": update})
-            stats["categories"] += 1
-        await asyncio.sleep(0.05)
+    try:
+        # Sections
+        async for s in db.menu_sections.find({"restaurant_id": restaurant_id}, {"_id": 0, "id": 1, "name": 1, "name_en": 1, "name_zh": 1}):
+            if not s.get('name'):
+                continue
+            update = {}
+            for t in targets:
+                field = f"name_{t}"
+                if force or not s.get(field):
+                    tr = await translate_ru_to(s['name'], t)
+                    if tr:
+                        update[field] = tr
+            if update:
+                await db.menu_sections.update_one({"id": s['id']}, {"$set": update})
+            await bump("sections")
+            await asyncio.sleep(0.05)
 
-    # Items
-    proj = {"_id": 0, "id": 1, "name": 1, "description": 1,
-            "name_en": 1, "description_en": 1, "name_zh": 1, "description_zh": 1}
-    async for it in db.menu_items.find({"restaurant_id": restaurant_id}, proj):
-        update = {}
-        for t in targets:
-            n_field, d_field = f"name_{t}", f"description_{t}"
-            if (force or not it.get(n_field)) and it.get('name'):
-                tr = await translate_ru_to(it['name'], t)
-                if tr:
-                    update[n_field] = tr
-            if (force or not it.get(d_field)) and it.get('description'):
-                tr = await translate_ru_to(it['description'], t)
-                if tr:
-                    update[d_field] = tr
-        if update:
-            await db.menu_items.update_one({"id": it['id']}, {"$set": update})
-            stats["items"] += 1
-        # Yield to the event loop so concurrent requests keep serving
-        await asyncio.sleep(0.1)
+        # Categories
+        async for c in db.categories.find({"restaurant_id": restaurant_id}, {"_id": 0, "id": 1, "name": 1, "name_en": 1, "name_zh": 1}):
+            if not c.get('name'):
+                continue
+            update = {}
+            for t in targets:
+                field = f"name_{t}"
+                if force or not c.get(field):
+                    tr = await translate_ru_to(c['name'], t)
+                    if tr:
+                        update[field] = tr
+            if update:
+                await db.categories.update_one({"id": c['id']}, {"$set": update})
+            await bump("categories")
+            await asyncio.sleep(0.05)
 
-    log.info("translate-all finished for %s (langs=%s): %s", restaurant_id, targets, stats)
+        # Items
+        proj = {"_id": 0, "id": 1, "name": 1, "description": 1,
+                "name_en": 1, "description_en": 1, "name_zh": 1, "description_zh": 1}
+        async for it in db.menu_items.find({"restaurant_id": restaurant_id}, proj):
+            update = {}
+            for t in targets:
+                n_field, d_field = f"name_{t}", f"description_{t}"
+                if (force or not it.get(n_field)) and it.get('name'):
+                    tr = await translate_ru_to(it['name'], t)
+                    if tr:
+                        update[n_field] = tr
+                if (force or not it.get(d_field)) and it.get('description'):
+                    tr = await translate_ru_to(it['description'], t)
+                    if tr:
+                        update[d_field] = tr
+            if update:
+                await db.menu_items.update_one({"id": it['id']}, {"$set": update})
+            await bump("items")
+            await asyncio.sleep(0.1)
+
+        await db.translation_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "done",
+                "phase": "done",
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+        log.info("translate-all finished for %s (langs=%s): %s", restaurant_id, targets, stats)
+    except Exception as e:
+        await db.translation_jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "error",
+                "error": f"{type(e).__name__}: {e}",
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+        log.exception("translate-all failed for %s", restaurant_id)
 
 
 # ============ LABELS ============
