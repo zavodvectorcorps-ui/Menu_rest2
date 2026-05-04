@@ -450,7 +450,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
   };
 
   return (
-    <div className="min-h-screen bg-background" data-testid="client-menu-page">
+    <div className="min-h-screen bg-background overflow-x-hidden" data-testid="client-menu-page">
       {/* Splash / promo overlay */}
       {showSplash && (
         <div
@@ -505,57 +505,24 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
       )}
 
       {/* Header */}
-      <header ref={headerRef} className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border">
-        <div className="px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+      <header ref={headerRef} className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border overflow-x-hidden">
+        <div className="px-4 pt-4 pb-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               {restaurant.logo_url ? (
-                <img src={restaurant.logo_url} alt={restaurant.name} className="w-10 h-10 rounded-xl object-cover" />
+                <img src={restaurant.logo_url} alt={restaurant.name} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
               ) : (
-                <div className="w-10 h-10 rounded-xl bg-mint-500 flex items-center justify-center text-white font-bold">
+                <div className="w-10 h-10 rounded-xl bg-mint-500 flex items-center justify-center text-white font-bold flex-shrink-0">
                   {restaurant.name?.charAt(0)}
                 </div>
               )}
-              <div>
-                <h1 className="font-heading font-bold text-foreground">{restaurant.name}</h1>
+              <div className="min-w-0">
+                <h1 className="font-heading font-bold text-foreground truncate">{restaurant.name}</h1>
                 <p className="text-xs text-muted-foreground">{t('table_label')} №{table.number}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <LanguageSwitcher lang={lang} setLang={setLang} />
-            {settings.staff_call_enabled && call_types && call_types.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => {
-                    const next = !searchOpen;
-                    setSearchOpen(next);
-                    if (!next) setSearchQuery('');
-                    if (next) setTimeout(() => searchInputRef.current?.focus(), 50);
-                  }}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-                    searchOpen
-                      ? 'bg-mint-500 text-white'
-                      : 'border border-border text-foreground/70 hover:bg-muted'
-                  }`}
-                  aria-label={t('search_placeholder')}
-                  data-testid="toggle-search-btn"
-                >
-                  <Search className="w-4 h-4" />
-                </button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 h-9 px-3"
-                  onClick={() => setCallModalOpen(true)}
-                  data-testid="call-staff-btn"
-                >
-                  <Bell className="w-4 h-4 mr-1" />
-                  {t('call_waiter')}
-                </Button>
-              </div>
-            )}
-            {!(settings.staff_call_enabled && call_types && call_types.length > 0) && (
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               <button
                 onClick={() => {
                   const next = !searchOpen;
@@ -573,8 +540,24 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
               >
                 <Search className="w-4 h-4" />
               </button>
-            )}
+              {settings.staff_call_enabled && call_types && call_types.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 h-9 px-3 whitespace-nowrap"
+                  onClick={() => setCallModalOpen(true)}
+                  data-testid="call-staff-btn"
+                >
+                  <Bell className="w-4 h-4 sm:mr-1" />
+                  <span className="hidden sm:inline">{t('call_waiter')}</span>
+                </Button>
+              )}
             </div>
+          </div>
+
+          {/* Language switcher — secondary row, right-aligned */}
+          <div className="flex justify-end mt-2">
+            <LanguageSwitcher lang={lang} setLang={setLang} />
           </div>
 
           {restaurant.slogan && (

@@ -1,4 +1,7 @@
-"""Capture mobile-sized screenshots of the app for the marketing /demo page.
+"""Capture screenshots for the marketing /demo page.
+
+Admin pages → desktop (1440 wide) — they are designed for desktop usage.
+Client menu → mobile (420 wide retina) — shown in phone-frame mockups.
 
 Run from /app: python3 scripts/refresh_demo_shots.py
 """
@@ -19,10 +22,8 @@ DEMO_PASSWORD = "demo2026"
 OUT = Path("/app/frontend/public/demo-shots")
 OUT.mkdir(parents=True, exist_ok=True)
 
-# Mobile viewport for everything — these images are shown inside phone-frame mockups
-# and inside small browser-chrome cards on DemoPage. Mobile size = sharp on retina mobile.
-PHONE_VIEW = {"width": 420, "height": 1100}  # admin pages — taller for content
-MENU_VIEW = {"width": 420, "height": 900}    # client menu — phone height
+DESKTOP_VIEW = {"width": 1440, "height": 900}
+MENU_VIEW = {"width": 420, "height": 900}    # client menu — phone
 
 
 async def wait_imgs(page, n=4, timeout=10000):
@@ -43,10 +44,10 @@ async def wait_imgs(page, n=4, timeout=10000):
 async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
+        # Admin context — desktop
         ctx = await browser.new_context(
-            viewport=PHONE_VIEW,
-            device_scale_factor=2,  # retina-quality
-            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+            viewport=DESKTOP_VIEW,
+            device_scale_factor=1,
         )
         page = await ctx.new_page()
 
@@ -101,10 +102,16 @@ async def main():
         )
         page = await ctx.new_page()
         for i, scroll in enumerate([0, 600]):
-            await page.goto(f"{BASE}/myata/1", wait_until="networkidle", timeout=30000)
+            for attempt in range(3):
+                try:
+                    await page.goto(f"{BASE}/myata/1", wait_until="domcontentloaded", timeout=30000)
+                    break
+                except Exception as e:
+                    print(f"retry menu ({attempt+1}/3): {e}")
+                    await page.wait_for_timeout(2000)
             # Force EN
             await page.evaluate("() => localStorage.setItem('client_menu_lang','en')")
-            await page.reload(wait_until="networkidle")
+            await page.reload(wait_until="domcontentloaded")
             await wait_imgs(page, n=6, timeout=15000)
             await page.wait_for_timeout(1500)
             if scroll:
