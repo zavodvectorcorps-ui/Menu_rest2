@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
 import html as html_module
 from datetime import datetime, timezone, timedelta
 
@@ -10,6 +11,7 @@ from helpers import serialize_doc, get_or_create_settings, get_or_create_menu_se
 from services.telegram import notify_restaurant_telegram, build_order_keyboard, build_call_keyboard
 from services.caffesta import is_caffesta_enabled, caffesta_send_order
 from services.websocket import manager
+from services.share_card import render_demo_share_card
 
 router = APIRouter()
 
@@ -188,6 +190,58 @@ async def get_demo_menu_info():
         "table_number": table['number'],
         "path": path,
     }
+
+
+@router.get("/public/demo-share-card")
+async def get_demo_share_card(request: Request):
+    """Returns a 1080x1080 PNG share card for the demo restaurant — branded
+    image with QR code that opens the live demo menu. Suited for sharing
+    in WhatsApp/Telegram/Instagram. The PNG is regenerated per request
+    (it's small, ~120 KB)."""
+    demo_user = await db.users.find_one({"username": "demo"}, {"_id": 0})
+    rids = (demo_user or {}).get('restaurant_ids') or []
+    if not rids:
+        raise HTTPException(status_code=404, detail="Демо-ресторан ещё не посеян")
+
+    restaurant = await db.restaurants.find_one({"id": rids[0]}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Демо-ресторан не найден")
+
+    table = await db.tables.find_one(
+        {"restaurant_id": restaurant["id"], "is_active": True, "number": {"$gte": 1}},
+        {"_id": 0},
+        sort=[("number", 1)],
+    )
+    if not table:
+        raise HTTPException(status_code=404, detail="У демо-ресторана нет столов")
+
+    slug = (restaurant.get('slug') or '').strip()
+    path = f"/{slug}/{table['number']}" if slug else f"/menu/{table['code']}"
+
+    # Build absolute URL the visitor will open. Prefer X-Forwarded headers so the
+    # link works behind nginx (deploy host) without hardcoding env vars.
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
+    host = (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or request.url.netloc
+    )
+    full_url = f"{proto}://{host}{path}"
+
+    png = render_demo_share_card(
+        url=full_url,
+        restaurant_name=restaurant.get("name", "Demo Restaurant"),
+        slogan=restaurant.get("slogan", "") or "Попробуйте платформу изнутри",
+        table_number=table["number"],
+    )
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": 'inline; filename="rest-menu-demo.png"',
+            "Cache-Control": "public, max-age=300",
+        },
+    )
 
 
 @router.get("/public/demo-stats")

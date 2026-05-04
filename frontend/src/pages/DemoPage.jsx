@@ -6,7 +6,7 @@ import {
   Sparkles, Globe, QrCode, BarChart3, Bot, Wallet,
   ShoppingBag, ArrowRight, Zap, Languages, ChefHat, MessageSquare,
   Lock, Rocket, Star, ExternalLink, Copy, User, Eye, Clock,
-  CheckCircle2, TrendingUp, Smartphone, Bell, RefreshCcw, ChevronRight,
+  CheckCircle2, TrendingUp, Smartphone, Bell, RefreshCcw, ChevronRight, Share2, Download,
 } from 'lucide-react';
 
 import { API } from '@/App';
@@ -29,6 +29,47 @@ export default function DemoPage() {
   }, []);
 
   const demoMenuUrl = demoMenu ? `${window.location.origin}${demoMenu.path}` : null;
+  const shareCardUrl = `${API}/public/demo-share-card`;
+  const [shareState, setShareState] = useState('idle'); // idle | sharing | done | error
+
+  const handleShareDemo = async () => {
+    if (shareState === 'sharing') return;
+    setShareState('sharing');
+    try {
+      // Fetch the PNG and try Web Share API with file. Fallback to download.
+      const res = await fetch(shareCardUrl, { cache: 'no-store' });
+      const blob = await res.blob();
+      const file = new File([blob], 'rest-menu-demo.png', { type: 'image/png' });
+      const shareData = {
+        title: 'REST-MENU — попробуйте демо',
+        text: `Демо-меню «${demoMenu?.restaurant_name || 'Demo Restaurant'}» — отсканируйте QR или откройте по ссылке`,
+        url: demoMenuUrl || `${window.location.origin}/demo`,
+        files: [file],
+      };
+      if (navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        setShareState('done');
+      } else if (navigator.share) {
+        const { files: _f, ...withoutFile } = shareData;
+        await navigator.share(withoutFile);
+        setShareState('done');
+      } else {
+        // Desktop fallback: download the PNG
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'rest-menu-demo.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+        setShareState('done');
+      }
+      setTimeout(() => setShareState('idle'), 2500);
+    } catch (e) {
+      setShareState('error');
+      setTimeout(() => setShareState('idle'), 2500);
+    }
+  };
 
   // SEO meta tags
   useEffect(() => {
@@ -480,10 +521,32 @@ export default function DemoPage() {
               </div>
 
               {demoMenuUrl && (
-                <a href={demoMenuUrl} target="_blank" rel="noopener noreferrer" className="mt-8 px-6 h-12 inline-flex items-center gap-2 rounded-full bg-white text-[#0a0e1a] font-semibold hover:bg-mint-300 transition-colors" data-testid="demo-guest-open-link">
-                  Открыть меню в новой вкладке <ExternalLink className="w-4 h-4" />
-                </a>
+                <div className="mt-8 flex flex-wrap items-center gap-3">
+                  <a href={demoMenuUrl} target="_blank" rel="noopener noreferrer" className="px-6 h-12 inline-flex items-center gap-2 rounded-full bg-white text-[#0a0e1a] font-semibold hover:bg-mint-300 transition-colors" data-testid="demo-guest-open-link">
+                    Открыть меню в новой вкладке <ExternalLink className="w-4 h-4" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={handleShareDemo}
+                    disabled={shareState === 'sharing'}
+                    className="px-6 h-12 inline-flex items-center gap-2 rounded-full border border-mint-500/40 bg-mint-500/10 text-mint-200 font-semibold hover:bg-mint-500/20 hover:border-mint-500/60 transition-colors disabled:opacity-60"
+                    data-testid="demo-share-btn"
+                  >
+                    {shareState === 'sharing' ? (
+                      <><RefreshCcw className="w-4 h-4 animate-spin" /> Готовим картинку…</>
+                    ) : shareState === 'done' ? (
+                      <><CheckCircle2 className="w-4 h-4" /> Готово!</>
+                    ) : shareState === 'error' ? (
+                      <><Share2 className="w-4 h-4" /> Не удалось — попробуйте ещё раз</>
+                    ) : (
+                      <><Share2 className="w-4 h-4" /> Поделиться демо</>
+                    )}
+                  </button>
+                </div>
               )}
+              <p className="mt-3 text-xs text-white/40 max-w-md">
+                Кнопка отдаёт PNG-карточку с QR — её можно сразу отправить в WhatsApp, Telegram или Instagram. На десктопе без Web Share API файл скачается.
+              </p>
             </div>
           </div>
         </div>
