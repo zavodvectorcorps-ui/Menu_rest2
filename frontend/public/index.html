@@ -6,12 +6,17 @@
         <meta name="theme-color" content="#5DA9A4" />
         <meta name="description" content="REST-MENU — готовая платформа цифрового меню для ресторанов: QR-меню, онлайн-заказы, Telegram-уведомления и аналитика. Запуск за день — без программирования." />
 
-        <!-- Open Graph (Telegram, Facebook, LinkedIn, Discord, etc.) -->
+        <!-- Open Graph (Telegram, Facebook, LinkedIn, Discord, etc.)
+             IMPORTANT: og:image must be an ABSOLUTE URL. Telegram refuses
+             relative paths like /og-image.jpg and shows the link without
+             a preview. We hardcode the canonical landing domain here. -->
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="REST-MENU" />
+        <meta property="og:url" content="https://rest-menu.by/" />
         <meta property="og:title" content="REST-MENU — Цифровое меню для ресторанов" />
         <meta property="og:description" content="QR-меню, онлайн-заказы, Telegram-уведомления и аналитика. Запуск за день — без программирования." />
-        <meta property="og:image" content="%PUBLIC_URL%/og-image.jpg" />
+        <meta property="og:image" content="https://rest-menu.by/og-image.jpg" />
+        <meta property="og:image:secure_url" content="https://rest-menu.by/og-image.jpg" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta property="og:image:type" content="image/jpeg" />
@@ -21,7 +26,7 @@
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="REST-MENU — Цифровое меню для ресторанов" />
         <meta name="twitter:description" content="QR-меню, онлайн-заказы, аналитика и Telegram — за день." />
-        <meta name="twitter:image" content="%PUBLIC_URL%/og-image.jpg" />
+        <meta name="twitter:image" content="https://rest-menu.by/og-image.jpg" />
 
         <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
         <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
