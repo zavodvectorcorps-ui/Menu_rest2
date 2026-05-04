@@ -127,7 +127,7 @@ export default function DemoPage() {
               <a href="#try" className="px-6 h-12 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-mint-400 to-emerald-500 text-[#0a0e1a] font-semibold hover:shadow-2xl hover:shadow-mint-500/30 transition-all hover:-translate-y-0.5" data-testid="demo-hero-cta-primary">
                 Попробовать сейчас <ArrowRight className="w-5 h-5" />
               </a>
-              <a href="#screens" className="px-6 h-12 inline-flex items-center gap-2 rounded-full border border-white/15 hover:bg-white/5 transition-colors text-sm">
+              <a href="#screencast" className="px-6 h-12 inline-flex items-center gap-2 rounded-full border border-white/15 hover:bg-white/5 transition-colors text-sm">
                 Как это выглядит
               </a>
             </div>
@@ -139,16 +139,46 @@ export default function DemoPage() {
             </div>
           </div>
 
-          {/* Hero media — autoplay screencast (with OG image as poster fallback) */}
+          {/* Hero media — static OG card */}
           <div className="relative" style={{ transform: `translateY(${scrollY * 0.05}px)` }}>
             <div className="absolute -inset-6 bg-gradient-to-tr from-mint-500/20 via-purple-500/20 to-cyan-500/20 blur-3xl rounded-full" />
-            <DemoHeroVideo />
+            <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+              <img
+                src="/og-image.jpg"
+                alt="REST-MENU — цифровое меню, QR, POS, Telegram"
+                className="w-full h-auto block"
+                data-testid="demo-hero-image"
+                loading="eager"
+              />
+            </div>
             {/* Floating badges */}
             <div className="absolute -left-4 top-8 hidden md:block">
               <FloatingChip icon={<Bell className="w-3.5 h-3.5" />} text="Новый заказ" tone="emerald" delay={0} />
             </div>
             <div className="absolute -right-4 bottom-12 hidden md:block">
               <FloatingChip icon={<Star className="w-3.5 h-3.5" />} text="+12% к выручке" tone="amber" delay={400} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== Live screencast ===== */}
+      <section id="screencast" className="py-16 border-t border-white/5">
+        <div className="max-w-5xl mx-auto px-5">
+          <div className="text-center mb-8">
+            <div className="text-mint-400 text-xs font-semibold tracking-wider uppercase mb-2">Демо за 22 секунды</div>
+            <h2 className="text-2xl sm:text-4xl font-bold leading-tight">
+              Посмотрите, как это работает
+            </h2>
+            <p className="mt-3 text-sm text-white/55 max-w-xl mx-auto">
+              От сканирования QR до уведомления в админке — реальная запись из сервиса. Без монтажа, без украшений.
+            </p>
+          </div>
+
+          <div className="relative">
+            <div className="absolute -inset-6 bg-gradient-to-tr from-mint-500/15 via-purple-500/15 to-cyan-500/15 blur-3xl rounded-full pointer-events-none" />
+            <div className="relative">
+              <DemoHeroVideo />
             </div>
           </div>
         </div>
