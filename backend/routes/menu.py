@@ -13,7 +13,7 @@ from models import (
 from auth import get_current_user, check_restaurant_access
 from helpers import serialize_doc, get_or_create_menu_sections
 from services.images import download_images_task
-from services.translation import translate_ru_to_en
+from services.translation import translate_ru_to_en, translate_ru_to_en_strict
 
 UPLOADS_DIR = Path(__file__).parent.parent / "uploads"
 ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
@@ -224,6 +224,32 @@ async def reorder_items(restaurant_id: str, order: List[str], current_user: dict
 
 # ============ I18N / BULK TRANSLATION ============
 
+@router.get("/translation-status")
+async def translation_status(current_user: dict = Depends(get_current_user)):
+    """Diagnostic endpoint — checks whether the AI translation pipeline
+    is configured correctly. Useful when «Перевести меню» fails on prod:
+    user can curl this to see the precise error.
+    """
+    import os
+    out = {
+        "key_present": bool(os.environ.get("EMERGENT_LLM_KEY")),
+        "key_prefix": (os.environ.get("EMERGENT_LLM_KEY") or "")[:14] + "..." if os.environ.get("EMERGENT_LLM_KEY") else None,
+        "smoke_test": None,
+        "error": None,
+    }
+    if not out["key_present"]:
+        out["error"] = "EMERGENT_LLM_KEY is not set in backend env. Add it to backend/.env or docker-compose.yml."
+        return out
+    try:
+        result = await translate_ru_to_en_strict("Привет")
+        out["smoke_test"] = result
+        if not result:
+            out["error"] = "LLM returned empty response (possibly out of credits)"
+    except Exception as e:
+        out["error"] = f"{type(e).__name__}: {e}"
+    return out
+
+
 @router.post("/restaurants/{restaurant_id}/translate-all")
 async def translate_all_menu_to_en(restaurant_id: str, background_tasks: BackgroundTasks, force: bool = False, current_user: dict = Depends(get_current_user)):
     """Kick off a background job that translates sections, categories and items
@@ -247,20 +273,32 @@ async def translate_all_menu_to_en(restaurant_id: str, background_tasks: Backgro
     # 2. Quick smoke-test: make sure the model actually replies before kicking off
     # a long background job. This catches expired keys / network issues early.
     try:
-        smoke = await translate_ru_to_en("Тест")
+        smoke = await translate_ru_to_en_strict("Тест")
         if not smoke:
             raise HTTPException(
                 status_code=502,
                 detail=(
-                    "AI-перевод не ответил. Проверьте баланс ключа "
-                    "(Emergent → Profile → Universal Key → Add Balance) "
-                    "и доступность интернета у backend-контейнера."
+                    "AI-перевод вернул пустой ответ. Проверьте баланс ключа "
+                    "(Emergent → Profile → Universal Key)."
                 ),
             )
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"AI-перевод недоступен: {e}")
+        # Surface the underlying network/API error so the operator can debug
+        # (e.g. geo-block, expired key, DNS issue inside the docker network).
+        err_text = str(e) or repr(e)
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                f"AI-перевод недоступен. Подробности: {err_text}\n\n"
+                "Возможные причины:\n"
+                "• Регион запрещён провайдером LLM (попробуйте VPS в EU/US или прокси).\n"
+                "• Истёк баланс ключа — Emergent → Profile → Universal Key → Add Balance.\n"
+                "• Backend-контейнер не имеет выхода в интернет — проверьте `docker compose logs backend`.\n"
+                "• Неверный ключ — сверьте значение `EMERGENT_LLM_KEY` в backend/.env."
+            ),
+        )
 
     # 3. Build the filters once to report an estimate
     if force:
