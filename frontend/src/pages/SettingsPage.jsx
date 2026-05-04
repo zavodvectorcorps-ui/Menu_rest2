@@ -1993,6 +1993,56 @@ function I18nTranslateActions({ restaurantId, token }) {
     }
   };
 
+  const purgeAndRetranslate = async () => {
+    if (!restaurantId) return;
+    if (targetLang === 'all') {
+      toast.error('Выберите конкретный язык (EN или ZH) для очистки');
+      return;
+    }
+    if (!window.confirm(
+      `Очистить ВСЕ переводы на ${targetLang.toUpperCase()} и перевести заново? ` +
+      `Полезно если LLM выдал «грязные» переводы (с reasoning или остатками русского).`,
+    )) return;
+    setRunning(true);
+    try {
+      const r1 = await axios.post(
+        `${API}/restaurants/${restaurantId}/purge-translations?lang=${targetLang}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const c = r1.data?.cleared || {};
+      toast.success(
+        `Очищено: ${c.items || 0} блюд, ${c.categories || 0} категорий, ${c.sections || 0} разделов, ${c.cache_purged || 0} кэш-записей`,
+        { duration: 5000 },
+      );
+      // Now kick translation
+      const params = new URLSearchParams();
+      params.set('lang', targetLang);
+      const r2 = await axios.post(
+        `${API}/restaurants/${restaurantId}/translate-all?${params.toString()}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const est = r2.data?.estimate || {};
+      const total = (est.sections || 0) + (est.categories || 0) + (est.items || 0);
+      setJob({
+        status: 'running', phase: 'sections',
+        total, done: 0,
+        stats: { sections: 0, categories: 0, items: 0 },
+        totals: est,
+        languages: r2.data?.languages || [],
+        started_at: new Date().toISOString(),
+      });
+      startPolling();
+      toast.success(`Запущен заново перевод на ${targetLang.toUpperCase()}`);
+    } catch (e) {
+      const detail = e?.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : 'Не удалось перечистить переводы');
+    } finally {
+      setRunning(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
@@ -2032,6 +2082,18 @@ function I18nTranslateActions({ restaurantId, token }) {
               Перевести всё меню
             </>
           )}
+        </Button>
+
+        <Button
+          variant="outline"
+          onClick={purgeAndRetranslate}
+          disabled={running || !restaurantId || job?.status === 'running' || targetLang === 'all'}
+          className="gap-2"
+          data-testid="translate-purge-btn"
+          title={targetLang === 'all' ? 'Выберите конкретный язык' : 'Удалить все переводы и перевести заново'}
+        >
+          <RefreshCw className="w-4 h-4" />
+          Очистить и перевести заново
         </Button>
 
         <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer h-10">

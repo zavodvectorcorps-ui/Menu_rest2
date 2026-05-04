@@ -16,6 +16,7 @@ from services.images import download_images_task
 from services.translation import (
     translate_ru_to, translate_ru_to_strict,
     translate_ru_to_en_strict, get_cache_stats, SUPPORTED_LANGS,
+    purge_translations,
 )
 
 UPLOADS_DIR = Path(__file__).parent.parent / "uploads"
@@ -288,6 +289,22 @@ async def translation_cache_stats(current_user: dict = Depends(get_current_user)
     """Cache hit/miss diagnostic. Lets the admin see how many translations
     are served from cache vs the LLM."""
     return await get_cache_stats()
+
+
+@router.post("/restaurants/{restaurant_id}/purge-translations")
+async def purge_restaurant_translations(
+    restaurant_id: str,
+    lang: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Clear all translations for `lang` on this restaurant — useful when the
+    LLM produced contaminated results (CoT leakage, residual Russian text).
+    The user can then re-run bulk translation from a clean slate."""
+    await check_restaurant_access(current_user, restaurant_id)
+    if lang not in SUPPORTED_LANGS:
+        raise HTTPException(status_code=400, detail=f"Unknown language: {lang}")
+    counts = await purge_translations(restaurant_id, lang)
+    return {"message": f"Очищены переводы для {lang.upper()}", "cleared": counts}
 
 
 @router.post("/restaurants/{restaurant_id}/translate-all")
