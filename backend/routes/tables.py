@@ -93,6 +93,56 @@ async def get_table_qr(restaurant_id: str, table_id: str, base_url: Optional[str
     }
 
 
+@router.get("/restaurants/{restaurant_id}/tables/{table_id}/share-card")
+async def get_table_share_card(
+    restaurant_id: str,
+    table_id: str,
+    base_url: Optional[str] = None,
+    fmt: str = "square",
+    current_user: dict = Depends(get_current_user),
+):
+    """Branded PNG share card for posting on Instagram/Telegram/WhatsApp.
+    fmt=square (1080x1080) or fmt=story (1080x1920, IG Stories).
+    Includes the restaurant's logo (if uploaded), name, slogan and a QR code
+    that opens the live customer menu."""
+    from fastapi.responses import Response
+    from services.share_card import render_share_card
+
+    await check_restaurant_access(current_user, restaurant_id)
+    table = await db.tables.find_one({"id": table_id, "restaurant_id": restaurant_id}, {"_id": 0})
+    if not table:
+        raise HTTPException(status_code=404, detail="Table not found")
+
+    restaurant = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0})
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Restaurant not found")
+
+    if not base_url:
+        base_url = os.environ.get('FRONTEND_URL', 'https://example.com')
+    slug = (restaurant.get('slug') or '').strip()
+    menu_url = f"{base_url}/{slug}/{table['number']}" if slug else f"{base_url}/menu/{table['code']}"
+
+    fmt_safe = "story" if fmt == "story" else "square"
+    png = render_share_card(
+        url=menu_url,
+        restaurant_name=restaurant.get("name", ""),
+        slogan=restaurant.get("slogan", "") or "Отсканируйте QR — откройте меню прямо сейчас",
+        eyebrow="Цифровое меню по QR",
+        cta="Наведите камеру → меню откроется",
+        table_number=table["number"],
+        logo_url=restaurant.get("logo_url") or None,
+        fmt=fmt_safe,
+    )
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": f'attachment; filename="qr_share_table_{table["number"]}_{fmt_safe}.png"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 @router.get("/restaurants/{restaurant_id}/tables/{table_id}/qr-pdf")
 async def get_table_qr_pdf(
     restaurant_id: str,

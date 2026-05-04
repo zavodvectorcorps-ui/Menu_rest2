@@ -327,6 +327,28 @@ export default function SettingsPage() {
     }
   };
 
+  const downloadShareCard = async (fmt) => {
+    if (!qrData) return;
+    try {
+      const baseUrl = window.location.origin;
+      const resp = await axios.get(
+        `${API}/restaurants/${currentRestaurantId}/tables/${qrData.table_id}/share-card?fmt=${fmt}&base_url=${encodeURIComponent(baseUrl)}`,
+        { ...authHeaders, responseType: 'blob' }
+      );
+      const url = URL.createObjectURL(new Blob([resp.data], { type: 'image/png' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `share_qr_table_${qrData.table_number}_${fmt}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Карточка для соцсетей (${fmt === 'story' ? 'Stories 9:16' : 'квадрат 1:1'}) скачана`);
+    } catch (e) {
+      toast.error('Не удалось сформировать карточку');
+    }
+  };
+
   const [bulkPdfLoading, setBulkPdfLoading] = useState(false);
   const downloadAllQrPdf = async (size) => {
     setBulkPdfLoading(true);
@@ -1632,6 +1654,30 @@ export default function SettingsPage() {
             >
               <Download className="w-4 h-4 mr-2" />
               PDF A5
+            </Button>
+            <div className="w-full border-t my-1" />
+            <div className="w-full text-xs text-muted-foreground -mb-1">
+              Готовая карточка для соцсетей (с логотипом, QR и брендом)
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => downloadShareCard('square')}
+              disabled={!qrData}
+              data-testid="download-share-card-square-btn"
+              title="1080×1080 — для Instagram-постов, Telegram и WhatsApp"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Соцсети 1:1
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => downloadShareCard('story')}
+              disabled={!qrData}
+              data-testid="download-share-card-story-btn"
+              title="1080×1920 — для Instagram Stories / Reels"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Stories 9:16
             </Button>
           </DialogFooter>
         </DialogContent>

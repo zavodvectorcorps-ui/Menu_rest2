@@ -14,7 +14,7 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 import qrcode
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 FONT_BOLD = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
 FONT_REG = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
@@ -162,6 +162,143 @@ def render_demo_share_card(
                              fill=(93, 169, 164, 40), outline=MINT, width=2)
         img.alpha_composite(badge)
         draw.text((bx + 18, by + 11), badge_text, font=f_badge, fill=MINT)
+
+    out = BytesIO()
+    img.convert("RGB").save(out, format="PNG", optimize=True)
+    return out.getvalue()
+
+
+def _fetch_logo(logo_url: str | None) -> Image.Image | None:
+    """Best-effort logo fetch. Returns None on any failure (silently)."""
+    if not logo_url:
+        return None
+    try:
+        import urllib.request
+        if logo_url.startswith(("http://", "https://")):
+            req = urllib.request.Request(logo_url, headers={"User-Agent": "rest-menu-share-card/1.0"})
+            with urllib.request.urlopen(req, timeout=4) as r:
+                data = r.read()
+        else:
+            # Local path / static
+            p = Path(logo_url)
+            if not p.is_absolute():
+                p = Path("/app/frontend/public") / logo_url.lstrip("/")
+            if not p.exists():
+                return None
+            data = p.read_bytes()
+        return Image.open(BytesIO(data)).convert("RGBA")
+    except Exception:
+        return None
+
+
+def render_share_card(
+    *,
+    url: str,
+    restaurant_name: str,
+    slogan: str = "",
+    eyebrow: str = "Цифровое меню по QR",
+    cta: str = "Наведите камеру → откройте меню",
+    table_number: int | None = None,
+    logo_url: str | None = None,
+    fmt: str = "square",
+) -> bytes:
+    """Generalized share-card renderer.
+
+    fmt: "square" (1080x1080, IG/Telegram/WhatsApp) or "story" (1080x1920, IG Stories/Reels).
+    """
+    is_story = fmt == "story"
+    W, H = (1080, 1920) if is_story else (1080, 1080)
+    img = Image.new("RGBA", (W, H), BG + (255,))
+    _draw_glow(img)
+    draw = ImageDraw.Draw(img)
+
+    pad = 80
+
+    # ---- Header: optional logo + brand wordmark ----
+    logo = _fetch_logo(logo_url)
+    header_y = pad
+    if logo:
+        # Round-square thumbnail, 96px
+        sz = 96
+        logo_sq = ImageOps.fit(logo, (sz, sz), method=Image.LANCZOS)
+        mask = Image.new("L", (sz, sz), 0)
+        ImageDraw.Draw(mask).rounded_rectangle((0, 0, sz, sz), radius=24, fill=255)
+        img.paste(logo_sq, (pad, header_y), mask)
+        text_x = pad + sz + 24
+    else:
+        text_x = pad
+
+    f_brand = _font(34, bold=True)
+    draw.text((text_x, header_y + (8 if logo else 0)), restaurant_name or "REST-MENU", font=f_brand, fill=WHITE)
+
+    f_eyebrow = _font(22)
+    draw.text((text_x, header_y + (50 if logo else 50)), eyebrow, font=f_eyebrow, fill=MINT)
+
+    # ---- Slogan / supporting copy block (mid) ----
+    f_title = _font(56 if is_story else 60, bold=True)
+    headline = slogan or "Отсканируйте QR — попробуйте меню прямо сейчас"
+    title_lines = _wrap(headline, f_title, W - 2 * pad)
+    y = header_y + 180 + (40 if is_story else 0)
+    for line in title_lines[:3]:
+        draw.text((pad, y), line, font=f_title, fill=WHITE)
+        y += 70
+
+    # ---- QR — large, centered ----
+    qr = qrcode.QRCode(box_size=10, border=2, error_correction=qrcode.constants.ERROR_CORRECT_M)
+    qr.add_data(url)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGBA")
+    qr_size = 560 if is_story else 500
+    qr_img = qr_img.resize((qr_size, qr_size), Image.NEAREST)
+    qr_x = (W - qr_size) // 2
+    # Position: centered vertically in lower half
+    qr_y = (H - qr_size) // 2 + (60 if is_story else 60)
+    panel_pad = 30
+    panel = (qr_x - panel_pad, qr_y - panel_pad, qr_x + qr_size + panel_pad, qr_y + qr_size + panel_pad)
+    panel_img = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    pd = ImageDraw.Draw(panel_img)
+    pd.rounded_rectangle(panel, radius=36, fill=WHITE)
+    img.alpha_composite(panel_img)
+    img.alpha_composite(qr_img, dest=(qr_x, qr_y))
+
+    # ---- Footer: CTA + URL ----
+    f_cta = _font(34, bold=True)
+    bbox = f_cta.getbbox(cta)
+    cta_w = bbox[2] - bbox[0]
+    draw.text(((W - cta_w) // 2, H - 160), cta, font=f_cta, fill=WHITE)
+
+    f_url = _font(22)
+    short = url
+    for prefix in ("https://", "http://"):
+        if short.startswith(prefix):
+            short = short[len(prefix):]
+            break
+    bbox = f_url.getbbox(short)
+    url_w = bbox[2] - bbox[0]
+    draw.text(((W - url_w) // 2, H - 100), short, font=f_url, fill=MINT)
+
+    # ---- Optional table-number badge top-right ----
+    if table_number is not None:
+        f_badge = _font(20, bold=True)
+        badge_text = f"СТОЛ №{table_number}"
+        bbox = f_badge.getbbox(badge_text)
+        bw = bbox[2] - bbox[0] + 36
+        bh = 44
+        bx = W - pad - bw
+        by = pad + 8
+        badge = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        bd = ImageDraw.Draw(badge)
+        bd.rounded_rectangle((bx, by, bx + bw, by + bh), radius=22,
+                             fill=(93, 169, 164, 40), outline=MINT, width=2)
+        img.alpha_composite(badge)
+        draw.text((bx + 18, by + 11), badge_text, font=f_badge, fill=MINT)
+
+    # ---- Tiny "powered by" footer (story only — more space) ----
+    if is_story:
+        f_pb = _font(18)
+        pb = "Powered by REST-MENU"
+        bbox = f_pb.getbbox(pb)
+        draw.text(((W - (bbox[2] - bbox[0])) // 2, H - 50), pb, font=f_pb, fill=(120, 130, 145))
 
     out = BytesIO()
     img.convert("RGB").save(out, format="PNG", optimize=True)

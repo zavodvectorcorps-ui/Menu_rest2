@@ -4,6 +4,14 @@
 ## Последнее обновление: 2026-05-04
 
 ### Изменения 2026-05-04
+- **Share-card для соцсетей (P1, DONE)**:
+  - **Backend**: `services/share_card.py::render_share_card()` — generalized PNG-генератор. Поддерживает 2 формата: `square` (1080×1080 — IG-посты, Telegram, WhatsApp) и `story` (1080×1920 — IG Stories/Reels). Подтягивает logo ресторана (если задан в `restaurant.logo_url`) и рендерит округлый logo-чип в шапке. Слоган берётся из `restaurant.slogan`. URL в QR — из X-Forwarded headers.
+  - **Admin endpoint** `GET /api/restaurants/{rid}/tables/{tid}/share-card?fmt=square|story&base_url=...` (auth required, проверка `check_restaurant_access`). Отдаёт PNG как attachment.
+  - **Frontend**: в `SettingsPage.jsx` → диалог QR-кода стола → новые кнопки «Соцсети 1:1» и «Stories 9:16» под разделителем с подписью «Готовая карточка для соцсетей (с логотипом, QR и брендом)». Скачивание через axios + blob URL.
+  - **Public endpoint** `GET /api/public/demo-share-card` остался — отдаёт квадратную карточку для публичного `/demo` лендинга.
+  - Проверено: square=68KB, story=107KB, кириллица рендерится без артефактов (Liberation Sans), QR корректно декодируется на production-URL.
+  - Регрессия: 12/12 тестов demo isolation + translation cache проходят.
+
 - **Изолированный демо-ресторан + кэш AI-переводов (P1, DONE)**:
   - **Demo Restaurant (slug=`demo`)** — отдельный посевной ресторан c полным набором моковых данных, создаётся через `services/demo_seed.py::seed_demo_restaurant()` и привязывается к юзеру `demo/demo2026`. Раньше demo юзер видел реальный ресторан «Мята Спортивная»; теперь имеет доступ только к Demo Restaurant.
   - Содержимое: 2 секции (Кухня/Бар), 11 категорий, 25 блюд (с RU и EN переводами + Unsplash фото), 8 столов, 45 заказов за 7 дней, 20 вызовов персонала, 180 просмотров меню, 3 типа вызовов. Все таймстемпы рандомизированы для красивых графиков в Analytics.
