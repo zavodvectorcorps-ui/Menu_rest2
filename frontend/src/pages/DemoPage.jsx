@@ -6,7 +6,7 @@ import {
   Sparkles, Globe, QrCode, BarChart3, Bot, Wallet,
   ShoppingBag, ArrowRight, Zap, Languages, ChefHat, MessageSquare,
   Lock, Rocket, Star, ExternalLink, Copy, User, Eye, Clock,
-  CheckCircle2, TrendingUp, Smartphone, Bell,
+  CheckCircle2, TrendingUp, Smartphone, Bell, RefreshCcw,
 } from 'lucide-react';
 
 import { API } from '@/App';
@@ -24,10 +24,8 @@ export default function DemoPage() {
   }, []);
 
   const [demoMenu, setDemoMenu] = useState(null);
-  const [liveStats, setLiveStats] = useState(null);
   useEffect(() => {
     axios.get(`${API}/public/demo-menu-info`).then((r) => setDemoMenu(r.data)).catch(() => {});
-    axios.get(`${API}/public/demo-stats`).then((r) => setLiveStats(r.data)).catch(() => {});
   }, []);
 
   const demoMenuUrl = demoMenu ? `${window.location.origin}${demoMenu.path}` : null;
@@ -144,27 +142,7 @@ export default function DemoPage() {
           {/* Hero media — autoplay screencast (with OG image as poster fallback) */}
           <div className="relative" style={{ transform: `translateY(${scrollY * 0.05}px)` }}>
             <div className="absolute -inset-6 bg-gradient-to-tr from-mint-500/20 via-purple-500/20 to-cyan-500/20 blur-3xl rounded-full" />
-            <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black aspect-[16/9]">
-              <video
-                src="/demo.mp4"
-                poster="/og-image.jpg"
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-                className="w-full h-full object-cover block"
-                data-testid="demo-hero-video"
-              />
-              {/* Subtle live indicator */}
-              <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[11px] font-semibold">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
-                </span>
-                <span className="text-white/90">Демо</span>
-              </div>
-            </div>
+            <DemoHeroVideo />
             {/* Floating badges */}
             <div className="absolute -left-4 top-8 hidden md:block">
               <FloatingChip icon={<Bell className="w-3.5 h-3.5" />} text="Новый заказ" tone="emerald" delay={0} />
@@ -176,32 +154,22 @@ export default function DemoPage() {
         </div>
       </section>
 
-      {/* ===== Live stats ===== */}
+      {/* ===== Selling stats ===== */}
       <section id="metrics" className="py-16 border-y border-white/5 bg-white/[0.015]">
         <div className="max-w-6xl mx-auto px-5">
-          <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
-            <div>
-              <div className="text-mint-400 text-xs font-semibold tracking-wider uppercase mb-1.5">Реальные цифры</div>
-              <h2 className="text-2xl sm:text-3xl font-bold leading-tight">
-                Платформа в работе прямо сейчас
-              </h2>
-            </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-              </span>
-              live
-            </div>
+          <div className="max-w-2xl mb-10">
+            <div className="text-mint-400 text-xs font-semibold tracking-wider uppercase mb-1.5">Платформа в работе</div>
+            <h2 className="text-2xl sm:text-3xl font-bold leading-tight">
+              Цифры, которые говорят за себя
+            </h2>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <LiveMetric value={liveStats?.restaurants} label="Ресторанов" icon={<ChefHat />} testid="stat-restaurants" />
-            <LiveMetric value={liveStats?.tables} label="Столов с QR" icon={<QrCode />} testid="stat-tables" />
-            <LiveMetric value={liveStats?.menu_items} label="Блюд в меню" icon={<ShoppingBag />} testid="stat-menu-items" />
-            <LiveMetric value={liveStats?.menu_views_total} delta={liveStats?.menu_views_24h} label="Просмотров" icon={<Eye />} testid="stat-menu-views" />
-            <LiveMetric value={liveStats?.orders_total} delta={liveStats?.orders_24h} label="Заказов" icon={<TrendingUp />} testid="stat-orders" />
-            <LiveMetric value={liveStats?.staff_calls_total} label="Вызовов" icon={<Bell />} testid="stat-staff-calls" />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <SellingMetric value="+24%" label="К среднему чеку" sub="у ресторанов с самостоятельным заказом" tone="mint" testid="stat-avg-check" />
+            <SellingMetric value="−40%" label="Времени официантов" sub="на приём заказов и счёт" tone="emerald" testid="stat-staff-time" />
+            <SellingMetric value="< 1 день" label="Запуск" sub="от заявки до первого QR на столе" tone="cyan" testid="stat-launch" />
+            <SellingMetric value="99.9%" label="Аптайм" sub="меню всегда доступно гостю" tone="amber" testid="stat-uptime" />
+            <SellingMetric value="0 ₽" label="За приложения" sub="меню открывается в любом браузере" tone="purple" testid="stat-zero-app" />
           </div>
         </div>
       </section>
@@ -254,6 +222,92 @@ export default function DemoPage() {
               desc="menu.вашресторан.by вместо длинной ссылки. Логотип, цвета, слоган. Гости видят ваш бренд, а не платформу."
               tone="rose"
             />
+          </div>
+        </div>
+      </section>
+
+      {/* ===== AI Multilingual feature ===== */}
+      <section id="multilang" className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] rounded-full bg-purple-500/8 blur-[140px]" />
+        </div>
+        <div className="max-w-6xl mx-auto px-5">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            {/* LEFT: text */}
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-300 text-xs font-medium mb-5">
+                <Sparkles className="w-3.5 h-3.5" />
+                AI · Автоматический перевод
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-bold leading-[1.1] mb-5">
+                Меню для иностранных гостей —{' '}
+                <span className="bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
+                  без ручной работы
+                </span>
+              </h2>
+              <p className="text-white/60 leading-relaxed mb-8 max-w-lg">
+                Добавили блюдо на русском — английская версия появляется через несколько секунд автоматически.
+                Ваш переводчик — Google Gemini AI с кулинарным контекстом: знает, что «борщ» это <em>Borscht</em>,
+                а не <em>beet soup</em>, и сохраняет аппетитный тон.
+              </p>
+
+              <ul className="space-y-3 mb-8">
+                <FeatureBullet icon={<Zap className="w-4 h-4" />} text="Авто-перевод при сохранении блюда — за 2-3 секунды" />
+                <FeatureBullet icon={<RefreshCcw className="w-4 h-4" />} text="Изменили цену или описание — перевод регенерируется" />
+                <FeatureBullet icon={<Languages className="w-4 h-4" />} text="Переключение RU / EN флагом в шапке клиентского меню" />
+                <FeatureBullet icon={<ShoppingBag className="w-4 h-4" />} text="Корзина, бейджи, статусы заказа — всё переведено" />
+              </ul>
+
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-200/80">
+                <span className="font-semibold text-amber-300">Один клик</span> — и всё существующее меню переводится одной командой в админке («Настройки → Переводы»).
+              </div>
+            </div>
+
+            {/* RIGHT: bilingual menu card */}
+            <div className="relative">
+              <div className="absolute -inset-8 bg-gradient-to-tr from-purple-500/15 via-pink-500/10 to-mint-500/10 blur-3xl rounded-full" />
+
+              <div className="relative grid grid-cols-2 gap-3">
+                <BilingualCard
+                  flag="🇷🇺"
+                  lang="Русский"
+                  title="Сырники со сметаной"
+                  desc="Воздушные творожные шарики с вишнево-розмариновым соусом"
+                  cat="Завтраки до 16:00"
+                />
+                <BilingualCard
+                  flag="🇬🇧"
+                  lang="English"
+                  title="Syrniki with sour cream"
+                  desc="Airy cottage cheese balls with cherry-rosemary sauce"
+                  cat="Breakfasts until 4 PM"
+                  highlight
+                />
+
+                <BilingualCard
+                  flag="🇷🇺"
+                  lang="Русский"
+                  title="Тост с лососем и авокадо"
+                  desc="С кремом из мяты и базилика"
+                  cat="Закуски"
+                  compact
+                />
+                <BilingualCard
+                  flag="🇬🇧"
+                  lang="English"
+                  title="Salmon avocado toast"
+                  desc="With mint-basil cream"
+                  cat="Starters"
+                  highlight
+                  compact
+                />
+              </div>
+
+              {/* Arrow indicator */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-purple-500/30 border border-purple-400/50 backdrop-blur-md flex items-center justify-center text-purple-200 z-10 shadow-2xl">
+                <ArrowRight className="w-5 h-5" />
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -458,6 +512,90 @@ export default function DemoPage() {
 
 // ============ Sub-components ============
 
+const SUBTITLES = [
+  { from: 0,    to: 3.2,  text: 'Гость сканирует QR — открывается меню', icon: <QrCode className="w-3.5 h-3.5" /> },
+  { from: 3.2,  to: 7,    text: 'Листает категории, видит фото и описания',  icon: <Smartphone className="w-3.5 h-3.5" /> },
+  { from: 7,   to: 11.5,  text: 'Один клик — меню переведено на английский', icon: <Languages className="w-3.5 h-3.5" /> },
+  { from: 11.5, to: 16,   text: 'Ресторан видит заказы в админке',  icon: <ShoppingBag className="w-3.5 h-3.5" /> },
+  { from: 16,   to: 23,   text: 'И всю аналитику за период — графики, топ блюд', icon: <BarChart3 className="w-3.5 h-3.5" /> },
+];
+
+function DemoHeroVideo() {
+  const [v, setV] = useState(null);
+  const [t, setT] = useState(0);
+  useEffect(() => {
+    if (!v) return;
+    const onTime = () => setT(v.currentTime);
+    v.addEventListener('timeupdate', onTime);
+    return () => v.removeEventListener('timeupdate', onTime);
+  }, [v]);
+
+  const current = SUBTITLES.find((s) => t >= s.from && t < s.to);
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black aspect-[16/9]" data-testid="demo-hero-video-wrap">
+      <video
+        ref={(el) => setV(el)}
+        src="/demo.mp4"
+        poster="/og-image.jpg"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        className="w-full h-full object-cover block"
+        data-testid="demo-hero-video"
+      />
+
+      {/* Bottom gradient for legibility */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+
+      {/* Subtitle */}
+      <div className="absolute bottom-4 inset-x-4 flex justify-center pointer-events-none">
+        <div
+          key={current?.from ?? 'none'}
+          className={
+            'inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/70 backdrop-blur-md border border-white/15 text-sm font-medium text-white shadow-2xl ' +
+            (current ? 'animate-[subFade_400ms_ease-out]' : 'opacity-0')
+          }
+          data-testid="demo-video-subtitle"
+        >
+          {current && (
+            <>
+              <span className="text-mint-300">{current.icon}</span>
+              <span>{current.text}</span>
+            </>
+          )}
+        </div>
+        <style>{`@keyframes subFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+      </div>
+
+      {/* Live indicator */}
+      <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 text-[11px] font-semibold">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+        </span>
+        <span className="text-white/90">Демо</span>
+      </div>
+
+      {/* Progress bar — segments */}
+      <div className="absolute top-0 inset-x-0 flex gap-0.5 px-1 pt-1 pointer-events-none">
+        {SUBTITLES.map((s, i) => {
+          const len = s.to - s.from;
+          const local = Math.max(0, Math.min(len, t - s.from));
+          const pct = (local / len) * 100;
+          return (
+            <div key={i} className="flex-1 h-0.5 rounded-full bg-white/15 overflow-hidden">
+              <div className="h-full bg-mint-400 transition-[width] duration-100" style={{ width: `${pct}%` }} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function FloatingChip({ icon, text, tone, delay }) {
   const tones = {
     emerald: 'from-emerald-500/30 to-emerald-500/10 border-emerald-500/30 text-emerald-200',
@@ -471,6 +609,50 @@ function FloatingChip({ icon, text, tone, delay }) {
       {icon}
       {text}
       <style>{`@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }`}</style>
+    </div>
+  );
+}
+
+function BilingualCard({ flag, lang, title, desc, cat, highlight = false, compact = false }) {
+  return (
+    <div
+      className={
+        'rounded-xl border p-4 backdrop-blur-sm transition-all ' +
+        (highlight
+          ? 'border-purple-400/40 bg-gradient-to-br from-purple-500/15 to-pink-500/10 shadow-lg shadow-purple-500/10'
+          : 'border-white/10 bg-white/[0.03]')
+      }
+    >
+      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider mb-2.5">
+        <span className="text-base leading-none">{flag}</span>
+        <span className={highlight ? 'text-purple-200' : 'text-white/40'}>{lang}</span>
+      </div>
+      <div className={'text-[10px] uppercase tracking-wider mb-1 ' + (highlight ? 'text-purple-300/70' : 'text-white/30')}>
+        {cat}
+      </div>
+      <div className={'font-semibold leading-snug ' + (compact ? 'text-sm' : 'text-base')}>{title}</div>
+      <div className={'text-white/55 mt-1 leading-snug ' + (compact ? 'text-[11px]' : 'text-xs')}>{desc}</div>
+    </div>
+  );
+}
+
+function SellingMetric({ value, label, sub, tone, testid }) {
+  const toneMap = {
+    mint: 'from-mint-500/20 to-mint-500/5 border-mint-500/30 text-mint-300',
+    emerald: 'from-emerald-500/20 to-emerald-500/5 border-emerald-500/30 text-emerald-300',
+    cyan: 'from-cyan-500/20 to-cyan-500/5 border-cyan-500/30 text-cyan-300',
+    amber: 'from-amber-500/20 to-amber-500/5 border-amber-500/30 text-amber-300',
+    purple: 'from-purple-500/20 to-purple-500/5 border-purple-500/30 text-purple-300',
+  };
+  const valueColor = toneMap[tone].split(' ').pop();
+  return (
+    <div
+      className={`group relative rounded-2xl border bg-gradient-to-br ${toneMap[tone]} p-5 hover:-translate-y-0.5 transition-transform`}
+      data-testid={testid}
+    >
+      <div className={`text-3xl sm:text-4xl font-bold tabular-nums tracking-tight ${valueColor}`}>{value}</div>
+      <div className="text-sm font-semibold text-white/85 mt-2">{label}</div>
+      <div className="text-xs text-white/45 mt-1 leading-snug">{sub}</div>
     </div>
   );
 }
