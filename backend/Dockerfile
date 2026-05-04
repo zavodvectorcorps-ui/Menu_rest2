@@ -9,7 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.prod.txt requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.prod.txt
+RUN pip install --no-cache-dir \
+    --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/ \
+    -r requirements.prod.txt
 
 COPY . .
 
