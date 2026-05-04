@@ -24,6 +24,7 @@ services:
       DB_NAME: restaurant_app
       JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_GENERATE_RANDOM_SECRET}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      EMERGENT_LLM_KEY: ${EMERGENT_LLM_KEY:-sk-emergent-fD66246F32fEc2eE9E}
     volumes:
       - ./backend/uploads:/app/uploads
       # Read-only доступ для страницы «Статус доменов» — backend перечисляет
