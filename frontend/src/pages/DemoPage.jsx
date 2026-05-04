@@ -553,11 +553,39 @@ const SUBTITLES = [
 function DemoHeroVideo() {
   const [v, setV] = useState(null);
   const [t, setT] = useState(0);
+  const [hasPlayed, setHasPlayed] = useState(false);
+
   useEffect(() => {
     if (!v) return;
     const onTime = () => setT(v.currentTime);
     v.addEventListener('timeupdate', onTime);
     return () => v.removeEventListener('timeupdate', onTime);
+  }, [v]);
+
+  // Restart from 0 every time the video re-enters the viewport.
+  useEffect(() => {
+    if (!v) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return;
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          try {
+            v.currentTime = 0;
+            const p = v.play();
+            if (p && typeof p.then === 'function') {
+              p.then(() => setHasPlayed(true)).catch(() => {});
+            } else {
+              setHasPlayed(true);
+            }
+          } catch { /* noop */ }
+        } else {
+          v.pause();
+        }
+      },
+      { threshold: [0, 0.5, 1] }
+    );
+    io.observe(v);
+    return () => io.disconnect();
   }, [v]);
 
   const current = SUBTITLES.find((s) => t >= s.from && t < s.to);
@@ -568,7 +596,6 @@ function DemoHeroVideo() {
         ref={(el) => setV(el)}
         src="/demo.mp4"
         poster="/og-image.jpg"
-        autoPlay
         muted
         loop
         playsInline
@@ -622,6 +649,21 @@ function DemoHeroVideo() {
           );
         })}
       </div>
+
+      {/* "Tap to play" — shown only if video never played (e.g. browser blocks autoplay) */}
+      {!hasPlayed && (
+        <button
+          type="button"
+          onClick={() => v && v.play().catch(() => {})}
+          className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors"
+          data-testid="demo-video-play-fallback"
+          aria-label="Play demo video"
+        >
+          <span className="w-16 h-16 rounded-full bg-white/95 text-[#0a0e1a] flex items-center justify-center shadow-2xl">
+            <svg viewBox="0 0 24 24" className="w-7 h-7 ml-1" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+          </span>
+        </button>
+      )}
     </div>
   );
 }
