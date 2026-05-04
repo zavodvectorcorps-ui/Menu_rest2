@@ -61,6 +61,12 @@ async def update_restaurant(restaurant_id: str, data: RestaurantUpdate, current_
     if 'enabled_modules' in update_data and current_user.get('role') != 'superadmin':
         update_data.pop('enabled_modules')
 
+    # enabled_languages — admin/superadmin allowed; constrain to supported codes.
+    if 'enabled_languages' in update_data:
+        from services.translation import SUPPORTED_LANGS
+        raw = update_data['enabled_languages'] or []
+        update_data['enabled_languages'] = [c for c in raw if c in SUPPORTED_LANGS]
+
     # custom_domains — only superadmin can manage tenant domains.
     # Normalise to lowercase, no scheme/path, deduplicated.
     if 'custom_domains' in update_data:

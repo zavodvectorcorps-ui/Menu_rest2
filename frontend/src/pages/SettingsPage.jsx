@@ -1300,8 +1300,9 @@ export default function SettingsPage() {
                 Мультиязычность меню
               </CardTitle>
               <CardDescription>
-                Гость в клиентском меню видит флажок RU / EN в шапке и может переключить язык.
-                Переводы названий и описаний блюд генерируются автоматически через ИИ.
+                Гость в клиентском меню видит переключатель языка в шапке. Переводы блюд
+                генерируются ИИ. Включайте только те языки, которые реально нужны вашим гостям —
+                это уменьшит расход кредитов LLM.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -1322,6 +1323,8 @@ export default function SettingsPage() {
                   </p>
                 </div>
               </div>
+
+              <LanguageToggles restaurantId={currentRestaurantId} token={token} />
 
               <I18nTranslateActions restaurantId={currentRestaurantId} token={token} />
             </CardContent>
@@ -1778,30 +1781,142 @@ export default function SettingsPage() {
 }
 
 
+// ============ Inline sub-component: language toggles ============
+
+const LANGS_META = [
+  { code: 'en', label: 'English', flag: '🇬🇧', note: 'Базовый язык для туристов' },
+  { code: 'zh', label: '简体中文 (упр. китайский)', flag: '🇨🇳', note: 'Для гостей из КНР' },
+];
+
+function LanguageToggles({ restaurantId, token }) {
+  const [enabled, setEnabled] = useState(['en']);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(null); // lang code currently saving
+
+  useEffect(() => {
+    if (!restaurantId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(`${API}/restaurants/${restaurantId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!cancelled) setEnabled(r.data?.enabled_languages || ['en']);
+      } catch {
+        // keep default
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [restaurantId, token]);
+
+  const toggle = async (code) => {
+    if (!restaurantId || saving) return;
+    const next = enabled.includes(code)
+      ? enabled.filter((x) => x !== code)
+      : [...enabled, code];
+    setSaving(code);
+    try {
+      await axios.put(
+        `${API}/restaurants/${restaurantId}`,
+        { enabled_languages: next },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      setEnabled(next);
+      toast.success(
+        enabled.includes(code)
+          ? `Язык ${code.toUpperCase()} отключён — переключатель скрыт у гостей`
+          : `Язык ${code.toUpperCase()} включён. Запустите перевод меню ниже, чтобы заполнить переводы.`,
+      );
+    } catch {
+      toast.error('Не удалось обновить настройки языков');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-sm text-muted-foreground">Загрузка настроек языков…</div>;
+  }
+
+  return (
+    <div className="space-y-3" data-testid="language-toggles">
+      <div className="text-sm font-semibold text-foreground">Доступные языки</div>
+      {LANGS_META.map(({ code, label, flag, note }) => {
+        const active = enabled.includes(code);
+        const isSaving = saving === code;
+        return (
+          <button
+            key={code}
+            type="button"
+            onClick={() => toggle(code)}
+            disabled={isSaving}
+            data-testid={`lang-toggle-${code}`}
+            className={
+              'w-full flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors text-left disabled:opacity-60 ' +
+              (active
+                ? 'border-mint-500 bg-mint-500/5 hover:bg-mint-500/10'
+                : 'border-border bg-muted/20 hover:bg-muted/40')
+            }
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-2xl leading-none">{flag}</span>
+              <div className="min-w-0">
+                <div className="font-medium truncate">{label}</div>
+                <div className="text-xs text-muted-foreground">{note}</div>
+              </div>
+            </div>
+            <div
+              className={
+                'shrink-0 inline-flex items-center justify-center w-12 h-7 rounded-full text-[11px] font-semibold transition-colors ' +
+                (active ? 'bg-mint-500 text-white' : 'bg-slate-200 text-slate-600')
+              }
+            >
+              {isSaving ? '…' : active ? 'ON' : 'OFF'}
+            </div>
+          </button>
+        );
+      })}
+      <p className="text-xs text-muted-foreground">
+        Для русского ничего включать не нужно — он всегда базовый. Включение нового языка не
+        переводит существующие блюда автоматически — после включения нажмите «Перевести всё
+        меню» ниже.
+      </p>
+    </div>
+  );
+}
+
+
 // ============ Inline sub-component: bulk translation panel ============
 
 function I18nTranslateActions({ restaurantId, token }) {
   const [running, setRunning] = useState(false);
   const [lastResult, setLastResult] = useState(null);
   const [force, setForce] = useState(false);
+  const [targetLang, setTargetLang] = useState('all');
 
   const trigger = async () => {
     if (!restaurantId) return;
     setRunning(true);
     try {
+      const params = new URLSearchParams();
+      if (force) params.set('force', 'true');
+      params.set('lang', targetLang);
       const r = await axios.post(
-        `${API}/restaurants/${restaurantId}/translate-all${force ? '?force=true' : ''}`,
+        `${API}/restaurants/${restaurantId}/translate-all?${params.toString()}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setLastResult(r.data);
       const est = r.data?.estimate || {};
       const total = (est.sections || 0) + (est.categories || 0) + (est.items || 0);
+      const langs = (r.data?.languages || []).join(', ').toUpperCase() || 'EN';
       if (total === 0) {
-        toast.success('Всё уже переведено');
+        toast.success(`Всё уже переведено (${langs})`);
       } else {
         toast.success(
-          `Перевод запущен в фоне — ${total} объектов (≈${Math.ceil(total * 1.5)} сек.)`,
+          `Перевод запущен (${langs}) — ${total} объектов (≈${Math.ceil(total * 1.5 * (r.data?.languages?.length || 1))} сек.)`,
         );
       }
     } catch (e) {
@@ -1821,7 +1936,21 @@ function I18nTranslateActions({ restaurantId, token }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground">Целевой язык</label>
+          <select
+            value={targetLang}
+            onChange={(e) => setTargetLang(e.target.value)}
+            data-testid="translate-lang-select"
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="all">Все включённые</option>
+            <option value="en">🇬🇧 Английский</option>
+            <option value="zh">🇨🇳 中文 (китайский)</option>
+          </select>
+        </div>
+
         <Button
           onClick={trigger}
           disabled={running || !restaurantId}
@@ -1836,12 +1965,12 @@ function I18nTranslateActions({ restaurantId, token }) {
           ) : (
             <>
               <Languages className="w-4 h-4" />
-              Перевести всё меню на английский
+              Перевести всё меню
             </>
           )}
         </Button>
 
-        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer pt-2.5">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer h-10">
           <input
             type="checkbox"
             checked={force}

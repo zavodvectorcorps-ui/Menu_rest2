@@ -17,9 +17,6 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 export default function ClientMenuPage({ domainMode = false } = {}) {
-  const { lang, setLang, t } = useI18n();
-  const localizedName = (d) => getLocalized(d, 'name', lang);
-  const localizedDescription = (d) => getLocalized(d, 'description', lang);
   const { tableCode, slug, tableNumber } = useParams();
 
   // "Mini" sticky header — collapses logo+name to a slim bar after the user scrolls
@@ -48,6 +45,11 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
       : `order_${tableCode}`;
 
   const [data, setData] = useState(null);
+  // Constrain the language switcher to languages the restaurant has enabled.
+  const enabledLangs = data?.restaurant?.enabled_languages;
+  const { lang, setLang, t } = useI18n(enabledLangs);
+  const localizedName = (d) => getLocalized(d, 'name', lang);
+  const localizedDescription = (d) => getLocalized(d, 'description', lang);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedSection, setSelectedSection] = useState(null);
@@ -588,7 +590,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
           {/* Language switcher — secondary row, hidden in mini mode */}
           {!headerMini && (
             <div className="flex justify-end mt-2">
-              <LanguageSwitcher lang={lang} setLang={setLang} />
+              <LanguageSwitcher lang={lang} setLang={setLang} availableLangs={enabledLangs} />
             </div>
           )}
 

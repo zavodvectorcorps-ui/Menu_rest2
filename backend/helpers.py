@@ -83,6 +83,15 @@ async def migrate_enabled_modules():
     if res2.modified_count:
         print(f"Migration: set currency=BYN for {res2.modified_count} legacy restaurants")
 
+    # Existing restaurants get EN enabled by default (preserves current behaviour).
+    # Chinese is opt-in per restaurant.
+    res3 = await db.restaurants.update_many(
+        {"enabled_languages": {"$exists": False}},
+        {"$set": {"enabled_languages": ["en"]}},
+    )
+    if res3.modified_count:
+        print(f"Migration: enabled EN for {res3.modified_count} legacy restaurants")
+
 
 async def get_or_create_settings(restaurant_id: str):
     settings = await db.settings.find_one({"restaurant_id": restaurant_id}, {"_id": 0})

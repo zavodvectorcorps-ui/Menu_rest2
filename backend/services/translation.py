@@ -1,15 +1,16 @@
-"""Lightweight RU→EN translation for menu content.
+"""RU → EN / ZH translation for menu content.
 
 Uses Gemini flash via emergentintegrations.
-- `translate_ru_to_en(text)` — fail-silent, returns "" so the caller can fall back to RU.
-- `translate_ru_to_en_strict(text)` — raises on errors so endpoints can surface the real cause.
+
+Public functions:
+- `translate_ru_to(text, target_lang)` — fail-silent, returns "" on error.
+- `translate_ru_to_strict(text, target_lang)` — raises on errors.
+- Convenience wrappers `translate_ru_to_en(text)` and `translate_ru_to_zh(text)`.
 
 Caching:
 A persistent MongoDB-backed cache (`translation_cache` collection) deduplicates LLM
-calls for repeated dish names like "Капучино" or "Карбонара". Keys are normalized
-(lowercase + trimmed) so "  Капучино  " and "капучино" hit the same entry.
-A small built-in seed dictionary covers common menu words to avoid the first
-LLM call for ubiquitous items.
+calls. Compound key = (key_ru, lang). A small built-in seed dictionary covers
+common menu words for EN to avoid the first LLM call for ubiquitous items.
 """
 import os
 import logging
@@ -22,9 +23,10 @@ log = logging.getLogger(__name__)
 
 CACHE_COLLECTION = "translation_cache"
 
-# Pre-seeded common menu translations. Inserted on first miss so we save tokens
-# from day 1. Keep it short; the cache grows organically with each new translation.
-SEED_DICTIONARY = {
+SUPPORTED_LANGS = {"en", "zh"}
+
+# Pre-seeded common menu translations for EN. Inserted on first miss.
+SEED_DICTIONARY_EN = {
     # Drinks
     "эспрессо": "Espresso",
     "капучино": "Cappuccino",
@@ -94,10 +96,26 @@ SEED_DICTIONARY = {
     "хит": "Bestseller",
 }
 
+# System prompt per target language. Keep them tight — long instructions
+# eat tokens and reduce reliability.
+SYSTEM_PROMPTS = {
+    "en": (
+        "You are a professional menu translator. Translate the given Russian restaurant "
+        "menu text into natural, concise English suitable for a tourist-friendly menu. "
+        "Preserve proper nouns (dish names like 'Borscht', 'Pelmeni'), keep the tone neutral "
+        "and appetizing. Do NOT add explanations, quotes, markdown, or punctuation that "
+        "wasn't in the original. Return ONLY the translated text, nothing else."
+    ),
+    "zh": (
+        "你是一位专业的餐厅菜单翻译。请将给定的俄语菜单文本翻译成简体中文（中国大陆使用），"
+        "适合中国游客阅读的自然、简洁的中文。保留专有名词的标准中文译法（如「罗宋汤」「俄式饺子」等）。"
+        "保持中性、令人有食欲的语气。不要添加任何解释、引号、Markdown 或原文中没有的标点符号。"
+        "只返回翻译后的文本，不要返回任何其他内容。"
+    ),
+}
+
 
 def _normalize(text: str) -> str:
-    """Cache key: lowercase + collapsed whitespace. Keeps original punctuation
-    so 'Цезарь, лёгкий' ≠ 'Цезарь лёгкий' — translations may differ."""
     return " ".join((text or "").strip().split()).lower()
 
 
@@ -105,35 +123,62 @@ _seed_done = False
 
 
 async def _ensure_indexes_and_seed() -> None:
-    """One-shot: create unique index on `key_ru` and load the seed dictionary
-    if the cache is empty. Cheap on subsequent calls (boolean guard)."""
+    """Idempotent: build compound (key_ru, lang) unique index and seed EN dictionary.
+    Migrates legacy entries (lang missing → 'en')."""
     global _seed_done
     if _seed_done:
         return
     try:
-        await db[CACHE_COLLECTION].create_index("key_ru", unique=True)
-        existing = await db[CACHE_COLLECTION].count_documents({})
-        if existing == 0 and SEED_DICTIONARY:
+        # Migrate legacy entries lacking `lang` field — they were all RU→EN.
+        await db[CACHE_COLLECTION].update_many(
+            {"lang": {"$exists": False}},
+            {"$set": {"lang": "en"}},
+        )
+        # Drop old single-field unique index (if present) and create compound.
+        try:
+            existing = await db[CACHE_COLLECTION].index_information()
+            for name, info in existing.items():
+                keys = info.get("key", [])
+                if len(keys) == 1 and keys[0][0] == "key_ru" and info.get("unique"):
+                    await db[CACHE_COLLECTION].drop_index(name)
+                    log.info("translation_cache: dropped legacy unique index '%s'", name)
+        except Exception as e:
+            log.warning("translation_cache: legacy index check failed: %s", e)
+
+        await db[CACHE_COLLECTION].create_index(
+            [("key_ru", 1), ("lang", 1)], unique=True
+        )
+
+        # Seed EN dictionary if empty for that lang.
+        en_count = await db[CACHE_COLLECTION].count_documents({"lang": "en", "source": "seed"})
+        if en_count == 0 and SEED_DICTIONARY_EN:
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc).isoformat()
-            await db[CACHE_COLLECTION].insert_many([
-                {"key_ru": _normalize(ru), "translation": en, "source": "seed", "created_at": now}
-                for ru, en in SEED_DICTIONARY.items()
-            ])
-            log.info("translation_cache seeded with %d entries", len(SEED_DICTIONARY))
+            try:
+                await db[CACHE_COLLECTION].insert_many([
+                    {"key_ru": _normalize(ru), "lang": "en", "translation": en,
+                     "source": "seed", "created_at": now}
+                    for ru, en in SEED_DICTIONARY_EN.items()
+                ], ordered=False)
+                log.info("translation_cache: seeded %d EN entries", len(SEED_DICTIONARY_EN))
+            except Exception as e:
+                # Duplicates from prior runs — fine, ignore.
+                log.info("translation_cache: seed skipped/partial: %s", e)
     except Exception as e:
         log.warning("translation_cache init failed: %s", e)
     _seed_done = True
 
 
-async def cache_get(text: str) -> str | None:
-    """Return cached translation or None."""
+async def cache_get(text: str, lang: str) -> str | None:
     await _ensure_indexes_and_seed()
     key = _normalize(text)
-    if not key:
+    if not key or lang not in SUPPORTED_LANGS:
         return None
     try:
-        doc = await db[CACHE_COLLECTION].find_one({"key_ru": key}, {"_id": 0, "translation": 1})
+        doc = await db[CACHE_COLLECTION].find_one(
+            {"key_ru": key, "lang": lang},
+            {"_id": 0, "translation": 1},
+        )
     except Exception as e:
         log.warning("cache_get error: %s", e)
         return None
@@ -142,9 +187,8 @@ async def cache_get(text: str) -> str | None:
     return None
 
 
-async def cache_put(text: str, translation: str, source: str = "llm") -> None:
-    """Upsert translation into the cache. Silent on errors."""
-    if not translation:
+async def cache_put(text: str, translation: str, lang: str, source: str = "llm") -> None:
+    if not translation or lang not in SUPPORTED_LANGS:
         return
     key = _normalize(text)
     if not key:
@@ -153,7 +197,7 @@ async def cache_put(text: str, translation: str, source: str = "llm") -> None:
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc).isoformat()
         await db[CACHE_COLLECTION].update_one(
-            {"key_ru": key},
+            {"key_ru": key, "lang": lang},
             {"$set": {"translation": translation, "source": source, "updated_at": now},
              "$setOnInsert": {"created_at": now}},
             upsert=True,
@@ -162,39 +206,35 @@ async def cache_put(text: str, translation: str, source: str = "llm") -> None:
         log.warning("cache_put error: %s", e)
 
 
-async def _llm_translate(text: str, max_retries: int = 3) -> str:
-    """Raw LLM call — raises on errors. Used by both strict and silent variants."""
+async def _llm_translate(text: str, lang: str, max_retries: int = 3) -> str:
+    """Raw LLM call — raises on errors."""
     api_key = os.environ.get("EMERGENT_LLM_KEY")
     if not api_key:
         raise RuntimeError("EMERGENT_LLM_KEY is not set in backend env")
+    if lang not in SYSTEM_PROMPTS:
+        raise ValueError(f"Unsupported translation language: {lang}")
 
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
     except ImportError as e:
         raise RuntimeError(f"emergentintegrations not installed: {e}") from e
 
-    system_message = (
-        "You are a professional menu translator. Translate the given Russian restaurant "
-        "menu text into natural, concise English suitable for a tourist-friendly menu. "
-        "Preserve proper nouns (dish names like 'Borscht', 'Pelmeni'), keep the tone neutral "
-        "and appetizing. Do NOT add explanations, quotes, markdown, or punctuation that "
-        "wasn't in the original. Return ONLY the translated text, nothing else."
-    )
-
     last_err: Exception | None = None
     for attempt in range(max_retries):
         try:
             chat = LlmChat(
                 api_key=api_key,
-                session_id=f"menu-tr-{uuid.uuid4()}",
-                system_message=system_message,
+                session_id=f"menu-tr-{lang}-{uuid.uuid4()}",
+                system_message=SYSTEM_PROMPTS[lang],
             ).with_model("gemini", "gemini-2.5-flash")
 
             resp = await chat.send_message(UserMessage(text=text.strip()))
             if resp:
                 out = resp.strip().strip('"').strip("'")
-                if len(out) > max(200, len(text) * 4):
-                    out = out[: max(200, len(text) * 4)]
+                # Bound length: Chinese text is more compact, so allow slightly less
+                cap = max(200, len(text) * 4)
+                if len(out) > cap:
+                    out = out[:cap]
                 if out:
                     return out
             last_err = RuntimeError("LLM returned empty response")
@@ -206,47 +246,73 @@ async def _llm_translate(text: str, max_retries: int = 3) -> str:
     raise last_err or RuntimeError("LLM translation failed after retries")
 
 
-async def _do_translate(text: str, max_retries: int = 3, use_cache: bool = True) -> str:
-    """Cache-aware translator. Raises on LLM errors so the strict variant
-    can propagate them. Cache hits never fail."""
+async def _do_translate(text: str, lang: str, max_retries: int = 3, use_cache: bool = True) -> str:
     if not text or not text.strip():
         return ""
+    if lang not in SUPPORTED_LANGS:
+        raise ValueError(f"Unsupported language: {lang}")
 
     if use_cache:
-        cached = await cache_get(text)
+        cached = await cache_get(text, lang)
         if cached:
             return cached
 
-    out = await _llm_translate(text, max_retries=max_retries)
+    out = await _llm_translate(text, lang, max_retries=max_retries)
     if use_cache:
-        await cache_put(text, out, source="llm")
+        await cache_put(text, out, lang, source="llm")
     return out
 
 
-async def translate_ru_to_en(text: str, use_cache: bool = True) -> str:
-    """Fail-silent variant for background tasks: returns "" on error."""
+# ============ Public API ============
+
+async def translate_ru_to(text: str, target_lang: str, use_cache: bool = True) -> str:
+    """Fail-silent: returns "" on any error."""
     try:
-        return await _do_translate(text, use_cache=use_cache)
+        return await _do_translate(text, target_lang, use_cache=use_cache)
     except Exception as e:
-        log.warning("translate_ru_to_en failed: %s", e)
+        log.warning("translate_ru_to(%s) failed: %s", target_lang, e)
         return ""
 
 
+async def translate_ru_to_strict(text: str, target_lang: str, use_cache: bool = True) -> str:
+    """Raises on errors. Use in pre-flight smoke tests."""
+    return await _do_translate(text, target_lang, use_cache=use_cache)
+
+
+# ---- Backward-compat thin wrappers ----
+
+async def translate_ru_to_en(text: str, use_cache: bool = True) -> str:
+    return await translate_ru_to(text, "en", use_cache=use_cache)
+
+
 async def translate_ru_to_en_strict(text: str, use_cache: bool = True) -> str:
-    """Strict variant: raises on error. Use in pre-flight checks where the
-    caller wants to report the real cause to the user."""
-    return await _do_translate(text, use_cache=use_cache)
+    return await translate_ru_to_strict(text, "en", use_cache=use_cache)
+
+
+async def translate_ru_to_zh(text: str, use_cache: bool = True) -> str:
+    return await translate_ru_to(text, "zh", use_cache=use_cache)
+
+
+async def translate_ru_to_zh_strict(text: str, use_cache: bool = True) -> str:
+    return await translate_ru_to_strict(text, "zh", use_cache=use_cache)
 
 
 async def get_cache_stats() -> dict:
-    """Lightweight stats for diagnostic UI."""
     await _ensure_indexes_and_seed()
     try:
-        total = await db[CACHE_COLLECTION].count_documents({})
-        seeded = await db[CACHE_COLLECTION].count_documents({"source": "seed"})
-        llm = await db[CACHE_COLLECTION].count_documents({"source": "llm"})
-        manual = await db[CACHE_COLLECTION].count_documents({"source": "manual"})
-        return {"total": total, "seed": seeded, "llm": llm, "manual": manual}
+        out = {"total": await db[CACHE_COLLECTION].count_documents({})}
+        for lang in SUPPORTED_LANGS:
+            out[lang] = await db[CACHE_COLLECTION].count_documents({"lang": lang})
+        out["seed"] = await db[CACHE_COLLECTION].count_documents({"source": "seed"})
+        out["llm"] = await db[CACHE_COLLECTION].count_documents({"source": "llm"})
+        out["manual"] = await db[CACHE_COLLECTION].count_documents({"source": "manual"})
+        return out
     except Exception as e:
         log.warning("get_cache_stats error: %s", e)
-        return {"total": 0, "seed": 0, "llm": 0, "manual": 0, "error": str(e)}
+        return {"total": 0, "error": str(e)}
+
+
+# Suffix → field name helper for routes/menu.py background tasks.
+def lang_suffix(lang: str) -> str:
+    """Return suffix used in DB fields. ZH → '_zh', EN → '_en', etc."""
+    return f"_{lang}"

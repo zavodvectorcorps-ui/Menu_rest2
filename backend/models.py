@@ -75,6 +75,10 @@ class Restaurant(BaseModel):
     # Custom domains pointing to this restaurant's menu (e.g. ["catch.com", "www.catch.com"]).
     # Lookup is case-insensitive. Domains must be added on Nginx side separately.
     custom_domains: List[str] = Field(default_factory=list)
+    # Languages enabled for the customer-facing menu. RU is always implied as the source.
+    # Possible values: "en" (English), "zh" (Simplified Chinese, 中文).
+    # Existing restaurants are migrated to ["en"] so behaviour stays identical.
+    enabled_languages: List[str] = Field(default_factory=lambda: ["en"])
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class RestaurantCreate(BaseModel):
@@ -100,6 +104,7 @@ class RestaurantUpdate(BaseModel):
     enabled_modules: Optional[List[str]] = None
     currency: Optional[str] = None
     custom_domains: Optional[List[str]] = None
+    enabled_languages: Optional[List[str]] = None
 
 
 # ============ MENU MODELS ============
@@ -110,6 +115,7 @@ class MenuSection(BaseModel):
     restaurant_id: str
     name: str
     name_en: Optional[str] = ""
+    name_zh: Optional[str] = ""
     sort_order: int = 0
     is_active: bool = True
 
@@ -124,6 +130,7 @@ class Category(BaseModel):
     restaurant_id: str
     name: str
     name_en: Optional[str] = ""
+    name_zh: Optional[str] = ""
     section_id: Optional[str] = None
     display_mode: str = "card"
     sort_order: int = 0
@@ -151,8 +158,10 @@ class MenuItem(BaseModel):
     category_id: str
     name: str
     name_en: Optional[str] = ""
+    name_zh: Optional[str] = ""
     description: Optional[str] = ""
     description_en: Optional[str] = ""
+    description_zh: Optional[str] = ""
     price: float = 0
     weight: Optional[str] = ""
     image_url: Optional[str] = ""
@@ -302,6 +311,7 @@ class CallType(BaseModel):
     restaurant_id: str
     name: str
     name_en: Optional[str] = ""
+    name_zh: Optional[str] = ""
     telegram_message: str = ""
     sort_order: int = 0
     is_active: bool = True

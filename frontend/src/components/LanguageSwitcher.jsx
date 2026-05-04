@@ -1,16 +1,24 @@
 import { SUPPORTED_LANGS } from '@/lib/i18n';
 
 /**
- * Tiny pill-style language switcher. Two-language compact toggle.
- * Used in the client menu header.
+ * Tiny pill-style language switcher. Two/three-language compact toggle.
+ * Used in the client menu header. Pass `availableLangs=['en','zh']` to
+ * restrict which non-RU languages are shown — RU is always shown.
  */
-export default function LanguageSwitcher({ lang, setLang, className = '' }) {
+export default function LanguageSwitcher({ lang, setLang, availableLangs = null, className = '' }) {
+  const allowed = (availableLangs && availableLangs.length)
+    ? new Set(['ru', ...availableLangs])
+    : null;
+  const visible = allowed
+    ? SUPPORTED_LANGS.filter((l) => allowed.has(l.code))
+    : SUPPORTED_LANGS;
+  if (visible.length <= 1) return null; // nothing to switch
   return (
     <div
       className={`inline-flex items-center gap-1 p-1 rounded-full border border-black/10 bg-white/90 backdrop-blur shadow-sm ${className}`}
       data-testid="language-switcher"
     >
-      {SUPPORTED_LANGS.map((l) => {
+      {visible.map((l) => {
         const active = lang === l.code;
         return (
           <button

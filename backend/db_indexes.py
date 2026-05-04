@@ -36,8 +36,8 @@ INDEXES: list[tuple[str, list, dict]] = [
     ("staff_calls", [("restaurant_id", 1), ("status", 1)], {}),
     # Auth
     ("users", [("username", 1)], {"unique": True}),
-    # Translation cache (already created in services/translation.py, but safe to re-declare)
-    ("translation_cache", [("key_ru", 1)], {"unique": True}),
+    # Translation cache uses compound (key_ru, lang) — handled in services/translation.py
+    # to also drop the legacy single-field unique. Don't declare here.
 ]
 
 
