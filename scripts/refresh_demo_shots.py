@@ -14,7 +14,7 @@ from playwright.async_api import async_playwright
 
 BASE = os.environ.get(
     "DEMO_BASE_URL",
-    "https://menu-management-hub-2.preview.emergentagent.com",
+    "https://demo-resto-hub.preview.emergentagent.com",
 )
 DEMO_LOGIN = "demo"
 DEMO_PASSWORD = "demo2026"
