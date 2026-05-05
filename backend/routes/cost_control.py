@@ -311,6 +311,25 @@ async def get_recipe(
     }
 
 
+async def _record_cost_history(restaurant_id: str, item_id: str, cost_price: float, cost_source: str, recipe: list | None) -> None:
+    """Append a snapshot to `cost_history` so the UI can show how a dish's
+    self-cost evolved over time. Cheap insert — one row per save."""
+    if cost_price is None:
+        return
+    try:
+        await db.cost_history.insert_one({
+            "restaurant_id": restaurant_id,
+            "menu_item_id": item_id,
+            "cost_price": float(cost_price),
+            "cost_source": cost_source or "",
+            "recipe_lines": len(recipe or []),
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:
+        # History is non-critical — never block the main path
+        pass
+
+
 @router.put("/restaurants/{restaurant_id}/menu-items/{item_id}/recipe")
 async def put_recipe(
     restaurant_id: str,
@@ -343,6 +362,8 @@ async def put_recipe(
     if res.matched_count == 0:
         raise HTTPException(404, "Блюдо не найдено")
 
+    cost_value = round(total, 2) if ingredients else None
+    await _record_cost_history(restaurant_id, item_id, cost_value, "recipe", ingredients)
     await _send_margin_alerts(restaurant_id)
     return {
         "ok": True,
@@ -403,10 +424,216 @@ async def recompute_all_recipes(
                 "cost_updated_at": now,
             }},
         )
+        await _record_cost_history(restaurant_id, it["id"], round(total, 2), "recipe", recipe)
         updated += 1
 
     await _send_margin_alerts(restaurant_id)
     return {"ok": True, "updated": updated, "cost_source": cost_source}
+
+
+@router.get("/restaurants/{restaurant_id}/menu-items/{item_id}/cost-history")
+async def get_cost_history(
+    restaurant_id: str,
+    item_id: str,
+    days: int = 90,
+    current_user: dict = Depends(get_current_user),
+):
+    """Return cost_price snapshots for the last N days. Used by the recipe
+    editor's chart to show how raw-material price changes affected this dish."""
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=max(1, min(days, 365)))).isoformat()
+    cur = db.cost_history.find(
+        {"restaurant_id": restaurant_id, "menu_item_id": item_id, "recorded_at": {"$gte": cutoff}},
+        {"_id": 0, "cost_price": 1, "cost_source": 1, "recipe_lines": 1, "recorded_at": 1},
+    ).sort("recorded_at", 1)
+    points = await cur.to_list(1000)
+    return {"points": points, "count": len(points)}
+
+
+# ============ Cost sandbox (calculate without saving) ============
+
+class _SandboxIngredient(BaseModel):
+    caffesta_product_id: Optional[int] = None
+    name: str = ""
+    qty: float = 0
+    unit: Optional[str] = ""
+    unit_factor: float = 1.0
+    unit_cost: float = 0
+
+
+class _SandboxPayload(BaseModel):
+    ingredients: list[_SandboxIngredient] = []
+    price: Optional[float] = None
+    cost_source: str = "avgInvoicedSelfCost"
+
+
+@router.post("/restaurants/{restaurant_id}/cost-calc")
+async def cost_sandbox_calc(
+    restaurant_id: str,
+    payload: _SandboxPayload,
+    current_user: dict = Depends(get_current_user),
+):
+    """Live cost calculation without persisting anything. Used by the
+    "Песочница" tab when planning a brand-new dish before adding it to the menu."""
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+    lines = []
+    total = 0.0
+    for ing in payload.ingredients:
+        d = ing.model_dump()
+        d["line_cost"] = _recompute_line(d)
+        total += d["line_cost"]
+        lines.append(d)
+    cost = round(total, 2)
+    price = float(payload.price or 0)
+    margin = price - cost if price > 0 else None
+    margin_pct = (margin / price * 100) if (price > 0 and margin is not None) else None
+    food_cost_pct = (cost / price * 100) if price > 0 else None
+    markup_pct = ((price - cost) / cost * 100) if cost > 0 and price > 0 else None
+    return {
+        "lines": lines,
+        "cost_price": cost,
+        "price": price or None,
+        "margin": round(margin, 2) if margin is not None else None,
+        "margin_pct": round(margin_pct, 1) if margin_pct is not None else None,
+        "food_cost_pct": round(food_cost_pct, 1) if food_cost_pct is not None else None,
+        "markup_pct": round(markup_pct, 0) if markup_pct is not None else None,
+    }
+
+
+@router.post("/restaurants/{restaurant_id}/cost-calc/upload")
+async def cost_sandbox_upload(
+    restaurant_id: str,
+    file: UploadFile = File(...),
+    cost_source: str = "avgInvoicedSelfCost",
+    current_user: dict = Depends(get_current_user),
+):
+    """Parse an XLSX/CSV recipe, fuzzy-match each line to Caffesta catalog by
+    name, and return a sandbox payload ready to be edited in the UI.
+
+    Expected columns (case-insensitive, any of):
+      - name | название | ингредиент
+      - qty | количество | вес
+      - unit | ед | единица  (optional)
+      - unit_factor | коэффициент  (optional, default 0.001 if unit is g/мл)
+    """
+    content = await file.read()
+    try:
+        if (file.filename or "").lower().endswith(".csv"):
+            entries = _parse_recipe_csv(content)
+        else:
+            entries = _parse_recipe_xlsx(content)
+    except Exception as e:
+        raise HTTPException(400, f"Не удалось прочитать файл: {e}")
+    if not entries:
+        raise HTTPException(400, "Файл пуст или не распознан формат")
+
+    # Fetch catalog and build a normalized name index for fuzzy match
+    products = await caffesta_get_products(restaurant_id)
+    if not products.get("ok"):
+        raise HTTPException(502, f"Caffesta: {products.get('message')}")
+    balances = await caffesta_get_balances(restaurant_id)
+    shop_data = await caffesta_get_product_shop_data(restaurant_id)
+    bal_by_id = {b["product_id"]: b for b in (balances.get("data") or [])}
+    shop_by_id = {s["product_id"]: s for s in (shop_data.get("data") or [])}
+
+    catalog = []
+    for p in products.get("data") or []:
+        pid = p.get("product_id")
+        if not pid:
+            continue
+        catalog.append({
+            "id": pid,
+            "name": p.get("title") or "",
+            "norm": _normalize_name(p.get("title") or ""),
+            "self_cost": (bal_by_id.get(pid, {}) or {}).get("self_cost") or 0,
+            "avg": (shop_by_id.get(pid, {}) or {}).get("avgInvoicedSelfCost") or 0,
+        })
+
+    def _cost_of(c: dict) -> float:
+        if cost_source == "self_cost":
+            return float(c.get("self_cost") or 0)
+        return float(c.get("avg") or c.get("self_cost") or 0)
+
+    matched: list[dict] = []
+    unmatched: list[dict] = []
+    for entry in entries:
+        norm = _normalize_name(entry["name"])
+        # Exact normalized match wins; otherwise substring fallback
+        hit = next((c for c in catalog if c["norm"] == norm), None)
+        if not hit:
+            hit = next((c for c in catalog if norm and norm in c["norm"]), None)
+        if hit:
+            matched.append({
+                "caffesta_product_id": hit["id"],
+                "name": hit["name"],
+                "qty": entry["qty"],
+                "unit": entry.get("unit") or "",
+                "unit_factor": entry.get("unit_factor") or 1.0,
+                "unit_cost": _cost_of(hit),
+            })
+        else:
+            unmatched.append(entry)
+
+    return {
+        "matched": matched,
+        "unmatched": unmatched,
+        "total_lines": len(entries),
+        "matched_count": len(matched),
+    }
+
+
+def _parse_recipe_xlsx(content: bytes) -> list[dict]:
+    wb = load_workbook(io.BytesIO(content), data_only=True, read_only=True)
+    ws = wb.active
+    rows = [[c.value for c in row] for row in ws.iter_rows()]
+    return _recipe_rows(rows)
+
+
+def _parse_recipe_csv(content: bytes) -> list[dict]:
+    text = content.decode("utf-8-sig")
+    reader = csv.reader(io.StringIO(text), delimiter=",")
+    rows = list(reader)
+    if rows and len(rows[0]) == 1 and ";" in rows[0][0]:
+        rows = list(csv.reader(io.StringIO(text), delimiter=";"))
+    return _recipe_rows(rows)
+
+
+def _recipe_rows(rows: list) -> list[dict]:
+    if len(rows) < 2:
+        return []
+    headers = [str(h or "").strip().lower() for h in rows[0]]
+    name_idx = qty_idx = unit_idx = factor_idx = None
+    for i, h in enumerate(headers):
+        if name_idx is None and any(k in h for k in ["назв", "name", "ингред", "товар", "продукт"]):
+            name_idx = i
+        if qty_idx is None and any(k in h for k in ["кол", "qty", "вес", "amount"]):
+            qty_idx = i
+        if unit_idx is None and any(k in h for k in ["unit", "ед", "единиц"]):
+            unit_idx = i
+        if factor_idx is None and any(k in h for k in ["factor", "коэф"]):
+            factor_idx = i
+    if name_idx is None:
+        name_idx = 0
+    if qty_idx is None:
+        qty_idx = 1
+
+    UNIT_DEFAULTS = {"г": 0.001, "g": 0.001, "грамм": 0.001, "мл": 0.001, "ml": 0.001,
+                     "кг": 1.0, "kg": 1.0, "л": 1.0, "l": 1.0,
+                     "шт": 1.0, "pcs": 1.0, "pc": 1.0}
+    out = []
+    for r in rows[1:]:
+        if name_idx >= len(r):
+            continue
+        name = str(r[name_idx] or "").strip()
+        if not name:
+            continue
+        qty = _parse_float(r[qty_idx]) if qty_idx is not None and qty_idx < len(r) else 0
+        unit = (str(r[unit_idx] or "").strip().lower() if unit_idx is not None and unit_idx < len(r) else "")
+        factor = _parse_float(r[factor_idx]) if factor_idx is not None and factor_idx < len(r) else None
+        if factor is None:
+            factor = UNIT_DEFAULTS.get(unit, 1.0)
+        out.append({"name": name, "qty": qty or 0, "unit": unit, "unit_factor": factor})
+    return out
 
 
 @router.get("/restaurants/{restaurant_id}/costs/analysis")
