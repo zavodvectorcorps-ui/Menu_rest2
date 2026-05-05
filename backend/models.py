@@ -176,6 +176,14 @@ class MenuItem(BaseModel):
     sort_order: int = 0
     label_ids: list = []
     caffesta_product_id: Optional[int] = None
+    # Cost/recipe tracking (cost_control module). `recipe` is a list of
+    # ingredients: [{caffesta_product_id, name, qty, unit, unit_cost, line_cost}].
+    # When a recipe is set, cost_price is recomputed from it; otherwise
+    # cost_price may be imported directly from Caffesta or uploaded via XLSX.
+    cost_price: Optional[float] = None
+    cost_source: Optional[str] = ""  # 'file' | 'caffesta' | 'recipe' | 'manual'
+    recipe: Optional[list] = None
+    margin_threshold: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class MenuItemCreate(BaseModel):

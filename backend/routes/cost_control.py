@@ -19,7 +19,10 @@ from pydantic import BaseModel
 from auth import check_restaurant_access, get_current_user, ensure_can_write_system, ensure_module_access
 from database import db
 from helpers import get_or_create_settings
-from services.caffesta import get_caffesta_config, caffesta_get_balances
+from services.caffesta import (
+    get_caffesta_config, caffesta_get_balances,
+    caffesta_get_products, caffesta_get_product_shop_data,
+)
 
 router = APIRouter()
 
@@ -207,6 +210,205 @@ async def import_caffesta_costs(restaurant_id: str, current_user: dict = Depends
     return result
 
 
+# ============ Recipe / ingredient-based cost calculation ============
+
+# Models (inline — not worth a separate file for 2 types)
+class _RecipeIngredient(BaseModel):
+    caffesta_product_id: int
+    name: str = ""
+    qty: float = 0                       # amount in base unit (g / ml / piece)
+    unit: Optional[str] = ""             # display unit from Caffesta, free text
+    # Caffesta self_cost is per 1 of its base unit (usually 1 kg / 1 l / 1 pc).
+    # `unit_factor` converts the user's qty to Caffesta's unit: e.g. if Caffesta
+    # sells butter by kg and recipe uses 50 g, factor = 0.001 (= 1/1000).
+    unit_factor: float = 1.0
+    unit_cost: float = 0                 # snapshot of self_cost at time of save
+
+
+class _RecipePayload(BaseModel):
+    ingredients: list[_RecipeIngredient] = []
+    # Caller can override source: "avgInvoicedSelfCost" | "self_cost"
+    cost_source: str = "avgInvoicedSelfCost"
+
+
+def _recompute_line(ing: dict) -> float:
+    """line_cost = qty * unit_factor * unit_cost. Safe against bad input."""
+    try:
+        qty = float(ing.get("qty") or 0)
+        fac = float(ing.get("unit_factor") or 1.0)
+        uc = float(ing.get("unit_cost") or 0)
+        return round(qty * fac * uc, 4)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+@router.get("/restaurants/{restaurant_id}/cost-catalog")
+async def get_cost_catalog(
+    restaurant_id: str,
+    include_tech_cards: bool = False,
+    current_user: dict = Depends(get_current_user),
+):
+    """Fetch the ingredient catalog from Caffesta, merging products list,
+    balances (self_cost) and per-shop avgInvoicedSelfCost. The UI uses this
+    to populate the ingredient autocomplete in recipes.
+
+    Query: `include_tech_cards=true` returns готовые блюда/полуфабрикаты too."""
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+
+    products = await caffesta_get_products(restaurant_id)
+    if not products.get("ok"):
+        raise HTTPException(502, f"Ошибка Caffesta: {products.get('message')}")
+    balances = await caffesta_get_balances(restaurant_id)
+    shop_data = await caffesta_get_product_shop_data(restaurant_id)
+
+    # Index by product_id for fast lookup
+    bal_by_id = {b["product_id"]: b for b in (balances.get("data") or [])}
+    shop_by_id = {s["product_id"]: s for s in (shop_data.get("data") or [])}
+
+    out = []
+    for p in products.get("data", []):
+        pid = p.get("product_id")
+        if not pid:
+            continue
+        ptype = (p.get("type") or "").lower()
+        is_tech = "tech" in ptype or "card" in ptype
+        if is_tech and not include_tech_cards:
+            continue
+        bal = bal_by_id.get(pid, {})
+        shop = shop_by_id.get(pid, {})
+        out.append({
+            "caffesta_product_id": pid,
+            "name": p.get("title") or "",
+            "type": ptype or "product",
+            "is_tech_card": is_tech,
+            "sale_price": p.get("price") or 0,
+            "self_cost": bal.get("self_cost", 0) or 0,
+            "avgInvoicedSelfCost": shop.get("avgInvoicedSelfCost", 0) or 0,
+            "balance": bal.get("balance", 0) or 0,
+            "in_stop_list": shop.get("inStopList", False),
+        })
+    out.sort(key=lambda x: x["name"].lower())
+    return {"ok": True, "data": out, "total": len(out)}
+
+
+@router.get("/restaurants/{restaurant_id}/menu-items/{item_id}/recipe")
+async def get_recipe(
+    restaurant_id: str,
+    item_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+    it = await db.menu_items.find_one(
+        {"id": item_id, "restaurant_id": restaurant_id},
+        {"_id": 0, "recipe": 1, "cost_price": 1, "cost_source": 1},
+    )
+    if not it:
+        raise HTTPException(404, "Блюдо не найдено")
+    return {
+        "recipe": it.get("recipe") or [],
+        "cost_price": it.get("cost_price"),
+        "cost_source": it.get("cost_source") or "",
+    }
+
+
+@router.put("/restaurants/{restaurant_id}/menu-items/{item_id}/recipe")
+async def put_recipe(
+    restaurant_id: str,
+    item_id: str,
+    payload: _RecipePayload,
+    current_user: dict = Depends(get_current_user),
+):
+    """Save the recipe and recompute cost_price as sum of line_costs.
+    The UI pre-snapshots unit_cost via /cost-catalog so the saved recipe
+    is stable even if Caffesta data changes later — manual recompute via
+    /recipes/recompute-all pulls fresh values."""
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+
+    ingredients = [ing.model_dump() for ing in payload.ingredients]
+    total = 0.0
+    for ing in ingredients:
+        ing["line_cost"] = _recompute_line(ing)
+        total += ing["line_cost"]
+
+    now = datetime.now(timezone.utc).isoformat()
+    res = await db.menu_items.update_one(
+        {"id": item_id, "restaurant_id": restaurant_id},
+        {"$set": {
+            "recipe": ingredients,
+            "cost_price": round(total, 2) if ingredients else None,
+            "cost_source": "recipe" if ingredients else "",
+            "cost_updated_at": now,
+        }},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Блюдо не найдено")
+
+    await _send_margin_alerts(restaurant_id)
+    return {
+        "ok": True,
+        "cost_price": round(total, 2),
+        "lines": len(ingredients),
+    }
+
+
+@router.post("/restaurants/{restaurant_id}/recipes/recompute-all")
+async def recompute_all_recipes(
+    restaurant_id: str,
+    cost_source: str = "avgInvoicedSelfCost",
+    current_user: dict = Depends(get_current_user),
+):
+    """Refresh every recipe's ingredient unit_cost from Caffesta (latest
+    self_cost / avgInvoicedSelfCost) and recompute cost_price. Useful after
+    invoices are imported in Caffesta and raw costs move."""
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+
+    balances = await caffesta_get_balances(restaurant_id)
+    shop_data = await caffesta_get_product_shop_data(restaurant_id)
+    bal_by_id = {b["product_id"]: b for b in (balances.get("data") or [])}
+    shop_by_id = {s["product_id"]: s for s in (shop_data.get("data") or [])}
+
+    def _cost_for(pid: int) -> float:
+        if cost_source == "self_cost":
+            return float(bal_by_id.get(pid, {}).get("self_cost", 0) or 0)
+        # default: avgInvoicedSelfCost, fallback to self_cost
+        s = shop_by_id.get(pid, {})
+        v = s.get("avgInvoicedSelfCost", 0) or 0
+        if not v:
+            v = float(bal_by_id.get(pid, {}).get("self_cost", 0) or 0)
+        return float(v)
+
+    items = await db.menu_items.find(
+        {"restaurant_id": restaurant_id, "recipe": {"$ne": None, "$not": {"$size": 0}}},
+        {"_id": 0, "id": 1, "recipe": 1},
+    ).to_list(10000)
+
+    now = datetime.now(timezone.utc).isoformat()
+    updated = 0
+    for it in items:
+        recipe = it.get("recipe") or []
+        if not recipe:
+            continue
+        total = 0.0
+        for ing in recipe:
+            pid = int(ing.get("caffesta_product_id") or 0)
+            ing["unit_cost"] = _cost_for(pid)
+            ing["line_cost"] = _recompute_line(ing)
+            total += ing["line_cost"]
+        await db.menu_items.update_one(
+            {"id": it["id"]},
+            {"$set": {
+                "recipe": recipe,
+                "cost_price": round(total, 2),
+                "cost_source": "recipe",
+                "cost_updated_at": now,
+            }},
+        )
+        updated += 1
+
+    await _send_margin_alerts(restaurant_id)
+    return {"ok": True, "updated": updated, "cost_source": cost_source}
+
+
 @router.get("/restaurants/{restaurant_id}/costs/analysis")
 async def costs_analysis(restaurant_id: str, current_user: dict = Depends(get_current_user)):
     await ensure_module_access(restaurant_id, "cost_control", current_user)
@@ -256,6 +458,7 @@ async def costs_analysis(restaurant_id: str, current_user: dict = Depends(get_cu
             "cost_price": item.get("cost_price"),
             "cost_source": item.get("cost_source"),
             "cost_updated_at": item.get("cost_updated_at"),
+            "recipe": item.get("recipe") or [],
             "margin_pct": margin,
             "threshold": threshold,
             "threshold_source": (

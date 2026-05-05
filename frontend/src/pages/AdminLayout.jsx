@@ -18,6 +18,7 @@ import {
   Coffee,
   Link as LinkIcon,
   TrendingDown,
+  ChefHat,
   Activity,
   Database,
   Wrench,
@@ -50,6 +51,7 @@ const navItems = [
 const analyticsItems = [
   { path: '/admin/analytics', label: 'Сводка', icon: BarChart3, exact: true },
   { path: '/admin/factual-margin', label: 'Факт. маржа', icon: Activity },
+  { path: '/admin/recipes', label: 'Калькуляция блюд', icon: ChefHat },
   { path: '/admin/price-control', label: 'Контроль цен', icon: TrendingDown },
   { path: '/admin/caffesta?tab=analytics', label: 'Аналитика POS', icon: Coffee, matchPath: '/admin/caffesta', matchTab: 'analytics' },
   { path: '/admin/caffesta?tab=time-window', label: 'Сравнение по времени', icon: Activity, matchPath: '/admin/caffesta', matchTab: 'time-window' },
@@ -149,6 +151,7 @@ export default function AdminLayout() {
     if (it.path === '/admin/analytics') return true; // Сводка всегда
     if (it.path === '/admin/factual-margin') return isModuleEnabled('factual_margin');
     if (it.path === '/admin/price-control') return isModuleEnabled('cost_control');
+    if (it.path === '/admin/recipes') return isModuleEnabled('cost_control');
     if (it.matchPath === '/admin/caffesta') return isModuleEnabled('caffesta');
     return true;
   });
@@ -162,7 +165,7 @@ export default function AdminLayout() {
   });
 
   // Analytics group: open by default if active route is one of analytics items
-  const analyticsPaths = ['/admin/analytics', '/admin/factual-margin', '/admin/price-control'];
+  const analyticsPaths = ['/admin/analytics', '/admin/factual-margin', '/admin/price-control', '/admin/recipes'];
   const currentTab = new URLSearchParams(location.search).get('tab');
   const analyticsActive =
     analyticsPaths.includes(location.pathname) ||

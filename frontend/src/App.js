@@ -21,6 +21,7 @@ import TelegramBotPage from "@/pages/TelegramBotPage";
 import CaffestaPage from "@/pages/CaffestaPage";
 import BackupPage from "@/pages/BackupPage";
 import PriceControlPage from "@/pages/PriceControlPage";
+import RecipeCalculatorPage from "@/pages/RecipeCalculatorPage";
 import CaffestaMappingPage from "@/pages/CaffestaMappingPage";
 import FactualMarginPage from "@/pages/FactualMarginPage";
 import RootRoute from "@/pages/RootRoute";
@@ -270,6 +271,7 @@ function App() {
                 <Route path="caffesta" element={<CaffestaPage />} />
                 <Route path="caffesta-mapping" element={<CaffestaMappingPage />} />
                 <Route path="price-control" element={<PriceControlPage />} />
+                <Route path="recipes" element={<RecipeCalculatorPage />} />
                 <Route path="factual-margin" element={<FactualMarginPage />} />
                 <Route path="users" element={user?.role === 'superadmin' ? <UsersPage /> : <Navigate to="/admin/profile" replace />} />
                 <Route path="restaurant-modules" element={user?.role === 'superadmin' ? <RestaurantModulesPage /> : <Navigate to="/admin/profile" replace />} />
