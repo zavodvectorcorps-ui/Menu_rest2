@@ -1036,7 +1036,11 @@ function CostSandbox({ catalog, costSource, currency, restaurantId, categories, 
                       </div>
                     </div>
                     <div className="text-sm tabular-nums whitespace-nowrap">
-                      {Number(source || 0).toFixed(2)} {currency}
+                      {Number(source || 0) > 0 ? (
+                        `${Number(source).toFixed(2)} ${currency}`
+                      ) : (
+                        <span className="text-amber-600 text-xs" title="Caffesta не отдаёт стоимость для этого п/ф. Создайте локальный п/ф во вкладке «Мои п/ф» с реальной раскладкой.">не задана</span>
+                      )}
                     </div>
                   </button>
                 );
@@ -1320,7 +1324,11 @@ function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId,
                         </div>
                       </div>
                       <div className="text-sm tabular-nums whitespace-nowrap">
-                        {Number(source || 0).toFixed(2)} {currency}
+                        {Number(source || 0) > 0 ? (
+                          `${Number(source).toFixed(2)} ${currency}`
+                        ) : (
+                          <span className="text-amber-600 text-xs" title="Caffesta не отдаёт стоимость для этого п/ф. Создайте локальный п/ф во вкладке «Мои п/ф» с реальной раскладкой.">не задана</span>
+                        )}
                       </div>
                     </button>
                   );

@@ -753,25 +753,38 @@ async def caffesta_subproduct_debug(restaurant_id: str, name_query: str = "") ->
 
     needle = (name_query or "").strip().lower()
     samples: list[dict] = []
+    total_scanned = 0
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            url = f"{_base_url(account_name)}/v1.0/draft/get_products/{pos_id}/0/0?type=sub_product"
-            resp = await client.get(url, headers=_headers(api_key))
-            data = _safe_json(resp)
-            rows = data.get("data") if isinstance(data, dict) else (data if isinstance(data, list) else [])
-            rows = rows or []
-            for r in rows:
-                if not isinstance(r, dict):
-                    continue
-                title = (r.get("title") or r.get("name") or "").lower()
-                if not needle or needle in title:
-                    samples.append(r)
-                    if len(samples) >= 5:
-                        break
+            start_id = 0
+            for _ in range(20):  # safety: до 20 страниц по 1000 = до 20K продуктов
+                url = f"{_base_url(account_name)}/v1.0/draft/get_products/{pos_id}/{start_id}/0?type=sub_product"
+                resp = await client.get(url, headers=_headers(api_key))
+                if resp.status_code >= 400:
+                    break
+                data = _safe_json(resp)
+                rows = data.get("data") if isinstance(data, dict) else (data if isinstance(data, list) else [])
+                rows = rows or []
+                if not rows:
+                    break
+                total_scanned += len(rows)
+                for r in rows:
+                    if not isinstance(r, dict):
+                        continue
+                    title = (r.get("title") or r.get("name") or "").lower()
+                    if not needle or needle in title:
+                        samples.append(r)
+                        if len(samples) >= 5:
+                            return {"ok": True, "data": samples, "count": len(samples), "scanned": total_scanned}
+                last_id = rows[-1].get("product_id") or rows[-1].get("id") or 0
+                if last_id and last_id != start_id and len(rows) >= 100:
+                    start_id = last_id
+                else:
+                    break
     except Exception as e:
         return {"ok": False, "message": str(e)}
 
-    return {"ok": True, "data": samples, "count": len(samples)}
+    return {"ok": True, "data": samples, "count": len(samples), "scanned": total_scanned}
 
 
 # ============ Shop data (stop-list, avgInvoicedSelfCost) ============
