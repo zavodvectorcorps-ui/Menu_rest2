@@ -533,9 +533,38 @@ export default function RecipeCalculatorPage() {
                     <summary className="cursor-pointer text-sm font-medium">
                       {row.title || row.name || `#${row.product_id || row.id}`} · ID {row.product_id || row.id || '—'}
                     </summary>
-                    <pre className="text-xs mt-2 p-2 bg-background rounded overflow-x-auto whitespace-pre-wrap break-all">
-                      {JSON.stringify(row, null, 2)}
-                    </pre>
+                    {Array.isArray(row._recipe_probes) && row._recipe_probes.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <div className="text-xs font-semibold text-muted-foreground">Пробуем эндпоинты для рецепта/тех.карты:</div>
+                        {row._recipe_probes.map((p, k) => {
+                          const ok = p.status === 200 && p.is_json && p.row_count > 0;
+                          return (
+                            <div key={k} className={`text-xs rounded p-1.5 ${ok ? 'border border-emerald-300 bg-emerald-50/60 dark:bg-emerald-900/20' : 'bg-muted/30'}`}>
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <code className="break-all">{p.path}</code>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`px-1.5 py-0.5 rounded ${p.status === 200 ? 'bg-emerald-200/60' : 'bg-rose-200/60'}`}>HTTP {p.status ?? 'err'}</span>
+                                  {p.is_json && <span className="px-1.5 py-0.5 rounded bg-blue-200/60">rows: {p.row_count}</span>}
+                                  {ok && <span className="px-1.5 py-0.5 rounded bg-emerald-500 text-white font-bold">✓</span>}
+                                </div>
+                              </div>
+                              {ok && p.body_sample && (
+                                <details className="mt-1">
+                                  <summary className="cursor-pointer text-[10px] text-muted-foreground">тело</summary>
+                                  <pre className="mt-1 p-1 bg-background rounded overflow-x-auto whitespace-pre-wrap break-all">{p.body_sample}</pre>
+                                </details>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs text-muted-foreground">Полное тело продукта</summary>
+                      <pre className="text-xs mt-2 p-2 bg-background rounded overflow-x-auto whitespace-pre-wrap break-all">
+                        {JSON.stringify(row, null, 2)}
+                      </pre>
+                    </details>
                   </details>
                 ))}
               </div>

@@ -778,9 +778,9 @@ async def caffesta_subproduct_debug(restaurant_id: str, name_query: str = "") ->
                     title = (r.get("title") or r.get("name") or "").lower()
                     if not needle or needle in title:
                         samples.append(r)
-                        if len(samples) >= 5:
+                        if len(samples) >= 2:  # ограничим: 2 п/ф × 12 пробных URL = 24 запроса
                             break
-                if len(samples) >= 5:
+                if len(samples) >= 2:
                     break
                 last_id = rows[-1].get("product_id") or rows[-1].get("id") or 0
                 if last_id and last_id != start_id and len(rows) >= 100:
@@ -818,6 +818,20 @@ async def caffesta_subproduct_debug(restaurant_id: str, name_query: str = "") ->
                         continue
 
             # Обогащаем каждый sample
+            recipe_candidates_tpl = [
+                "v1.0/draft/get_recipe/{pos_id}/{pid}",
+                "v1.0/draft/get_recipe/{pid}",
+                "v1.0/draft/get_tech_card/{pos_id}/{pid}",
+                "v1.0/draft/get_tech_card/{pid}",
+                "v1.0/draft/get_composition/{pos_id}/{pid}",
+                "v1.0/draft/get_composition/{pid}",
+                "v1.0/draft/get_sub_product/{pos_id}/{pid}",
+                "v1.0/draft/get_sub_product/{pid}",
+                "v1.0/draft/sub_products/{pid}",
+                "v1.0/draft/get_product/{pos_id}/{pid}",
+                "v1.0/draft/get_ingredients/{pos_id}/{pid}",
+                "v1.0/draft/get_product_recipe/{pos_id}/{pid}",
+            ]
             for s in samples:
                 try:
                     pid = int(s.get("product_id") or s.get("id") or 0)
@@ -825,6 +839,42 @@ async def caffesta_subproduct_debug(restaurant_id: str, name_query: str = "") ->
                     pid = 0
                 s["_balances_row"] = bal_by_pid.get(pid)
                 s["_shop_data_row"] = shop_by_pid.get(pid)
+                s["_recipe_probes"] = []
+                if pid:
+                    for tpl in recipe_candidates_tpl:
+                        path = tpl.format(pos_id=pos_id, pid=pid)
+                        try:
+                            r = await client.get(
+                                f"{_base_url(account_name)}/{path}",
+                                headers=_headers(api_key),
+                            )
+                            body_sample = (r.text or "")[:400]
+                            row_count = 0
+                            is_json = False
+                            try:
+                                j = r.json()
+                                is_json = True
+                                if isinstance(j, list):
+                                    row_count = len(j)
+                                elif isinstance(j, dict):
+                                    d = j.get("data")
+                                    if isinstance(d, list):
+                                        row_count = len(d)
+                                    elif isinstance(d, dict):
+                                        # часто рецепт возвращается одним объектом с ingredients
+                                        ings = d.get("ingredients") or d.get("recipe") or []
+                                        row_count = len(ings) if isinstance(ings, list) else 1
+                            except Exception:
+                                pass
+                            s["_recipe_probes"].append({
+                                "path": path,
+                                "status": r.status_code,
+                                "is_json": is_json,
+                                "row_count": row_count,
+                                "body_sample": body_sample,
+                            })
+                        except Exception as e:
+                            s["_recipe_probes"].append({"path": path, "error": str(e)})
     except Exception as e:
         return {"ok": False, "message": str(e)}
 
