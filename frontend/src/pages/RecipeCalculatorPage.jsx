@@ -920,7 +920,7 @@ function CostSandbox({ catalog, costSource, currency, restaurantId, categories, 
                 const source = costSource === 'self_cost' ? p.self_cost : (p.avgInvoicedSelfCost || p.self_cost);
                 return (
                   <button
-                    key={p.caffesta_product_id}
+                    key={p.caffesta_product_id || p.local_subproduct_id || p.name}
                     type="button"
                     onClick={() => addIngredient(p)}
                     className="w-full text-left px-3 py-2 hover:bg-muted/40 flex items-start justify-between gap-3"
@@ -1203,11 +1203,11 @@ function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId,
                   const source = costSource === 'self_cost' ? p.self_cost : (p.avgInvoicedSelfCost || p.self_cost);
                   return (
                     <button
-                      key={p.caffesta_product_id}
+                      key={p.caffesta_product_id || p.local_subproduct_id || p.name}
                       type="button"
                       onClick={() => addIngredient(p)}
                       className="w-full text-left px-3 py-2 hover:bg-muted/40 flex items-start justify-between gap-3"
-                      data-testid={`pick-${p.caffesta_product_id}`}
+                      data-testid={`pick-${p.caffesta_product_id || p.local_subproduct_id || 'x'}`}
                     >
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate flex items-center gap-1.5">
