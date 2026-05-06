@@ -446,6 +446,45 @@ def _compute_subproduct_cost(yield_g: float, ingredients: list[dict]) -> tuple[f
     return round(total, 4), round(cost_per_kg, 4)
 
 
+@router.post("/restaurants/{restaurant_id}/local-subproducts/bulk")
+async def bulk_create_local_subproducts(
+    restaurant_id: str,
+    payload: list[_LocalSubproductPayload],
+    current_user: dict = Depends(get_current_user),
+    _: dict = Depends(ensure_can_write_system),
+):
+    """Создаёт сразу N локальных п/ф одним запросом. Пропускает записи без
+    имени, возвращает счётчики created/skipped. Используется AI-парсером,
+    когда повар скидывает стопку раскладок за раз."""
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+    now = datetime.now(timezone.utc).isoformat()
+    docs = []
+    skipped = 0
+    for item in payload:
+        if not item.name.strip():
+            skipped += 1
+            continue
+        ingredients = [i.model_dump() for i in item.ingredients]
+        total, cost_per_kg = _compute_subproduct_cost(item.yield_g, ingredients)
+        docs.append({
+            "id": str(_uuid.uuid4()),
+            "restaurant_id": restaurant_id,
+            "name": item.name.strip(),
+            "yield_g": float(item.yield_g or 0),
+            "ingredients": ingredients,
+            "notes": (item.notes or "").strip(),
+            "total_cost": total,
+            "cost_per_kg": cost_per_kg,
+            "created_at": now,
+            "updated_at": now,
+        })
+    if docs:
+        await db.local_subproducts.insert_many(docs)
+    for d in docs:
+        d.pop("_id", None)
+    return {"ok": True, "created": len(docs), "skipped": skipped, "data": docs}
+
+
 @router.get("/restaurants/{restaurant_id}/local-subproducts")
 async def list_local_subproducts(
     restaurant_id: str,

@@ -1720,6 +1720,7 @@ function AIParseDialog({ open, onOpenChange, restaurantId, catalog, costSource, 
   const [parsing, setParsing] = useState(false);
   const [result, setResult] = useState(null);
   const [savingIdx, setSavingIdx] = useState(null);
+  const [savingAll, setSavingAll] = useState(false);
 
   const reset = () => { setText(''); setResult(null); };
 
@@ -1766,6 +1767,48 @@ function AIParseDialog({ open, onOpenChange, restaurantId, catalog, costSource, 
     }
   };
 
+  const saveAllSubproducts = async () => {
+    if (!result) return;
+    const spBlocks = result.blocks.filter((b) => b.kind === 'subproduct' && b.yield_g);
+    if (spBlocks.length === 0) {
+      toast.error('Нет блоков-полуфабрикатов с указанным выходом');
+      return;
+    }
+    setSavingAll(true);
+    try {
+      const payload = spBlocks.map((block) => ({
+        name: block.title.replace(/\s*п\/ф\s*$/i, '').trim(),
+        yield_g: block.yield_g || 0,
+        notes: 'Создано из AI-парсера (bulk)',
+        ingredients: block.ingredients.filter((i) => i.matched).map((i) => ({
+          caffesta_product_id: i.matched.caffesta_product_id || null,
+          local_subproduct_id: i.matched.local_subproduct_id || null,
+          name: i.matched.name,
+          qty: i.qty,
+          unit: i.unit || 'г',
+          unit_factor: i.unit_factor,
+          unit_cost: i.matched.self_cost,
+        })),
+      }));
+      const r = await axios.post(
+        `${API}/restaurants/${restaurantId}/local-subproducts/bulk`,
+        payload,
+        authHeaders,
+      );
+      toast.success(`Создано ${r.data?.created || 0} локальных п/ф${r.data?.skipped ? ` (пропущено: ${r.data.skipped})` : ''}`);
+      await onCreatedSubproduct?.();
+      // Убираем subproduct-блоки из результата (остались только dish)
+      setResult((prev) => ({
+        ...prev,
+        blocks: (prev?.blocks || []).filter((b) => b.kind !== 'subproduct'),
+      }));
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Ошибка bulk-сохранения');
+    } finally {
+      setSavingAll(false);
+    }
+  };
+
   const sample = `Соус кукуруза п/ф
 Кукуруза зерно 1300
 Молоко 300
@@ -1786,8 +1829,8 @@ function AIParseDialog({ open, onOpenChange, restaurantId, catalog, costSource, 
             <Sparkles className="w-5 h-5 text-fuchsia-600" /> Распознать рецепт из текста
           </DialogTitle>
           <DialogDescription>
-            Вставьте сообщение от повара. Можно сразу несколько п/ф + блюдо (разделяйте пустой строкой).
-            Также можно вставить только п/ф — без блюда: AI посчитает раскладку и сохранит как локальный п/ф.
+            Вставьте сообщение от повара. Можно сразу <b>несколько раскладок п/ф + блюдо</b> (разделяйте пустой строкой).
+            При 2+ блоков-п/ф появится кнопка «Сохранить все п/ф» — создаст все одним кликом.
             Если AI неправильно определил тип блока (п/ф или блюдо) — переключите его кнопкой ⇄.
           </DialogDescription>
         </DialogHeader>
@@ -1816,9 +1859,17 @@ function AIParseDialog({ open, onOpenChange, restaurantId, catalog, costSource, 
 
         {result && (
           <div className="space-y-4">
-            <div className="text-sm">
-              Найдено блоков: <b>{result.stats.blocks}</b> · Совпадений: <b className="text-emerald-600">{result.stats.matched}</b>
-              {result.stats.unmatched > 0 && <> · Не найдено: <b className="text-amber-600">{result.stats.unmatched}</b></>}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="text-sm">
+                Найдено блоков: <b>{result.stats.blocks}</b> · Совпадений: <b className="text-emerald-600">{result.stats.matched}</b>
+                {result.stats.unmatched > 0 && <> · Не найдено: <b className="text-amber-600">{result.stats.unmatched}</b></>}
+              </div>
+              {result.blocks.filter((b) => b.kind === 'subproduct' && b.yield_g).length >= 2 && (
+                <Button onClick={saveAllSubproducts} disabled={savingAll} size="sm" data-testid="ai-save-all-sp"
+                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white">
+                  {savingAll ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Сохраняем все…</> : <><Save className="w-4 h-4 mr-2" />Сохранить все п/ф ({result.blocks.filter((b) => b.kind === 'subproduct' && b.yield_g).length})</>}
+                </Button>
+              )}
             </div>
             {result.blocks.map((block, i) => (
               <div key={i} className="rounded-lg border p-4" data-testid={`ai-block-${i}`}>
