@@ -743,7 +743,11 @@ async def caffesta_subproduct_debug(restaurant_id: str, name_query: str = "") ->
     названия). Использует тот же эндпоинт что и `get_sub_products`, но НЕ
     нормализует данные — отдаёт ровно как пришло от Caffesta. Полезно когда
     обычные поля (`self_cost`/`avgInvoicedSelfCost`) пусты и нужно понять,
-    в каком другом поле спрятана себестоимость."""
+    в каком другом поле спрятана себестоимость.
+
+    Дополнительно показывает, что лежит в /get_balances и /get_product_shop_data
+    для каждого найденного п/ф — там Caffesta хранит per-shop стоимость для
+    п/ф с методом списания «По техкарте» (когда плоский self_cost=0)."""
     config = await get_caffesta_config(restaurant_id)
     if not config or not config.get("enabled"):
         return {"ok": False, "message": "Caffesta не настроена"}
@@ -775,12 +779,52 @@ async def caffesta_subproduct_debug(restaurant_id: str, name_query: str = "") ->
                     if not needle or needle in title:
                         samples.append(r)
                         if len(samples) >= 5:
-                            return {"ok": True, "data": samples, "count": len(samples), "scanned": total_scanned}
+                            break
+                if len(samples) >= 5:
+                    break
                 last_id = rows[-1].get("product_id") or rows[-1].get("id") or 0
                 if last_id and last_id != start_id and len(rows) >= 100:
                     start_id = last_id
                 else:
                     break
+
+            # Доп. лукап: для каждого найденного п/ф достанем per-shop данные и balances.
+            balances_resp = await client.get(
+                f"{_base_url(account_name)}/v1.0/draft/get_balances/{pos_id}/0",
+                headers=_headers(api_key),
+            )
+            balances_data = _safe_json(balances_resp)
+            bal_rows = balances_data.get("data") if isinstance(balances_data, dict) else balances_data
+            bal_by_pid = {}
+            if isinstance(bal_rows, list):
+                for b in bal_rows:
+                    try:
+                        bal_by_pid[int(b.get("product_id") or 0)] = b
+                    except (ValueError, TypeError):
+                        continue
+
+            shop_resp = await client.get(
+                f"{_base_url(account_name)}/v1.0/draft/get_product_shop_data/{pos_id}/0",
+                headers=_headers(api_key),
+            )
+            shop_data = _safe_json(shop_resp)
+            shop_rows = shop_data.get("data") if isinstance(shop_data, dict) else shop_data
+            shop_by_pid = {}
+            if isinstance(shop_rows, list):
+                for s in shop_rows:
+                    try:
+                        shop_by_pid[int(s.get("product_id") or 0)] = s
+                    except (ValueError, TypeError):
+                        continue
+
+            # Обогащаем каждый sample
+            for s in samples:
+                try:
+                    pid = int(s.get("product_id") or s.get("id") or 0)
+                except (ValueError, TypeError):
+                    pid = 0
+                s["_balances_row"] = bal_by_pid.get(pid)
+                s["_shop_data_row"] = shop_by_pid.get(pid)
     except Exception as e:
         return {"ok": False, "message": str(e)}
 
