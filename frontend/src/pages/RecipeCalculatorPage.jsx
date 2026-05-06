@@ -49,6 +49,29 @@ export default function RecipeCalculatorPage() {
   const [recomputing, setRecomputing] = useState(false);
   const [search, setSearch] = useState('');
   const [editItem, setEditItem] = useState(null);
+  const [probeOpen, setProbeOpen] = useState(false);
+  const [probeLoading, setProbeLoading] = useState(false);
+  const [probeData, setProbeData] = useState(null);
+
+  const runProbe = async () => {
+    if (!currentRestaurantId) return;
+    setProbeOpen(true);
+    setProbeLoading(true);
+    setProbeData(null);
+    try {
+      const r = await axios.get(
+        `${API}/restaurants/${currentRestaurantId}/caffesta/probe-subproducts`,
+        authHeaders,
+      );
+      setProbeData(r.data);
+    } catch (e) {
+      const detail = e?.response?.data?.detail || e.message;
+      toast.error(`Диагностика не удалась: ${detail}`);
+      setProbeData({ ok: false, message: detail });
+    } finally {
+      setProbeLoading(false);
+    }
+  };
 
   const loadItems = useCallback(async () => {
     if (!currentRestaurantId) return;
@@ -174,6 +197,14 @@ export default function RecipeCalculatorPage() {
             {recomputing
               ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Пересчитываем…</>
               : <><RefreshCw className="w-4 h-4 mr-2" />Пересчитать все рецепты</>}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={runProbe}
+            data-testid="probe-subproducts-btn"
+            title="Диагностика: какой URL Caffesta отдаёт полуфабрикаты для вашего аккаунта"
+          >
+            <Search className="w-4 h-4 mr-2" />Диагностика п/ф
           </Button>
         </div>
       </div>
@@ -342,6 +373,71 @@ export default function RecipeCalculatorPage() {
           />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={probeOpen} onOpenChange={setProbeOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Диагностика полуфабрикатов Caffesta</DialogTitle>
+            <DialogDescription>
+              Перебираем вероятные URL Caffesta API. Тот, у которого <b>row_count &gt; 0</b> и
+              <b> status = 200</b> — содержит полуфабрикаты для вашего аккаунта.
+            </DialogDescription>
+          </DialogHeader>
+          {probeLoading && (
+            <div className="flex items-center gap-2 text-muted-foreground py-6">
+              <Loader2 className="w-4 h-4 animate-spin" /> Опрашиваем Caffesta…
+            </div>
+          )}
+          {!probeLoading && probeData && (
+            <div className="space-y-2 text-sm">
+              {Array.isArray(probeData?.data) && probeData.data.length > 0 ? (
+                probeData.data.map((row, i) => {
+                  const ok = row.status === 200 && row.is_json && row.row_count > 0;
+                  return (
+                    <div
+                      key={i}
+                      className={`rounded-md border p-3 ${ok ? 'border-emerald-300 bg-emerald-50/50 dark:bg-emerald-900/10' : 'bg-muted/20'}`}
+                      data-testid={`probe-row-${i}`}
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <code className="text-xs break-all">{row.url}</code>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className={`px-2 py-0.5 rounded ${row.status === 200 ? 'bg-emerald-200/50' : 'bg-rose-200/50'}`}>
+                            HTTP {row.status ?? 'err'}
+                          </span>
+                          {row.is_json && (
+                            <span className="px-2 py-0.5 rounded bg-blue-200/50">JSON, rows: {row.row_count}</span>
+                          )}
+                          {ok && <span className="px-2 py-0.5 rounded bg-emerald-500 text-white font-semibold">✓ РАБОТАЕТ</span>}
+                        </div>
+                      </div>
+                      {row.error && <div className="text-rose-600 text-xs mt-1">Ошибка: {row.error}</div>}
+                      {row.body_sample && (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-xs text-muted-foreground">Показать тело ответа (600 символов)</summary>
+                          <pre className="text-xs mt-1 p-2 bg-background rounded overflow-x-auto whitespace-pre-wrap break-all">
+                            {row.body_sample}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-muted-foreground py-4">
+                  {probeData?.message || 'Нет данных. Проверьте, что Caffesta настроена.'}
+                </div>
+              )}
+              <div className="text-xs text-muted-foreground pt-2 border-t">
+                Скиньте скриншот этого окна — я зафиксирую рабочий URL в коде.
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProbeOpen(false)} data-testid="probe-close">Закрыть</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
