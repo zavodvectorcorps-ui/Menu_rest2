@@ -161,6 +161,43 @@ def _match_ingredient(name: str, choices: list[tuple[str, dict]], threshold: int
     }
 
 
+def _get_suggestions(
+    name: str,
+    choices: list[tuple[str, dict]],
+    top: int = 3,
+    min_score: int = 45,
+    max_score: int = 75,
+) -> list[dict]:
+    """Return top-N fuzzy candidates in [min_score, max_score) for a name that
+    didn't pass the primary match threshold. Used for 'Did you mean…' UX."""
+    if not choices:
+        return []
+    norm = _strip_marker(name).lower()
+    if not norm:
+        return []
+    names_only = [c[0] for c in choices]
+    candidates = process.extract(norm, names_only, scorer=fuzz.WRatio, limit=top * 3)
+    out: list[dict] = []
+    for _, score, idx in candidates:
+        if score < min_score or score >= max_score:
+            continue
+        entry = choices[idx][1]
+        out.append({
+            "caffesta_product_id": entry.get("caffesta_product_id"),
+            "local_subproduct_id": entry.get("local_subproduct_id"),
+            "name": entry.get("name"),
+            "self_cost": float(entry.get("self_cost") or entry.get("avgInvoicedSelfCost") or 0),
+            "confidence": int(score),
+            "type": ("local_subproduct" if entry.get("local_subproduct_id")
+                     else "sub_product" if entry.get("is_sub_product")
+                     else "tech_card" if entry.get("is_tech_card")
+                     else "product"),
+        })
+        if len(out) >= top:
+            break
+    return out
+
+
 def _unit_factor(unit: str) -> float:
     """Convert recipe unit to Caffesta's base unit (kg/l/pc).
     Defaults to 1.0 (no conversion) so the UI can override."""
@@ -262,6 +299,9 @@ def parse_recipe_text(text: str, catalog: list[dict]) -> dict:
             else:
                 ing["matched"] = None
                 ing["confidence"] = 0
+                # Did-you-mean: показываем top-3 кандидатов ниже порога,
+                # чтобы повар мог одним кликом выбрать правильный.
+                ing["suggestions"] = _get_suggestions(ing["name"], choices)
                 unmatched += 1
 
         # If this block is a sub-product, register it for later blocks.

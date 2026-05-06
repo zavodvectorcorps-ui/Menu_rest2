@@ -77,10 +77,30 @@ def test_single_block_is_dish():
     assert res["blocks"][0]["kind"] == "dish"
 
 
+def test_did_you_mean_suggestions():
+    text = "Тест\nМасло растительное 30\nВыход 100"
+    cat = [
+        {"caffesta_product_id": 1, "name": "Масло подсолнечное", "self_cost": 4.3},
+        {"caffesta_product_id": 2, "name": "Масло оливковое", "self_cost": 12.0},
+        {"caffesta_product_id": 3, "name": "Масло сливочное", "self_cost": 8.0},
+    ]
+    res = parse_recipe_text(text, cat)
+    ing = res["blocks"][0]["ingredients"][0]
+    assert ing["matched"] is None
+    suggestions = ing.get("suggestions") or []
+    assert len(suggestions) >= 2, f"Expected ≥2 suggestions, got {suggestions}"
+    # All suggestions should mention 'Масло'
+    assert all("асло" in s["name"] for s in suggestions)
+    # Sorted by confidence desc
+    scores = [s["confidence"] for s in suggestions]
+    assert scores == sorted(scores, reverse=True)
+
+
 if __name__ == "__main__":
     test_parses_two_block_message()
     test_unit_factor_default_is_grams()
     test_yo_normalization()
     test_empty_text_returns_empty()
     test_single_block_is_dish()
+    test_did_you_mean_suggestions()
     print("All tests passed ✓")

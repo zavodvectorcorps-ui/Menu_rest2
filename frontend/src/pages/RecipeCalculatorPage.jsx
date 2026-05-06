@@ -1654,16 +1654,52 @@ function AIParseDialog({ open, onOpenChange, restaurantId, catalog, costSource, 
                 </div>
                 <div className="space-y-1">
                   {block.ingredients.map((ing, j) => (
-                    <div key={j} className="flex items-center justify-between gap-2 text-sm py-1 border-b last:border-0">
+                    <div key={j} className="flex items-start justify-between gap-2 text-sm py-1.5 border-b last:border-0">
                       <div className="min-w-0 flex-1">
                         <div className="truncate">{ing.name} <span className="text-muted-foreground">({ing.qty} {ing.unit || 'г'})</span></div>
                         {ing.matched ? (
                           <div className="text-xs text-emerald-700 truncate">→ {ing.matched.name} ({ing.confidence}%)</div>
                         ) : (
-                          <div className="text-xs text-amber-700">⚠ Не найдено в каталоге — добавь вручную</div>
+                          <div className="text-xs text-amber-700 mt-0.5">
+                            <div>⚠ Не найдено в каталоге</div>
+                            {ing.suggestions?.length > 0 && (
+                              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                <span className="text-muted-foreground">Возможно:</span>
+                                {ing.suggestions.map((s, k) => (
+                                  <button
+                                    key={k}
+                                    type="button"
+                                    onClick={() => {
+                                      setResult((prev) => {
+                                        const next = JSON.parse(JSON.stringify(prev));
+                                        const line = next.blocks[i].ingredients[j];
+                                        line.matched = {
+                                          caffesta_product_id: s.caffesta_product_id,
+                                          local_subproduct_id: s.local_subproduct_id,
+                                          name: s.name,
+                                          type: s.type,
+                                          self_cost: s.self_cost,
+                                        };
+                                        line.confidence = s.confidence;
+                                        line.suggestions = [];
+                                        next.stats.matched += 1;
+                                        next.stats.unmatched = Math.max(0, next.stats.unmatched - 1);
+                                        return next;
+                                      });
+                                    }}
+                                    className="text-xs px-2 py-0.5 rounded-full border border-amber-300 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-700 transition-colors"
+                                    data-testid={`suggestion-${i}-${j}-${k}`}
+                                    title={`${s.confidence}% совпадение · ${s.self_cost.toFixed(2)} ${currency}`}
+                                  >
+                                    {s.name} <span className="text-muted-foreground">{s.confidence}%</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
-                      <div className="text-xs tabular-nums whitespace-nowrap">
+                      <div className="text-xs tabular-nums whitespace-nowrap pt-0.5">
                         {ing.matched ? `${(ing.qty * ing.unit_factor * (ing.matched.self_cost || 0)).toFixed(2)} ${currency}` : '—'}
                       </div>
                     </div>
