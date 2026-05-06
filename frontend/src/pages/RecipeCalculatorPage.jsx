@@ -78,6 +78,17 @@ export default function RecipeCalculatorPage() {
   const [localSubproducts, setLocalSubproducts] = useState([]);
   const [activeTab, setActiveTab] = useState('menu');
   const [sandboxPreload, setSandboxPreload] = useState(null);
+  const [localSpPreload, setLocalSpPreload] = useState(null);
+
+  const startLocalFromCaffesta = (caffestaItem) => {
+    setLocalSpPreload({
+      name: (caffestaItem.name || '').replace(/^п\/ф\s*/i, ''),
+      yield_g: 1000,
+      ingredients: [],
+      notes: `Создан из каталога Caffesta (ID ${caffestaItem.caffesta_product_id}) — стоимость в Caffesta API = 0`,
+    });
+    setActiveTab('local-sp');
+  };
 
   const loadLocalSubproducts = useCallback(async () => {
     if (!currentRestaurantId) return;
@@ -416,6 +427,7 @@ export default function RecipeCalculatorPage() {
             setEditItem(null);
             await loadItems();
           }}
+          onCreateLocalFromCaffesta={(p) => { setEditItem(null); startLocalFromCaffesta(p); }}
         />
       )}
         </TabsContent>
@@ -430,6 +442,7 @@ export default function RecipeCalculatorPage() {
             onSavedAsItem={loadItems}
             preload={sandboxPreload}
             onPreloadConsumed={() => setSandboxPreload(null)}
+            onCreateLocalFromCaffesta={startLocalFromCaffesta}
           />
         </TabsContent>
 
@@ -445,6 +458,8 @@ export default function RecipeCalculatorPage() {
               await loadCatalog();
             }}
             onAiHelp={() => setAiOpen(true)}
+            preload={localSpPreload}
+            onPreloadConsumed={() => setLocalSpPreload(null)}
           />
         </TabsContent>
       </Tabs>
@@ -727,7 +742,7 @@ function CostHistoryChart({ restaurantId, itemId, currency }) {
 
 // ============ Sandbox (calculate cost for a NEW dish, no DB write) ============
 
-function CostSandbox({ catalog, costSource, currency, restaurantId, categories, onSavedAsItem, preload, onPreloadConsumed }) {
+function CostSandbox({ catalog, costSource, currency, restaurantId, categories, onSavedAsItem, preload, onPreloadConsumed, onCreateLocalFromCaffesta }) {
   const authHeaders = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -1040,12 +1055,15 @@ function CostSandbox({ catalog, costSource, currency, restaurantId, categories, 
               )}
               {pickerFiltered.map((p) => {
                 const source = costSource === 'self_cost' ? p.self_cost : (p.avgInvoicedSelfCost || p.self_cost);
+                const noCost = p.is_sub_product && !p.is_local_subproduct && Number(source || 0) <= 0;
                 return (
-                  <button
+                  <div
                     key={p.caffesta_product_id || p.local_subproduct_id || p.name}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => addIngredient(p)}
-                    className="w-full text-left px-3 py-2 hover:bg-muted/40 flex items-start justify-between gap-3"
+                    onKeyDown={(e) => { if (e.key === 'Enter') addIngredient(p); }}
+                    className="w-full text-left px-3 py-2 hover:bg-muted/40 flex items-start justify-between gap-3 cursor-pointer"
                   >
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate flex items-center gap-1.5">
@@ -1065,14 +1083,25 @@ function CostSandbox({ catalog, costSource, currency, restaurantId, categories, 
                         {p.is_local_subproduct ? 'Локальный п/ф' : p.is_sub_product ? 'Полуфабрикат' : p.is_tech_card ? 'Тех. карта' : 'Сырьё'}
                       </div>
                     </div>
-                    <div className="text-sm tabular-nums whitespace-nowrap">
+                    <div className="text-sm tabular-nums whitespace-nowrap flex items-center gap-2 shrink-0">
                       {Number(source || 0) > 0 ? (
                         `${Number(source).toFixed(2)} ${currency}`
                       ) : (
-                        <span className="text-amber-600 text-xs" title="Caffesta не отдаёт стоимость для этого п/ф. Создайте локальный п/ф во вкладке «Мои п/ф» с реальной раскладкой.">не задана</span>
+                        <span className="text-amber-600 text-xs">не задана</span>
+                      )}
+                      {noCost && onCreateLocalFromCaffesta && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setPickerOpen(false); onCreateLocalFromCaffesta(p); }}
+                          className="text-[10px] px-2 py-1 rounded border border-fuchsia-300 text-fuchsia-700 hover:bg-fuchsia-50 dark:border-fuchsia-700 dark:text-fuchsia-300 dark:hover:bg-fuchsia-900/20 whitespace-nowrap"
+                          data-testid={`set-cost-${p.caffesta_product_id}`}
+                          title="Открыть форму создания локального п/ф с этим именем"
+                        >
+                          Задать стоимость
+                        </button>
                       )}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -1096,7 +1125,7 @@ function SandboxCell({ label, value, cls = '', primary = false }) {
 }
 
 
-function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId, onClose, onSaved }) {
+function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId, onClose, onSaved, onCreateLocalFromCaffesta }) {
   const authHeaders = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
   const [ingredients, setIngredients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1327,12 +1356,15 @@ function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId,
                 )}
                 {pickerFiltered.map((p) => {
                   const source = costSource === 'self_cost' ? p.self_cost : (p.avgInvoicedSelfCost || p.self_cost);
+                  const noCost = p.is_sub_product && !p.is_local_subproduct && Number(source || 0) <= 0;
                   return (
-                    <button
+                    <div
                       key={p.caffesta_product_id || p.local_subproduct_id || p.name}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => addIngredient(p)}
-                      className="w-full text-left px-3 py-2 hover:bg-muted/40 flex items-start justify-between gap-3"
+                      onKeyDown={(e) => { if (e.key === 'Enter') addIngredient(p); }}
+                      className="w-full text-left px-3 py-2 hover:bg-muted/40 flex items-start justify-between gap-3 cursor-pointer"
                       data-testid={`pick-${p.caffesta_product_id || p.local_subproduct_id || 'x'}`}
                     >
                       <div className="min-w-0">
@@ -1353,14 +1385,25 @@ function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId,
                           {p.is_local_subproduct ? 'Локальный п/ф' : p.is_sub_product ? 'Полуфабрикат' : p.is_tech_card ? 'Тех. карта' : 'Сырьё'} · ID {p.caffesta_product_id}
                         </div>
                       </div>
-                      <div className="text-sm tabular-nums whitespace-nowrap">
+                      <div className="text-sm tabular-nums whitespace-nowrap flex items-center gap-2 shrink-0">
                         {Number(source || 0) > 0 ? (
                           `${Number(source).toFixed(2)} ${currency}`
                         ) : (
-                          <span className="text-amber-600 text-xs" title="Caffesta не отдаёт стоимость для этого п/ф. Создайте локальный п/ф во вкладке «Мои п/ф» с реальной раскладкой.">не задана</span>
+                          <span className="text-amber-600 text-xs">не задана</span>
+                        )}
+                        {noCost && onCreateLocalFromCaffesta && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setPickerOpen(false); onClose?.(); onCreateLocalFromCaffesta(p); }}
+                            className="text-[10px] px-2 py-1 rounded border border-fuchsia-300 text-fuchsia-700 hover:bg-fuchsia-50 dark:border-fuchsia-700 dark:text-fuchsia-300 dark:hover:bg-fuchsia-900/20 whitespace-nowrap"
+                            data-testid={`menu-set-cost-${p.caffesta_product_id}`}
+                            title="Открыть форму создания локального п/ф с этим именем"
+                          >
+                            Задать стоимость
+                          </button>
                         )}
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1376,9 +1419,18 @@ function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId,
 
 // ============ LOCAL SUB-PRODUCTS TAB ============
 
-function LocalSubproductsTab({ restaurantId, catalog, costSource, currency, list, onChange, onAiHelp }) {
+function LocalSubproductsTab({ restaurantId, catalog, costSource, currency, list, onChange, onAiHelp, preload, onPreloadConsumed }) {
   const authHeaders = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
   const [editing, setEditing] = useState(null); // {id?, name, yield_g, ingredients}
+
+  // Preload из каталога: «Создать локальный с именем из Caffesta»
+  useEffect(() => {
+    if (preload) {
+      setEditing(preload);
+      onPreloadConsumed?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preload]);
 
   const startNew = () => setEditing({ name: '', yield_g: 1000, ingredients: [], notes: '' });
   const startEdit = (sp) => setEditing({ ...sp });
