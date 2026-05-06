@@ -687,6 +687,7 @@ async def caffesta_get_sub_products(restaurant_id: str) -> dict:
 
     # Нормализуем + парсим self_cost из вложенных структур (если есть)
     out = []
+    raw_first_sample: dict | None = None
     for r in all_raw:
         try:
             pid = int(r.get("product_id") or r.get("id") or 0)
@@ -694,17 +695,27 @@ async def caffesta_get_sub_products(restaurant_id: str) -> dict:
             continue
         if not pid:
             continue
+        if raw_first_sample is None:
+            raw_first_sample = r  # для отладки: запомним первый объект целиком
         title = r.get("title") or r.get("name") or r.get("product_name") or ""
+        # Перебираем фиксированные поля + любые ключи, где есть cost/price/себест.
         sc = 0.0
-        for key in ("self_cost", "avgInvoicedSelfCost", "cost", "self_price", "cost_price"):
+        candidate_keys = list(("self_cost", "avgInvoicedSelfCost", "cost", "self_price", "cost_price"))
+        for k in r.keys():
+            kl = k.lower()
+            if any(p in kl for p in ("cost", "price", "sebes", "self")):
+                if k not in candidate_keys:
+                    candidate_keys.append(k)
+        for key in candidate_keys:
             v = r.get(key)
-            if v is not None:
-                try:
-                    sc = float(v)
-                    if sc > 0:
-                        break
-                except (ValueError, TypeError):
-                    continue
+            if v is None:
+                continue
+            try:
+                sc = float(v)
+                if sc > 0:
+                    break
+            except (ValueError, TypeError):
+                continue
         out.append({
             "product_id": pid,
             "title": title,
@@ -713,7 +724,54 @@ async def caffesta_get_sub_products(restaurant_id: str) -> dict:
         })
 
     logger.info(f"Caffesta sub-products: loaded {len(out)} items via {endpoint_used}")
-    return {"ok": True, "data": out, "endpoint": endpoint_used}
+    # Diagnostic: сохраним список ключей первого п/ф, чтобы понять, есть ли какое-то
+    # экзотическое поле со стоимостью, которое мы не учли (видно в caffesta/probe-sample).
+    raw_sample_keys: list[str] = []
+    if raw_first_sample is not None:
+        raw_sample_keys = list(raw_first_sample.keys())
+    return {
+        "ok": True,
+        "data": out,
+        "endpoint": endpoint_used,
+        "raw_sample_keys": raw_sample_keys,
+        "raw_sample": raw_first_sample,
+    }
+
+
+async def caffesta_subproduct_debug(restaurant_id: str, name_query: str = "") -> dict:
+    """Возвращает сырое тело Caffesta для одного полуфабриката (по совпадению
+    названия). Использует тот же эндпоинт что и `get_sub_products`, но НЕ
+    нормализует данные — отдаёт ровно как пришло от Caffesta. Полезно когда
+    обычные поля (`self_cost`/`avgInvoicedSelfCost`) пусты и нужно понять,
+    в каком другом поле спрятана себестоимость."""
+    config = await get_caffesta_config(restaurant_id)
+    if not config or not config.get("enabled"):
+        return {"ok": False, "message": "Caffesta не настроена"}
+    account_name = config["account_name"]
+    api_key = config["api_key"]
+    pos_id = config.get("pos_id", 1)
+
+    needle = (name_query or "").strip().lower()
+    samples: list[dict] = []
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            url = f"{_base_url(account_name)}/v1.0/draft/get_products/{pos_id}/0/0?type=sub_product"
+            resp = await client.get(url, headers=_headers(api_key))
+            data = _safe_json(resp)
+            rows = data.get("data") if isinstance(data, dict) else (data if isinstance(data, list) else [])
+            rows = rows or []
+            for r in rows:
+                if not isinstance(r, dict):
+                    continue
+                title = (r.get("title") or r.get("name") or "").lower()
+                if not needle or needle in title:
+                    samples.append(r)
+                    if len(samples) >= 5:
+                        break
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+    return {"ok": True, "data": samples, "count": len(samples)}
 
 
 # ============ Shop data (stop-list, avgInvoicedSelfCost) ============

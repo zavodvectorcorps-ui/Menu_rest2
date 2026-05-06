@@ -23,6 +23,7 @@ from services.caffesta import (
     get_caffesta_config, caffesta_get_balances,
     caffesta_get_products, caffesta_get_product_shop_data,
     caffesta_get_sub_products, caffesta_probe_subproducts,
+    caffesta_subproduct_debug,
 )
 
 router = APIRouter()
@@ -387,6 +388,19 @@ async def probe_subproducts(
     эндпоинт у Caffesta содержит полуфабрикаты для конкретного аккаунта."""
     await ensure_module_access(restaurant_id, "cost_control", current_user)
     return await caffesta_probe_subproducts(restaurant_id)
+
+
+@router.get("/restaurants/{restaurant_id}/caffesta/subproduct-debug")
+async def subproduct_debug(
+    restaurant_id: str,
+    name: str = "",
+    current_user: dict = Depends(get_current_user),
+):
+    """Возвращает сырое body Caffesta для 1-5 полуфабрикатов (по подстроке
+    в имени). Помогает понять, в каком поле Caffesta хранит self_cost для п/ф,
+    когда обычные поля пусты."""
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+    return await caffesta_subproduct_debug(restaurant_id, name)
 
 
 # ============ LOCAL SUB-PRODUCTS (полуфабрикаты, которых нет в Caffesta) ============

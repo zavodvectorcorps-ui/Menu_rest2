@@ -53,9 +53,31 @@ export default function RecipeCalculatorPage() {
   const [probeOpen, setProbeOpen] = useState(false);
   const [probeLoading, setProbeLoading] = useState(false);
   const [probeData, setProbeData] = useState(null);
+  const [debugQuery, setDebugQuery] = useState('');
+  const [debugLoading, setDebugLoading] = useState(false);
+  const [debugData, setDebugData] = useState(null);
+
+  const runDebug = async () => {
+    if (!currentRestaurantId) return;
+    setDebugLoading(true);
+    setDebugData(null);
+    try {
+      const r = await axios.get(
+        `${API}/restaurants/${currentRestaurantId}/caffesta/subproduct-debug?name=${encodeURIComponent(debugQuery)}`,
+        authHeaders,
+      );
+      setDebugData(r.data);
+    } catch (e) {
+      const detail = e?.response?.data?.detail || e.message;
+      toast.error(`Не удалось получить debug: ${detail}`);
+    } finally {
+      setDebugLoading(false);
+    }
+  };
   const [aiOpen, setAiOpen] = useState(false);
   const [localSubproducts, setLocalSubproducts] = useState([]);
   const [activeTab, setActiveTab] = useState('menu');
+  const [sandboxPreload, setSandboxPreload] = useState(null);
 
   const loadLocalSubproducts = useCallback(async () => {
     if (!currentRestaurantId) return;
@@ -406,6 +428,8 @@ export default function RecipeCalculatorPage() {
             restaurantId={currentRestaurantId}
             categories={items.length ? Array.from(new Set(items.map(i => i.category_name).filter(Boolean))) : []}
             onSavedAsItem={loadItems}
+            preload={sandboxPreload}
+            onPreloadConsumed={() => setSandboxPreload(null)}
           />
         </TabsContent>
 
@@ -483,6 +507,42 @@ export default function RecipeCalculatorPage() {
               </div>
             </div>
           )}
+
+          <div className="border-t pt-4 mt-2 space-y-2">
+            <div className="text-sm font-semibold">Сырое тело конкретного п/ф</div>
+            <div className="text-xs text-muted-foreground">
+              Введите часть имени (например «лук»), мы покажем все поля Caffesta для этой записи.
+              Так найдём, в каком поле спрятана себестоимость.
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={debugQuery}
+                onChange={(e) => setDebugQuery(e.target.value)}
+                placeholder="Например: лук"
+                data-testid="probe-debug-input"
+              />
+              <Button onClick={runDebug} disabled={debugLoading} data-testid="probe-debug-btn">
+                {debugLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Ищем…</> : <><Search className="w-4 h-4 mr-2" />Показать тело</>}
+              </Button>
+            </div>
+            {debugData && Array.isArray(debugData.data) && debugData.data.length > 0 && (
+              <div className="space-y-2">
+                {debugData.data.map((row, i) => (
+                  <details key={i} open className="border rounded-md p-2 bg-muted/10">
+                    <summary className="cursor-pointer text-sm font-medium">
+                      {row.title || row.name || `#${row.product_id || row.id}`} · ID {row.product_id || row.id || '—'}
+                    </summary>
+                    <pre className="text-xs mt-2 p-2 bg-background rounded overflow-x-auto whitespace-pre-wrap break-all">
+                      {JSON.stringify(row, null, 2)}
+                    </pre>
+                  </details>
+                ))}
+              </div>
+            )}
+            {debugData && (!debugData.data || debugData.data.length === 0) && (
+              <div className="text-xs text-muted-foreground">Ничего не найдено по запросу.</div>
+            )}
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProbeOpen(false)} data-testid="probe-close">Закрыть</Button>
           </DialogFooter>
@@ -500,7 +560,28 @@ export default function RecipeCalculatorPage() {
           await loadLocalSubproducts();
           await loadCatalog();
         }}
-        onSendToSandbox={() => {
+        onSendToSandbox={(dishBlock) => {
+          // Передаём блок-блюдо в Песочницу с заполненной формой
+          if (dishBlock) {
+            const preloadIngredients = (dishBlock.ingredients || [])
+              .filter((i) => i.matched)
+              .map((i) => ({
+                caffesta_product_id: i.matched.caffesta_product_id || null,
+                local_subproduct_id: i.matched.local_subproduct_id || null,
+                name: i.matched.name,
+                qty: i.qty,
+                unit: i.unit || 'г',
+                unit_factor: i.unit_factor,
+                unit_cost: i.matched.self_cost,
+              }));
+            setSandboxPreload({
+              name: dishBlock.title,
+              ingredients: preloadIngredients,
+              unmatched: (dishBlock.ingredients || [])
+                .filter((i) => !i.matched)
+                .map((i) => ({ name: i.name, qty: i.qty, unit: i.unit })),
+            });
+          }
           setAiOpen(false);
           setActiveTab('sandbox');
         }}
@@ -616,7 +697,7 @@ function CostHistoryChart({ restaurantId, itemId, currency }) {
 
 // ============ Sandbox (calculate cost for a NEW dish, no DB write) ============
 
-function CostSandbox({ catalog, costSource, currency, restaurantId, categories, onSavedAsItem }) {
+function CostSandbox({ catalog, costSource, currency, restaurantId, categories, onSavedAsItem, preload, onPreloadConsumed }) {
   const authHeaders = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -627,6 +708,17 @@ function CostSandbox({ catalog, costSource, currency, restaurantId, categories, 
   const [uploading, setUploading] = useState(false);
   const [unmatched, setUnmatched] = useState([]);
   const fileRef = useRef(null);
+
+  // Подхватываем preload из AI-парсера: имя + matched-ингредиенты + список unmatched
+  useEffect(() => {
+    if (!preload) return;
+    if (preload.name) setName(preload.name);
+    if (preload.ingredients?.length) setIngredients(preload.ingredients);
+    if (preload.unmatched?.length) setUnmatched(preload.unmatched.map((u) => u.name));
+    toast.success(`Загружено из AI: ${preload.ingredients?.length || 0} ингредиентов${preload.unmatched?.length ? `, ${preload.unmatched.length} вручную` : ''}`);
+    onPreloadConsumed?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preload]);
 
   const total = useMemo(
     () => ingredients.reduce((s, ing) => s + lineCost(ing), 0),
@@ -1647,7 +1739,7 @@ function AIParseDialog({ open, onOpenChange, restaurantId, catalog, costSource, 
                     </Button>
                   )}
                   {block.kind === 'dish' && (
-                    <Button size="sm" variant="outline" onClick={() => onSendToSandbox?.()} data-testid={`ai-open-sandbox-${i}`}>
+                    <Button size="sm" variant="outline" onClick={() => onSendToSandbox?.(block)} data-testid={`ai-open-sandbox-${i}`}>
                       Открыть в Песочнице
                     </Button>
                   )}
