@@ -444,6 +444,7 @@ export default function RecipeCalculatorPage() {
               await loadLocalSubproducts();
               await loadCatalog();
             }}
+            onAiHelp={() => setAiOpen(true)}
           />
         </TabsContent>
       </Tabs>
@@ -1346,7 +1347,7 @@ function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId,
 
 // ============ LOCAL SUB-PRODUCTS TAB ============
 
-function LocalSubproductsTab({ restaurantId, catalog, costSource, currency, list, onChange }) {
+function LocalSubproductsTab({ restaurantId, catalog, costSource, currency, list, onChange, onAiHelp }) {
   const authHeaders = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
   const [editing, setEditing] = useState(null); // {id?, name, yield_g, ingredients}
 
@@ -1380,9 +1381,15 @@ function LocalSubproductsTab({ restaurantId, catalog, costSource, currency, list
             Доступны как ингредиенты в рецептах блюд (бейдж «лок. п/ф»).
           </p>
         </div>
-        <Button onClick={startNew} data-testid="add-local-sp-btn">
-          <Plus className="w-4 h-4 mr-2" /> Создать п/ф
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onAiHelp} data-testid="local-sp-ai-help-btn"
+            className="border-fuchsia-300 text-fuchsia-700 hover:bg-fuchsia-50 dark:border-fuchsia-700 dark:text-fuchsia-300 dark:hover:bg-fuchsia-900/20">
+            <Sparkles className="w-4 h-4 mr-2" /> С AI помощью
+          </Button>
+          <Button onClick={startNew} data-testid="add-local-sp-btn">
+            <Plus className="w-4 h-4 mr-2" /> Создать п/ф
+          </Button>
+        </div>
       </div>
 
       {list.length === 0 ? (
@@ -1699,7 +1706,8 @@ function AIParseDialog({ open, onOpenChange, restaurantId, catalog, costSource, 
           </DialogTitle>
           <DialogDescription>
             Вставьте сообщение от повара. Можно сразу несколько п/ф + блюдо (разделяйте пустой строкой).
-            Парсер автоматически сопоставит ингредиенты с каталогом Caffesta и вашими локальными п/ф.
+            Также можно вставить только п/ф — без блюда: AI посчитает раскладку и сохранит как локальный п/ф.
+            Если AI неправильно определил тип блока (п/ф или блюдо) — переключите его кнопкой ⇄.
           </DialogDescription>
         </DialogHeader>
 
@@ -1735,8 +1743,21 @@ function AIParseDialog({ open, onOpenChange, restaurantId, catalog, costSource, 
               <div key={i} className="rounded-lg border p-4" data-testid={`ai-block-${i}`}>
                 <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                   <div>
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {block.kind === 'subproduct' ? 'Полуфабрикат' : 'Блюдо'}
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                      <span>{block.kind === 'subproduct' ? 'Полуфабрикат' : 'Блюдо'}</span>
+                      <button
+                        type="button"
+                        onClick={() => setResult((prev) => {
+                          const next = JSON.parse(JSON.stringify(prev));
+                          next.blocks[i].kind = next.blocks[i].kind === 'subproduct' ? 'dish' : 'subproduct';
+                          return next;
+                        })}
+                        className="text-[10px] px-1.5 py-0.5 rounded border border-muted-foreground/40 hover:bg-muted normal-case"
+                        data-testid={`ai-toggle-kind-${i}`}
+                        title="Это другой тип? Переключить."
+                      >
+                        ⇄ это {block.kind === 'subproduct' ? 'блюдо' : 'п/ф'}
+                      </button>
                     </div>
                     <div className="font-semibold text-lg">{block.title}</div>
                     {block.yield_g && <div className="text-xs text-muted-foreground">Выход: {block.yield_g} г</div>}
