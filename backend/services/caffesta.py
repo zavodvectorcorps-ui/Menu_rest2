@@ -581,6 +581,134 @@ async def caffesta_get_balances(restaurant_id: str) -> dict:
         return {"ok": False, "message": str(e)}
 
 
+# ============ Sub-products (полуфабрикаты) ============
+
+# Caffesta-вские эндпоинты для полуфабрикатов точно не задокументированы публично,
+# поэтому пробуем несколько вероятных URL по аналогии с уже работающими методами.
+# Тот, что вернёт корректный JSON со списком — будем использовать.
+SUBPRODUCT_URL_CANDIDATES = [
+    "v1.0/draft/get_sub_products/{pos_id}/0",
+    "v1.0/draft/get_subproducts/{pos_id}/0",
+    "v1.0/draft/sub_products/{pos_id}/0",
+    "v1.0/draft/subproducts/{pos_id}/0",
+    "v1.0/draft/get_semi_products/{pos_id}/0",
+    "v1.0/draft/semi_products/{pos_id}/0",
+    "v1.0/draft/get_blanks/{pos_id}/0",
+    "v1.0/draft/blanks/{pos_id}/0",
+    "v1.0/draft/get_compositions/{pos_id}/0",
+    "v1.0/draft/get_products/{pos_id}/0/0?type=sub_product",
+    "v1.0/draft/get_products/{pos_id}/0/1",
+    "v1.0/draft/get_products/{pos_id}/0/2",
+]
+
+
+async def caffesta_probe_subproducts(restaurant_id: str) -> dict:
+    """Перебирает кандидатские URL и возвращает результат каждого
+    (status, body sample) — диагностический помощник, чтобы понять,
+    какой эндпоинт у Caffesta возвращает полуфабрикаты."""
+    config = await get_caffesta_config(restaurant_id)
+    if not config or not config.get("enabled"):
+        return {"ok": False, "message": "Caffesta не настроена"}
+    account_name = config["account_name"]
+    api_key = config["api_key"]
+    pos_id = config.get("pos_id", 1)
+
+    findings = []
+    async with httpx.AsyncClient(timeout=20) as client:
+        for tpl in SUBPRODUCT_URL_CANDIDATES:
+            path = tpl.format(pos_id=pos_id)
+            url = f"{_base_url(account_name)}/{path}"
+            try:
+                resp = await client.get(url, headers=_headers(api_key))
+                snippet = (resp.text or "")[:600]
+                ok_json = False
+                rows = 0
+                try:
+                    j = resp.json()
+                    ok_json = True
+                    if isinstance(j, list):
+                        rows = len(j)
+                    elif isinstance(j, dict):
+                        d = j.get("data")
+                        if isinstance(d, list):
+                            rows = len(d)
+                except Exception:
+                    pass
+                findings.append({
+                    "url": url,
+                    "status": resp.status_code,
+                    "is_json": ok_json,
+                    "row_count": rows,
+                    "body_sample": snippet,
+                })
+            except Exception as e:
+                findings.append({"url": url, "error": str(e)})
+    return {"ok": True, "data": findings}
+
+
+async def caffesta_get_sub_products(restaurant_id: str) -> dict:
+    """Универсальный загрузчик полуфабрикатов: пытается несколько URL
+    и возвращает первый успешный список нормализованных полуфабрикатов
+    {product_id, title, self_cost, type='sub_product'}."""
+    config = await get_caffesta_config(restaurant_id)
+    if not config or not config.get("enabled"):
+        return {"ok": False, "message": "Caffesta не настроена"}
+    account_name = config["account_name"]
+    api_key = config["api_key"]
+    pos_id = config.get("pos_id", 1)
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        for tpl in SUBPRODUCT_URL_CANDIDATES:
+            path = tpl.format(pos_id=pos_id)
+            url = f"{_base_url(account_name)}/{path}"
+            try:
+                resp = await client.get(url, headers=_headers(api_key))
+                if resp.status_code >= 400:
+                    continue
+                data = _safe_json(resp)
+            except Exception:
+                continue
+
+            rows = None
+            if isinstance(data, list):
+                rows = data
+            elif isinstance(data, dict):
+                if data.get("success") or data.get("code") == "ok":
+                    d = data.get("data")
+                    if isinstance(d, list):
+                        rows = d
+            if not rows:
+                continue
+
+            # Нормализуем
+            out = []
+            for r in rows:
+                try:
+                    pid = int(r.get("product_id") or r.get("id") or 0)
+                except (ValueError, TypeError):
+                    continue
+                if not pid:
+                    continue
+                title = r.get("title") or r.get("name") or r.get("product_name") or ""
+                try:
+                    sc = float(r.get("self_cost") or r.get("avgInvoicedSelfCost") or r.get("cost") or 0)
+                except (ValueError, TypeError):
+                    sc = 0
+                out.append({
+                    "product_id": pid,
+                    "title": title,
+                    "self_cost": sc,
+                    "type": "sub_product",
+                    "raw_keys": list(r.keys())[:10],
+                })
+            if out:
+                logger.info(f"Caffesta sub-products via {url}: {len(out)} rows")
+                return {"ok": True, "data": out, "endpoint": url}
+
+    logger.warning("Caffesta sub-products: ни один кандидатский URL не вернул данные")
+    return {"ok": True, "data": [], "endpoint": None}
+
+
 # ============ Shop data (stop-list, avgInvoicedSelfCost) ============
 
 async def caffesta_get_product_shop_data(restaurant_id: str) -> dict:

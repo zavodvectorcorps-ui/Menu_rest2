@@ -1,7 +1,14 @@
 # PRD: Личный кабинет ресторана
 
 ## Дата создания: 2026-01-26
-## Последнее обновление: 2026-05-04
+## Последнее обновление: 2026-02-05
+
+### Изменения 2026-02-05
+- **Полуфабрикаты Caffesta в калькуляторе себестоимости (P0, IN PROGRESS — ждёт диагностику с VPS)**:
+  - **Backend**: добавлены функции `caffesta_get_sub_products()` и `caffesta_probe_subproducts()` в `services/caffesta.py`. Перебирают 12 кандидатских URL Caffesta (`get_sub_products`, `get_subproducts`, `sub_products`, `semi_products`, `get_blanks`, `get_compositions`, `get_products?type=sub_product`, варианты с pos_id/0/1 и /0/2 и т.д.) и используют первый, который вернёт корректный список.
+  - **Endpoint** `GET /api/restaurants/{rid}/cost-catalog` теперь подмешивает полуфабрикаты в каталог: они всегда видны (флаг `is_sub_product=true`), `self_cost` берётся из ответа sub-products. Если полуфабрикат уже есть в основном `get_products`, тип переопределяется на `sub_product`.
+  - **Diagnostic endpoint** `GET /api/restaurants/{rid}/caffesta/probe-subproducts` — суперадмин дёргает на VPS, получает status/sample/row_count для каждого кандидатского URL → можно точно определить рабочий эндпоинт Caffesta для этого аккаунта.
+  - **Дальше**: пользователь запускает probe на проде → присылает результат → фиксируем нужный URL первым в `SUBPRODUCT_URL_CANDIDATES` или удаляем нерабочие.
 
 ### Изменения 2026-05-04
 - **Share-card для соцсетей (P1, DONE)**:

@@ -22,6 +22,7 @@ from helpers import get_or_create_settings
 from services.caffesta import (
     get_caffesta_config, caffesta_get_balances,
     caffesta_get_products, caffesta_get_product_shop_data,
+    caffesta_get_sub_products, caffesta_probe_subproducts,
 )
 
 router = APIRouter()
@@ -249,10 +250,12 @@ async def get_cost_catalog(
     current_user: dict = Depends(get_current_user),
 ):
     """Fetch the ingredient catalog from Caffesta, merging products list,
-    balances (self_cost) and per-shop avgInvoicedSelfCost. The UI uses this
-    to populate the ingredient autocomplete in recipes.
+    balances (self_cost), per-shop avgInvoicedSelfCost and sub-products
+    (полуфабрикаты). The UI uses this to populate the ingredient autocomplete
+    in recipes.
 
-    Query: `include_tech_cards=true` returns готовые блюда/полуфабрикаты too."""
+    Полуфабрикаты выводятся всегда (повара используют их в рецептах).
+    Готовые тех.карты — только если `include_tech_cards=true`."""
     await ensure_module_access(restaurant_id, "cost_control", current_user)
 
     products = await caffesta_get_products(restaurant_id)
@@ -260,35 +263,86 @@ async def get_cost_catalog(
         raise HTTPException(502, f"Ошибка Caffesta: {products.get('message')}")
     balances = await caffesta_get_balances(restaurant_id)
     shop_data = await caffesta_get_product_shop_data(restaurant_id)
+    sub_products = await caffesta_get_sub_products(restaurant_id)
 
     # Index by product_id for fast lookup
     bal_by_id = {b["product_id"]: b for b in (balances.get("data") or [])}
     shop_by_id = {s["product_id"]: s for s in (shop_data.get("data") or [])}
+    sub_by_id = {s["product_id"]: s for s in (sub_products.get("data") or [])}
 
     out = []
+    seen_pids = set()
     for p in products.get("data", []):
         pid = p.get("product_id")
         if not pid:
             continue
         ptype = (p.get("type") or "").lower()
-        is_tech = "tech" in ptype or "card" in ptype
+        # Эвристика: если product_id есть в списке полуфабрикатов — это полуфабрикат.
+        is_sub = pid in sub_by_id or "sub" in ptype or "semi" in ptype or "blank" in ptype
+        is_tech = (not is_sub) and ("tech" in ptype or "card" in ptype or "composit" in ptype)
         if is_tech and not include_tech_cards:
             continue
         bal = bal_by_id.get(pid, {})
         shop = shop_by_id.get(pid, {})
+        sub = sub_by_id.get(pid, {})
+        # self_cost для полуфабрикатов берём из sub_products в первую очередь
+        sc = bal.get("self_cost", 0) or 0
+        if is_sub and (sub.get("self_cost") or 0) > 0:
+            sc = sub.get("self_cost") or 0
         out.append({
             "caffesta_product_id": pid,
-            "name": p.get("title") or "",
-            "type": ptype or "product",
+            "name": p.get("title") or sub.get("title") or "",
+            "type": "sub_product" if is_sub else (ptype or "product"),
             "is_tech_card": is_tech,
+            "is_sub_product": is_sub,
             "sale_price": p.get("price") or 0,
-            "self_cost": bal.get("self_cost", 0) or 0,
+            "self_cost": sc,
             "avgInvoicedSelfCost": shop.get("avgInvoicedSelfCost", 0) or 0,
             "balance": bal.get("balance", 0) or 0,
             "in_stop_list": shop.get("inStopList", False),
         })
+        seen_pids.add(pid)
+
+    # Полуфабрикаты, которых не было в основном списке products — добавляем отдельно
+    for pid, sub in sub_by_id.items():
+        if pid in seen_pids:
+            continue
+        bal = bal_by_id.get(pid, {})
+        shop = shop_by_id.get(pid, {})
+        sc = sub.get("self_cost") or bal.get("self_cost") or 0
+        out.append({
+            "caffesta_product_id": pid,
+            "name": sub.get("title") or "",
+            "type": "sub_product",
+            "is_tech_card": False,
+            "is_sub_product": True,
+            "sale_price": 0,
+            "self_cost": sc,
+            "avgInvoicedSelfCost": shop.get("avgInvoicedSelfCost", 0) or 0,
+            "balance": bal.get("balance", 0) or 0,
+            "in_stop_list": False,
+        })
+
     out.sort(key=lambda x: x["name"].lower())
-    return {"ok": True, "data": out, "total": len(out)}
+    return {
+        "ok": True,
+        "data": out,
+        "total": len(out),
+        "sub_products_count": sum(1 for x in out if x.get("is_sub_product")),
+        "sub_products_endpoint": sub_products.get("endpoint"),
+    }
+
+
+@router.get("/restaurants/{restaurant_id}/caffesta/probe-subproducts")
+async def probe_subproducts(
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Диагностика: перебирает кандидатские URL Caffesta для полуфабрикатов
+    и возвращает status/sample от каждого. Помогает понять, какой
+    эндпоинт у Caffesta содержит полуфабрикаты для конкретного аккаунта."""
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+    return await caffesta_probe_subproducts(restaurant_id)
 
 
 @router.get("/restaurants/{restaurant_id}/menu-items/{item_id}/recipe")
