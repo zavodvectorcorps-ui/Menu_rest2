@@ -3,7 +3,8 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import {
   ChefHat, Plus, Trash2, RefreshCw, Search, AlertTriangle,
-  Loader2, Save, X, Upload, History, FileSpreadsheet,
+  Loader2, Save, X, Upload, History, FileSpreadsheet, Sparkles,
+  Pencil, Beaker,
 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -52,6 +53,25 @@ export default function RecipeCalculatorPage() {
   const [probeOpen, setProbeOpen] = useState(false);
   const [probeLoading, setProbeLoading] = useState(false);
   const [probeData, setProbeData] = useState(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [localSubproducts, setLocalSubproducts] = useState([]);
+  const [activeTab, setActiveTab] = useState('menu');
+
+  const loadLocalSubproducts = useCallback(async () => {
+    if (!currentRestaurantId) return;
+    try {
+      const r = await axios.get(
+        `${API}/restaurants/${currentRestaurantId}/local-subproducts`,
+        authHeaders,
+      );
+      setLocalSubproducts(r.data?.data || []);
+    } catch {
+      // тихо: повар может работать без локальных п/ф
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRestaurantId]);
+
+  useEffect(() => { loadLocalSubproducts(); }, [loadLocalSubproducts]);
 
   const runProbe = async () => {
     if (!currentRestaurantId) return;
@@ -206,13 +226,29 @@ export default function RecipeCalculatorPage() {
           >
             <Search className="w-4 h-4 mr-2" />Диагностика п/ф
           </Button>
+          <Button
+            onClick={() => setAiOpen(true)}
+            data-testid="ai-parse-btn"
+            className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white"
+            title="Вставить текст рецепта от повара — AI разберёт и подберёт ингредиенты"
+          >
+            <Sparkles className="w-4 h-4 mr-2" />Распознать из текста
+          </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="menu">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="menu" data-testid="tab-menu">Текущее меню</TabsTrigger>
           <TabsTrigger value="sandbox" data-testid="tab-sandbox">Песочница (новое блюдо)</TabsTrigger>
+          <TabsTrigger value="local-sp" data-testid="tab-local-sp">
+            Мои п/ф
+            {localSubproducts.length > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 text-[10px] px-1.5 rounded-full bg-amber-200 text-amber-900">
+                {localSubproducts.length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="menu" className="space-y-6 pt-4">
@@ -372,6 +408,20 @@ export default function RecipeCalculatorPage() {
             onSavedAsItem={loadItems}
           />
         </TabsContent>
+
+        <TabsContent value="local-sp" className="pt-4">
+          <LocalSubproductsTab
+            restaurantId={currentRestaurantId}
+            catalog={catalog}
+            costSource={costSource}
+            currency={currency}
+            list={localSubproducts}
+            onChange={async () => {
+              await loadLocalSubproducts();
+              await loadCatalog();
+            }}
+          />
+        </TabsContent>
       </Tabs>
 
       <Dialog open={probeOpen} onOpenChange={setProbeOpen}>
@@ -438,6 +488,23 @@ export default function RecipeCalculatorPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AIParseDialog
+        open={aiOpen}
+        onOpenChange={setAiOpen}
+        restaurantId={currentRestaurantId}
+        catalog={catalog}
+        costSource={costSource}
+        currency={currency}
+        onCreatedSubproduct={async () => {
+          await loadLocalSubproducts();
+          await loadCatalog();
+        }}
+        onSendToSandbox={() => {
+          setAiOpen(false);
+          setActiveTab('sandbox');
+        }}
+      />
     </div>
   );
 }
@@ -861,6 +928,11 @@ function CostSandbox({ catalog, costSource, currency, restaurantId, categories, 
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate flex items-center gap-1.5">
                         <span className="truncate">{p.name}</span>
+                        {p.is_local_subproduct && (
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                            лок. п/ф
+                          </span>
+                        )}
                         {p.is_sub_product && (
                           <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                             п/ф
@@ -868,7 +940,7 @@ function CostSandbox({ catalog, costSource, currency, restaurantId, categories, 
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {p.is_sub_product ? 'Полуфабрикат' : p.is_tech_card ? 'Тех. карта' : 'Сырьё'}
+                        {p.is_local_subproduct ? 'Локальный п/ф' : p.is_sub_product ? 'Полуфабрикат' : p.is_tech_card ? 'Тех. карта' : 'Сырьё'}
                       </div>
                     </div>
                     <div className="text-sm tabular-nums whitespace-nowrap">
@@ -1140,6 +1212,11 @@ function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId,
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate flex items-center gap-1.5">
                           <span className="truncate">{p.name}</span>
+                          {p.is_local_subproduct && (
+                            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                              лок. п/ф
+                            </span>
+                          )}
                           {p.is_sub_product && (
                             <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                               п/ф
@@ -1147,7 +1224,7 @@ function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId,
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {p.is_sub_product ? 'Полуфабрикат' : p.is_tech_card ? 'Тех. карта' : 'Сырьё'} · ID {p.caffesta_product_id}
+                          {p.is_local_subproduct ? 'Локальный п/ф' : p.is_sub_product ? 'Полуфабрикат' : p.is_tech_card ? 'Тех. карта' : 'Сырьё'} · ID {p.caffesta_product_id}
                         </div>
                       </div>
                       <div className="text-sm tabular-nums whitespace-nowrap">
@@ -1159,6 +1236,446 @@ function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId,
               </div>
             </DialogContent>
           </Dialog>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+
+// ============ LOCAL SUB-PRODUCTS TAB ============
+
+function LocalSubproductsTab({ restaurantId, catalog, costSource, currency, list, onChange }) {
+  const authHeaders = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
+  const [editing, setEditing] = useState(null); // {id?, name, yield_g, ingredients}
+
+  const startNew = () => setEditing({ name: '', yield_g: 1000, ingredients: [], notes: '' });
+  const startEdit = (sp) => setEditing({ ...sp });
+
+  const remove = async (sp) => {
+    if (!window.confirm(`Удалить «${sp.name}»? Это действие необратимо.`)) return;
+    try {
+      const r = await axios.delete(
+        `${API}/restaurants/${restaurantId}/local-subproducts/${sp.id}`,
+        authHeaders,
+      );
+      const inUse = r.data?.in_use_recipes || 0;
+      toast.success(inUse > 0 ? `Удалено. ВНИМАНИЕ: использовался в ${inUse} рецептах меню` : 'Удалено');
+      await onChange?.();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Не удалось удалить');
+    }
+  };
+
+  return (
+    <div className="space-y-4" data-testid="local-subproducts-tab">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Beaker className="w-5 h-5 text-amber-500" /> Локальные полуфабрикаты
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            П/ф, которых нет в Caffesta. Себестоимость считается из ингредиентов и выхода.
+            Доступны как ингредиенты в рецептах блюд (бейдж «лок. п/ф»).
+          </p>
+        </div>
+        <Button onClick={startNew} data-testid="add-local-sp-btn">
+          <Plus className="w-4 h-4 mr-2" /> Создать п/ф
+        </Button>
+      </div>
+
+      {list.length === 0 ? (
+        <div className="rounded-lg border-2 border-dashed p-12 text-center text-muted-foreground">
+          <Beaker className="w-10 h-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm">Нет локальных п/ф. Создайте первый, чтобы использовать в блюдах.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+          {list.map((sp) => (
+            <div key={sp.id} className="rounded-lg border p-4 bg-card" data-testid={`local-sp-card-${sp.id}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold truncate">{sp.name}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Выход: {sp.yield_g} г · Ингредиентов: {sp.ingredients?.length || 0}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button size="sm" variant="ghost" onClick={() => startEdit(sp)} data-testid={`edit-local-sp-${sp.id}`}>
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => remove(sp)} data-testid={`delete-local-sp-${sp.id}`}>
+                    <Trash2 className="w-4 h-4 text-rose-600" />
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t text-sm">
+                <div>
+                  <div className="text-xs text-muted-foreground">Себестоимость</div>
+                  <div className="font-semibold tabular-nums">{Number(sp.total_cost || 0).toFixed(2)} {currency}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">За 1 кг</div>
+                  <div className="font-semibold tabular-nums">{Number(sp.cost_per_kg || 0).toFixed(2)} {currency}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <LocalSubproductForm
+          restaurantId={restaurantId}
+          catalog={catalog}
+          costSource={costSource}
+          currency={currency}
+          initial={editing}
+          onClose={() => setEditing(null)}
+          onSaved={async () => { setEditing(null); await onChange?.(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+
+function LocalSubproductForm({ restaurantId, catalog, costSource, currency, initial, onClose, onSaved }) {
+  const authHeaders = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
+  const [name, setName] = useState(initial.name || '');
+  const [yieldG, setYieldG] = useState(initial.yield_g || 1000);
+  const [ingredients, setIngredients] = useState(initial.ingredients || []);
+  const [notes, setNotes] = useState(initial.notes || '');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const totalCost = ingredients.reduce(
+    (s, ing) => s + (Number(ing.qty) || 0) * (Number(ing.unit_factor) || 1) * (Number(ing.unit_cost) || 0),
+    0,
+  );
+  const costPerKg = yieldG > 0 ? (totalCost / yieldG) * 1000 : 0;
+
+  const addFromCatalog = (p) => {
+    const sourceCost = costSource === 'self_cost' ? p.self_cost : (p.avgInvoicedSelfCost || p.self_cost || 0);
+    setIngredients((prev) => [...prev, {
+      caffesta_product_id: p.caffesta_product_id || null,
+      local_subproduct_id: p.local_subproduct_id || null,
+      name: p.name,
+      qty: 0,
+      unit: 'г',
+      unit_factor: 0.001,
+      unit_cost: Number(sourceCost) || 0,
+    }]);
+    setPickerOpen(false);
+  };
+
+  const updateIng = (idx, patch) => setIngredients((prev) => prev.map((ing, i) => i === idx ? { ...ing, ...patch } : ing));
+  const removeIng = (idx) => setIngredients((prev) => prev.filter((_, i) => i !== idx));
+
+  const save = async () => {
+    if (!name.trim()) { toast.error('Имя обязательно'); return; }
+    if (yieldG <= 0) { toast.error('Выход должен быть > 0'); return; }
+    setSaving(true);
+    try {
+      const payload = { name: name.trim(), yield_g: Number(yieldG), ingredients, notes };
+      if (initial.id) {
+        await axios.put(`${API}/restaurants/${restaurantId}/local-subproducts/${initial.id}`, payload, authHeaders);
+        toast.success('Полуфабрикат обновлён');
+      } else {
+        await axios.post(`${API}/restaurants/${restaurantId}/local-subproducts`, payload, authHeaders);
+        toast.success('Полуфабрикат создан');
+      }
+      await onSaved?.();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filtered = pickerSearch
+    ? catalog.filter((p) => p.name?.toLowerCase().includes(pickerSearch.toLowerCase()))
+    : catalog.slice(0, 200);
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{initial.id ? 'Редактировать п/ф' : 'Новый локальный п/ф'}</DialogTitle>
+          <DialogDescription>
+            Себестоимость = (сумма ингредиентов) ÷ выход × 1000 = {currency}/кг.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Название</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Соус кукуруза п/ф" data-testid="local-sp-name" />
+            </div>
+            <div>
+              <Label>Выход, г</Label>
+              <Input type="number" min={1} value={yieldG} onChange={(e) => setYieldG(Number(e.target.value))} data-testid="local-sp-yield" />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label>Ингредиенты ({ingredients.length})</Label>
+            <Button size="sm" variant="outline" onClick={() => setPickerOpen(true)} data-testid="local-sp-add-ing">
+              <Plus className="w-4 h-4 mr-2" /> Добавить из каталога
+            </Button>
+          </div>
+
+          {ingredients.length === 0 ? (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Добавьте ингредиенты из каталога Caffesta
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {ingredients.map((ing, idx) => {
+                const lineCost = (Number(ing.qty) || 0) * (Number(ing.unit_factor) || 1) * (Number(ing.unit_cost) || 0);
+                return (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-center border rounded-md p-2 bg-muted/10" data-testid={`local-sp-ing-${idx}`}>
+                    <div className="col-span-4 text-sm truncate">
+                      {ing.name}
+                      <div className="text-xs text-muted-foreground">{Number(ing.unit_cost).toFixed(2)} {currency}</div>
+                    </div>
+                    <Input className="col-span-2 h-8" type="number" min={0} step="0.01" value={ing.qty}
+                      onChange={(e) => updateIng(idx, { qty: Number(e.target.value) })} placeholder="кол-во" />
+                    <select className="col-span-2 h-8 rounded-md border border-input bg-background px-2 text-sm"
+                      value={ing.unit_factor}
+                      onChange={(e) => updateIng(idx, { unit_factor: Number(e.target.value), unit: e.target.options[e.target.selectedIndex].dataset.unit })}>
+                      <option value="0.001" data-unit="г">г</option>
+                      <option value="1" data-unit="кг">кг</option>
+                      <option value="0.001" data-unit="мл">мл</option>
+                      <option value="1" data-unit="шт">шт</option>
+                    </select>
+                    <div className="col-span-3 text-sm tabular-nums text-right">{lineCost.toFixed(2)} {currency}</div>
+                    <Button size="sm" variant="ghost" className="col-span-1" onClick={() => removeIng(idx)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 mt-2 pt-3 border-t">
+            <div className="rounded-md bg-amber-50 dark:bg-amber-900/10 p-3">
+              <div className="text-xs text-muted-foreground">Итого себестоимость</div>
+              <div className="text-xl font-semibold tabular-nums">{totalCost.toFixed(2)} {currency}</div>
+            </div>
+            <div className="rounded-md bg-emerald-50 dark:bg-emerald-900/10 p-3">
+              <div className="text-xs text-muted-foreground">За 1 кг</div>
+              <div className="text-xl font-semibold tabular-nums">{costPerKg.toFixed(2)} {currency}</div>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs">Заметка (необязательно)</Label>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Например: рецепт от шефа от 06.05" />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Отмена</Button>
+          <Button onClick={save} disabled={saving} data-testid="local-sp-save">
+            {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Сохраняем…</> : <><Save className="w-4 h-4 mr-2" />Сохранить</>}
+          </Button>
+        </DialogFooter>
+
+        {pickerOpen && (
+          <Dialog open onOpenChange={(o) => { if (!o) setPickerOpen(false); }}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Выберите ингредиент из каталога</DialogTitle>
+              </DialogHeader>
+              <Input autoFocus value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Поиск…" />
+              <div className="max-h-[60vh] overflow-y-auto divide-y border rounded-md">
+                {filtered.map((p) => {
+                  const sc = costSource === 'self_cost' ? p.self_cost : (p.avgInvoicedSelfCost || p.self_cost || 0);
+                  return (
+                    <button key={`${p.caffesta_product_id || p.local_subproduct_id}`} type="button"
+                      onClick={() => addFromCatalog(p)}
+                      className="w-full text-left px-3 py-2 hover:bg-muted/40 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate flex items-center gap-1.5">
+                          <span className="truncate">{p.name}</span>
+                          {p.is_local_subproduct && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 font-semibold uppercase">лок. п/ф</span>}
+                          {p.is_sub_product && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 font-semibold uppercase">п/ф</span>}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {p.is_local_subproduct ? 'Локальный п/ф' : p.is_sub_product ? 'Полуфабрикат' : p.is_tech_card ? 'Тех. карта' : 'Сырьё'}
+                        </div>
+                      </div>
+                      <div className="text-sm tabular-nums">{Number(sc || 0).toFixed(2)} {currency}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+// ============ AI PARSE DIALOG ============
+
+function AIParseDialog({ open, onOpenChange, restaurantId, catalog, costSource, currency, onCreatedSubproduct, onSendToSandbox }) {
+  const authHeaders = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
+  const [text, setText] = useState('');
+  const [parsing, setParsing] = useState(false);
+  const [result, setResult] = useState(null);
+  const [savingIdx, setSavingIdx] = useState(null);
+
+  const reset = () => { setText(''); setResult(null); };
+
+  const parse = async () => {
+    if (!text.trim()) return;
+    setParsing(true);
+    setResult(null);
+    try {
+      const r = await axios.post(`${API}/restaurants/${restaurantId}/recipes/ai-parse`, { text }, authHeaders);
+      setResult(r.data);
+      const stats = r.data?.stats || {};
+      toast.success(`Распознано: ${stats.matched || 0} совпадений, ${stats.unmatched || 0} вручную`);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Не удалось распознать');
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const saveSubproduct = async (block, idx) => {
+    setSavingIdx(idx);
+    try {
+      const ingredients = block.ingredients.filter((i) => i.matched).map((i) => ({
+        caffesta_product_id: i.matched.caffesta_product_id || null,
+        local_subproduct_id: i.matched.local_subproduct_id || null,
+        name: i.matched.name,
+        qty: i.qty,
+        unit: i.unit || 'г',
+        unit_factor: i.unit_factor,
+        unit_cost: i.matched.self_cost,
+      }));
+      await axios.post(`${API}/restaurants/${restaurantId}/local-subproducts`, {
+        name: block.title.replace(/\s*п\/ф\s*$/i, '').trim(),
+        yield_g: block.yield_g || 0,
+        ingredients,
+        notes: 'Создано из AI-парсера',
+      }, authHeaders);
+      toast.success(`«${block.title}» сохранён как локальный п/ф`);
+      await onCreatedSubproduct?.();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Ошибка сохранения');
+    } finally {
+      setSavingIdx(null);
+    }
+  };
+
+  const sample = `Соус кукуруза п/ф
+Кукуруза зерно 1300
+Молоко 300
+Соль 10
+Выход 1000
+
+Паста с креветками
+Креветки п/ф 100
+Соль 5
+Соус кукуруза п/ф 150
+Выход 310`;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-fuchsia-600" /> Распознать рецепт из текста
+          </DialogTitle>
+          <DialogDescription>
+            Вставьте сообщение от повара. Можно сразу несколько п/ф + блюдо (разделяйте пустой строкой).
+            Парсер автоматически сопоставит ингредиенты с каталогом Caffesta и вашими локальными п/ф.
+          </DialogDescription>
+        </DialogHeader>
+
+        {!result && (
+          <div className="space-y-3">
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={14}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y"
+              placeholder={sample}
+              data-testid="ai-parse-textarea"
+            />
+            <div className="flex items-center justify-between gap-2">
+              <button type="button" className="text-xs text-muted-foreground hover:underline" onClick={() => setText(sample)}>
+                Вставить пример
+              </button>
+              <Button onClick={parse} disabled={parsing || !text.trim()} data-testid="ai-parse-submit"
+                className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white">
+                {parsing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Распознаём…</> : <><Sparkles className="w-4 h-4 mr-2" />Распознать</>}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {result && (
+          <div className="space-y-4">
+            <div className="text-sm">
+              Найдено блоков: <b>{result.stats.blocks}</b> · Совпадений: <b className="text-emerald-600">{result.stats.matched}</b>
+              {result.stats.unmatched > 0 && <> · Не найдено: <b className="text-amber-600">{result.stats.unmatched}</b></>}
+            </div>
+            {result.blocks.map((block, i) => (
+              <div key={i} className="rounded-lg border p-4" data-testid={`ai-block-${i}`}>
+                <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                  <div>
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                      {block.kind === 'subproduct' ? 'Полуфабрикат' : 'Блюдо'}
+                    </div>
+                    <div className="font-semibold text-lg">{block.title}</div>
+                    {block.yield_g && <div className="text-xs text-muted-foreground">Выход: {block.yield_g} г</div>}
+                  </div>
+                  {block.kind === 'subproduct' && (
+                    <Button size="sm" disabled={savingIdx === i || !block.yield_g} onClick={() => saveSubproduct(block, i)} data-testid={`ai-save-sp-${i}`}>
+                      {savingIdx === i ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Сохраняем…</> : <><Save className="w-4 h-4 mr-2" />Сохранить как лок. п/ф</>}
+                    </Button>
+                  )}
+                  {block.kind === 'dish' && (
+                    <Button size="sm" variant="outline" onClick={() => onSendToSandbox?.()} data-testid={`ai-open-sandbox-${i}`}>
+                      Открыть в Песочнице
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {block.ingredients.map((ing, j) => (
+                    <div key={j} className="flex items-center justify-between gap-2 text-sm py-1 border-b last:border-0">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate">{ing.name} <span className="text-muted-foreground">({ing.qty} {ing.unit || 'г'})</span></div>
+                        {ing.matched ? (
+                          <div className="text-xs text-emerald-700 truncate">→ {ing.matched.name} ({ing.confidence}%)</div>
+                        ) : (
+                          <div className="text-xs text-amber-700">⚠ Не найдено в каталоге — добавь вручную</div>
+                        )}
+                      </div>
+                      <div className="text-xs tabular-nums whitespace-nowrap">
+                        {ing.matched ? `${(ing.qty * ing.unit_factor * (ing.matched.self_cost || 0)).toFixed(2)} ${currency}` : '—'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" onClick={() => setResult(null)}>Распознать ещё раз</Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Закрыть</Button>
+            </div>
+          </div>
         )}
       </DialogContent>
     </Dialog>

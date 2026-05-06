@@ -259,11 +259,17 @@ async def get_cost_catalog(
     await ensure_module_access(restaurant_id, "cost_control", current_user)
 
     products = await caffesta_get_products(restaurant_id)
-    if not products.get("ok"):
-        raise HTTPException(502, f"Ошибка Caffesta: {products.get('message')}")
-    balances = await caffesta_get_balances(restaurant_id)
-    shop_data = await caffesta_get_product_shop_data(restaurant_id)
-    sub_products = await caffesta_get_sub_products(restaurant_id)
+    caffesta_ok = products.get("ok")
+    if not caffesta_ok:
+        # Caffesta не настроена/недоступна — вернём только локальные п/ф,
+        # пользователь всё равно может ими пользоваться без POS.
+        balances = {"data": []}
+        shop_data = {"data": []}
+        sub_products = {"data": [], "endpoint": None}
+    else:
+        balances = await caffesta_get_balances(restaurant_id)
+        shop_data = await caffesta_get_product_shop_data(restaurant_id)
+        sub_products = await caffesta_get_sub_products(restaurant_id)
 
     # Index by product_id for fast lookup
     bal_by_id = {b["product_id"]: b for b in (balances.get("data") or [])}
@@ -337,11 +343,36 @@ async def get_cost_catalog(
         })
 
     out.sort(key=lambda x: x["name"].lower())
+
+    # Локальные п/ф (созданные пользователем вручную для блюд, которых нет в Caffesta).
+    locals_rows = await db.local_subproducts.find(
+        {"restaurant_id": restaurant_id}, {"_id": 0}
+    ).to_list(2000)
+    local_entries = []
+    for ls in locals_rows:
+        local_entries.append({
+            "caffesta_product_id": None,
+            "local_subproduct_id": ls["id"],
+            "name": ls["name"],
+            "type": "local_subproduct",
+            "is_tech_card": False,
+            "is_sub_product": False,
+            "is_local_subproduct": True,
+            "sale_price": 0,
+            "self_cost": float(ls.get("cost_per_kg") or 0),
+            "avgInvoicedSelfCost": 0,
+            "balance": 0,
+            "in_stop_list": False,
+        })
+    # Локальные п/ф — наверх, чтобы повар их сразу видел.
+    out = sorted(local_entries, key=lambda x: x["name"].lower()) + out
+
     return {
         "ok": True,
         "data": out,
         "total": len(out),
         "sub_products_count": sum(1 for x in out if x.get("is_sub_product")),
+        "local_subproducts_count": len(local_entries),
         "sub_products_endpoint": sub_products.get("endpoint"),
     }
 
@@ -356,6 +387,217 @@ async def probe_subproducts(
     эндпоинт у Caffesta содержит полуфабрикаты для конкретного аккаунта."""
     await ensure_module_access(restaurant_id, "cost_control", current_user)
     return await caffesta_probe_subproducts(restaurant_id)
+
+
+# ============ LOCAL SUB-PRODUCTS (полуфабрикаты, которых нет в Caffesta) ============
+
+import uuid as _uuid
+
+
+class _LocalSubproductIngredient(BaseModel):
+    caffesta_product_id: Optional[int] = None
+    local_subproduct_id: Optional[str] = None  # вложенность: п/ф в п/ф
+    name: str = ""
+    qty: float = 0
+    unit: Optional[str] = ""
+    unit_factor: float = 1.0
+    unit_cost: float = 0
+
+
+class _LocalSubproductPayload(BaseModel):
+    name: str
+    yield_g: float = 0
+    ingredients: list[_LocalSubproductIngredient] = []
+    notes: Optional[str] = ""
+
+
+def _compute_subproduct_cost(yield_g: float, ingredients: list[dict]) -> tuple[float, float]:
+    """Returns (total_cost, cost_per_kg). cost_per_kg = за 1 кг готового п/ф —
+    в той же единице, что Caffesta self_cost, поэтому при использовании в
+    рецепте блюда работает unit_factor=0.001 (граммы → кг).
+    """
+    total = 0.0
+    for ing in ingredients:
+        try:
+            qty = float(ing.get("qty") or 0)
+            fac = float(ing.get("unit_factor") or 1.0)
+            uc = float(ing.get("unit_cost") or 0)
+            line = qty * fac * uc
+        except (TypeError, ValueError):
+            line = 0.0
+        ing["line_cost"] = round(line, 4)
+        total += line
+    yield_g = float(yield_g or 0)
+    cost_per_kg = (total / yield_g) * 1000 if yield_g > 0 else 0
+    return round(total, 4), round(cost_per_kg, 4)
+
+
+@router.get("/restaurants/{restaurant_id}/local-subproducts")
+async def list_local_subproducts(
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+    rows = await db.local_subproducts.find(
+        {"restaurant_id": restaurant_id}, {"_id": 0}
+    ).sort("name", 1).to_list(2000)
+    return {"data": rows, "total": len(rows)}
+
+
+@router.post("/restaurants/{restaurant_id}/local-subproducts")
+async def create_local_subproduct(
+    restaurant_id: str,
+    payload: _LocalSubproductPayload,
+    current_user: dict = Depends(get_current_user),
+    _: dict = Depends(ensure_can_write_system),
+):
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+    if not payload.name.strip():
+        raise HTTPException(400, "Имя обязательно")
+    ingredients = [i.model_dump() for i in payload.ingredients]
+    total, cost_per_kg = _compute_subproduct_cost(payload.yield_g, ingredients)
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": str(_uuid.uuid4()),
+        "restaurant_id": restaurant_id,
+        "name": payload.name.strip(),
+        "yield_g": float(payload.yield_g or 0),
+        "ingredients": ingredients,
+        "notes": (payload.notes or "").strip(),
+        "total_cost": total,
+        "cost_per_kg": cost_per_kg,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.local_subproducts.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@router.put("/restaurants/{restaurant_id}/local-subproducts/{sp_id}")
+async def update_local_subproduct(
+    restaurant_id: str,
+    sp_id: str,
+    payload: _LocalSubproductPayload,
+    current_user: dict = Depends(get_current_user),
+    _: dict = Depends(ensure_can_write_system),
+):
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+    if not payload.name.strip():
+        raise HTTPException(400, "Имя обязательно")
+    ingredients = [i.model_dump() for i in payload.ingredients]
+    total, cost_per_kg = _compute_subproduct_cost(payload.yield_g, ingredients)
+    now = datetime.now(timezone.utc).isoformat()
+    res = await db.local_subproducts.update_one(
+        {"id": sp_id, "restaurant_id": restaurant_id},
+        {"$set": {
+            "name": payload.name.strip(),
+            "yield_g": float(payload.yield_g or 0),
+            "ingredients": ingredients,
+            "notes": (payload.notes or "").strip(),
+            "total_cost": total,
+            "cost_per_kg": cost_per_kg,
+            "updated_at": now,
+        }},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Полуфабрикат не найден")
+    doc = await db.local_subproducts.find_one(
+        {"id": sp_id, "restaurant_id": restaurant_id}, {"_id": 0},
+    )
+    return doc
+
+
+@router.delete("/restaurants/{restaurant_id}/local-subproducts/{sp_id}")
+async def delete_local_subproduct(
+    restaurant_id: str,
+    sp_id: str,
+    current_user: dict = Depends(get_current_user),
+    _: dict = Depends(ensure_can_write_system),
+):
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+    # Defensive: warn if any menu item still references this subproduct.
+    in_use = await db.menu_items.count_documents({
+        "restaurant_id": restaurant_id,
+        "recipe.local_subproduct_id": sp_id,
+    })
+    res = await db.local_subproducts.delete_one({"id": sp_id, "restaurant_id": restaurant_id})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Полуфабрикат не найден")
+    return {"ok": True, "deleted": 1, "in_use_recipes": in_use}
+
+
+# ============ AI Chef parser ============
+
+class _AIParsePayload(BaseModel):
+    text: str
+
+
+@router.post("/restaurants/{restaurant_id}/recipes/ai-parse")
+async def ai_parse_recipe(
+    restaurant_id: str,
+    payload: _AIParsePayload,
+    current_user: dict = Depends(get_current_user),
+):
+    """Parse chef-supplied recipe text. Splits into blocks (sub-products +
+    final dish), fuzzy-matches each ingredient against the Caffesta catalog
+    AND existing local sub-products, returns structured JSON ready for the UI."""
+    await ensure_module_access(restaurant_id, "cost_control", current_user)
+
+    if not (payload.text or "").strip():
+        raise HTTPException(400, "Пустой текст")
+
+    # Build the catalog the parser sees: Caffesta + existing local subproducts.
+    # Caffesta может быть не настроена — это ок, тогда работаем только с
+    # локальными п/ф; повар всё равно может вставить рецепт и матч сделать руками.
+    catalog: list[dict] = []
+    products = await caffesta_get_products(restaurant_id)
+    if products.get("ok"):
+        balances = await caffesta_get_balances(restaurant_id)
+        shop_data = await caffesta_get_product_shop_data(restaurant_id)
+        sub_products = await caffesta_get_sub_products(restaurant_id)
+        bal_by_id = {b["product_id"]: b for b in (balances.get("data") or [])}
+        shop_by_id = {s["product_id"]: s for s in (shop_data.get("data") or [])}
+        sub_by_id = {s["product_id"]: s for s in (sub_products.get("data") or [])}
+
+        for p in products.get("data", []):
+            pid = p.get("product_id")
+            if not pid:
+                continue
+            ptype = (p.get("type") or "").lower()
+            is_sub = pid in sub_by_id or "sub" in ptype or "semi" in ptype
+            is_tech = (not is_sub) and ("tech" in ptype or "card" in ptype)
+            bal = bal_by_id.get(pid, {})
+            shop = shop_by_id.get(pid, {})
+            sub = sub_by_id.get(pid, {})
+            sc = bal.get("self_cost", 0) or 0
+            if is_sub and (sub.get("self_cost") or 0) > 0:
+                sc = sub.get("self_cost") or 0
+            catalog.append({
+                "caffesta_product_id": pid,
+                "name": p.get("title") or sub.get("title") or "",
+                "self_cost": sc,
+                "avgInvoicedSelfCost": shop.get("avgInvoicedSelfCost", 0) or 0,
+                "is_sub_product": is_sub,
+                "is_tech_card": is_tech,
+            })
+    locals_rows = await db.local_subproducts.find(
+        {"restaurant_id": restaurant_id}, {"_id": 0}
+    ).to_list(2000)
+    for ls in locals_rows:
+        catalog.append({
+            "local_subproduct_id": ls["id"],
+            "caffesta_product_id": None,
+            "name": ls["name"],
+            "self_cost": float(ls.get("cost_per_kg") or 0),
+            "avgInvoicedSelfCost": 0,
+            "is_sub_product": False,
+            "is_tech_card": False,
+            "is_local_subproduct": True,
+        })
+
+    from services.recipe_parser import parse_recipe_text
+    return parse_recipe_text(payload.text, catalog)
 
 
 @router.get("/restaurants/{restaurant_id}/menu-items/{item_id}/recipe")

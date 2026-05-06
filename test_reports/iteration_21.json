@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 21 — both backend & frontend tested for AI Chef Assistant + Local Sub-products feature. 16/16 backend pytest cases pass (11 new + 5 regression). Frontend e2e flows verified: login as admin/220066 → /admin/recipes shows purple 'Распознать из текста' button (data-testid='ai-parse-btn') and 'Мои п/ф' tab (data-testid='tab-local-sp'); AI parse dialog correctly parses two-block sample and renders 'ПОЛУФАБРИКАТ Соус кукуруза п/ф' + 'БЛЮДО Паста с креветками' with action buttons (Сохранить как лок. п/ф, Открыть в Песочнице). Local SP creation form (name+yield+save) works end-to-end and the new SP appears in Sandbox ingredient picker with the blue 'лок. п/ф' badge. Caffesta unavailable in preview is handled gracefully (cost-catalog still serves local subproducts; ai-parse still works).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Ingredient picker (Sandbox + Recipe edit dialog)",
+        "issue": "React warning 'Encountered two children with the same key, null' — the picker uses key={p.caffesta_product_id} which is null for ALL local sub-products, so when there are 2+ local SPs in the catalog they collide. Line 1500 in the same file already does it correctly with `${p.caffesta_product_id || p.local_subproduct_id}`. Apply the same pattern to lines 923 and 1206.",
+        "selector": "/app/frontend/src/pages/RecipeCalculatorPage.jsx:923 and :1206",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_local_subproducts_and_ai_parse.py",
+    "/app/backend/tests/test_recipe_parser.py",
+    "/app/test_reports/pytest/iteration_21_results.xml"
+  ],
+  "action_items": [
+    "Fix React duplicate-key warning in RecipeCalculatorPage.jsx lines 923 and 1206 — change `key={p.caffesta_product_id}` to `key={p.caffesta_product_id || p.local_subproduct_id || p.name}` (line 1500 already uses the correct pattern, just propagate it).",
+    "(optional) Consider adding a delete confirmation toast/dialog for local sub-products — current delete button removes immediately. Not a bug, just UX."
+  ],
+  "critical_code_review_comments": [
+    "Backend cost_control.py: local subproducts CRUD is clean — uses uuid for ids, excludes _id in projections, recomputes total_cost+cost_per_kg server-side on POST/PUT (good defense in depth). Empty-name validation returns 400, missing id returns 404, delete returns {ok,deleted,in_use_recipes} as documented.",
+    "Backend cost-catalog graceful degradation when Caffesta is unavailable: returns {ok:true, data:[<local_subproducts only>]} instead of failing — this is the correct behavior the review_request asked for. Verified in test_cost_catalog_includes_local_subproducts.",
+    "ai-parse endpoint: accepts {text} POST, validates non-empty (400 on whitespace-only), returns {blocks, stats} as documented. Block kind heuristic (last block = dish, earlier = subproduct) works as specified. Inline-defined subproducts are matched in subsequent blocks via fuzzy name match — verified in two tests.",
+    "Frontend RecipeCalculatorPage.jsx is 1684 lines, exceeding the 700-line guideline. Already contains AIParseDialog, LocalSubproductsTab, LocalSubproductForm, IngredientPicker, multiple modals — would benefit from extraction into separate files. Not a blocker but tech debt.",
+    "Recipe parser regression file (test_recipe_parser.py) is correctly written and stable; covers two-block parsing, yo-normalization, unit factor defaulting to grams, empty input, and single-block-as-dish heuristic.",
+    "Minor: lines 923 and 1206 in RecipeCalculatorPage.jsx have the duplicate React-key bug described above. Line 1500 in the SAME file already implements the fix correctly, so it is clearly a copy-paste oversight from when local SPs were added to the picker."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_local_subproducts_and_ai_parse.py (new — 11 tests covering CRUD + ai-parse + cost-catalog integration)"
+  ],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% of critical flows (AI parse dialog renders blocks + buttons, Local SP create→catalog round-trip works, blue 'лок. п/ф' badge confirmed)"},
+  "test_credentials": "admin/220066 (superadmin) — used as specified. Default restaurant_id resolved from /api/auth/login response (restaurants[0].id).",
+  "seed_data_creation": "Test data prefixed with TEST_ was created and cleaned up after each test class via DELETE. One non-prefixed 'Соус кукуруза' (cost_per_kg=0.66) was already in DB from a previous fork — left untouched. UI-test artifact TEST_UI_Соус_iter21 was deleted via API after the test run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression is at /app/backend/tests/test_local_subproducts_and_ai_parse.py — 11 tests, includes Create→GET, Update→GET, Delete→GET-404 patterns, plus cost-catalog and ai-parse integration. Recipe parser unit suite at /app/backend/tests/test_recipe_parser.py (5 tests) is independent and very fast. Caffesta is not configured in preview env — this is expected; the new endpoints all degrade gracefully and tests rely on this. Restaurant id is resolved dynamically from login response; do not hardcode.",
+  "rca of the issue": "The React duplicate-key warning during ingredient picking is caused by `key={p.caffesta_product_id}` at RecipeCalculatorPage.jsx:923 and :1206. For local sub-products, caffesta_product_id is null. With ≥2 local SPs in catalog, multiple list children get key=null, triggering the warning and (per React docs) potentially causing item duplication/omission on re-render. Fix: use `key={p.caffesta_product_id || p.local_subproduct_id || p.name}` (mirroring the already-correct line 1500). Reproduction: login admin/220066 → /admin/recipes → 'Мои п/ф' → create 2 local SPs → switch to 'Песочница' → click 'Добавить ингредиент' → open browser console → see warning."
+}

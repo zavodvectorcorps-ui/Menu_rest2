@@ -3,6 +3,18 @@
 ## Дата создания: 2026-01-26
 ## Последнее обновление: 2026-02-05
 
+### Изменения 2026-02-05 (часть 2)
+- **Локальные п/ф + AI Chef Assistant (P1, DONE)**:
+  - **Backend `services/recipe_parser.py`**: чисто-питоновский парсер сообщений повара. Разделяет текст на блоки (по пустой строке), внутри блока: 1-я строка = title, последняя «Выход N» = yield в граммах, средние = `<name> <qty>[<unit>]`. Каждое имя матчится через RapidFuzz (WRatio ≥ 75) на каталог Caffesta + локальные п/ф. Inline-определённые п/ф (первые блоки) автоматически становятся доступными для матчинга в финальном блюде с приоритетом над каталогом.
+  - **Endpoint `POST /api/restaurants/{rid}/recipes/ai-parse`** возвращает `{blocks: [{kind: 'subproduct'|'dish', title, yield_g, ingredients[]}], stats: {matched, unmatched, blocks}}`. Устойчив к отсутствию Caffesta (работает только на локальных п/ф).
+  - **CRUD локальных п/ф**: коллекция `local_subproducts` (`{id, restaurant_id, name, yield_g, ingredients[], total_cost, cost_per_kg, notes}`), эндпоинты `GET/POST/PUT/DELETE /api/restaurants/{rid}/local-subproducts`. Себестоимость авто-считается: `total_cost / yield_g * 1000 = cost/кг`. При DELETE возвращает `in_use_recipes` если п/ф использовался в блюдах меню (warning).
+  - **Cost catalog** дополнен `is_local_subproduct=true` записями (наверху списка). Caffesta-эндпоинт стал устойчив к отсутствию Caffesta API (для preview-окружения).
+  - **Frontend**:
+    - В шапке Калькуляции — фиолетово-фуксиевая кнопка **«🪄 Распознать из текста»**. Открывает диалог: textarea + пример повара + кнопка «Распознать»; результат показывает блоки с подбором ингредиентов и кнопками «Сохранить как лок. п/ф» / «Открыть в Песочнице».
+    - Новая вкладка **«Мои п/ф»** (с бейджем-счётчиком) — карточки локальных п/ф, кнопки `Pencil` (редактировать) / `Trash2` (удалить с подтверждением). Форма создания/редактирования: имя, выход (г), ингредиенты из каталога, авто-расчёт total_cost / cost_per_kg.
+    - Бейдж **«лок. п/ф»** (синий) рядом с названием в picker'ах ингредиентов (recipe editor + sandbox + форма локального п/ф).
+  - **Тесты** `/app/backend/tests/test_recipe_parser.py` (5 кейсов): 2-блочный paste, единицы по умолчанию = граммы, ё-нормализация, пустой текст, single-block = dish. Все проходят.
+
 ### Изменения 2026-02-05
 - **Полуфабрикаты Caffesta в калькуляторе себестоимости (P0, DONE)**:
   - **Probe-диагностика выявила** (rest-menu.by на проде): рабочий URL — `/v1.0/draft/get_products/{pos_id}/0/0?type=sub_product` (HTTP 200, 1000 строк). `get_semi_products`, `get_blanks`, `get_compositions`, `semi_products`, `blanks` все возвращают 500.
