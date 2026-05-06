@@ -50,9 +50,11 @@ services:
       - backend
 
   # Nginx reverse proxy
+  # Container name is intentionally left to docker-compose auto-naming
+  # (menu_rest2-nginx-1) because wm-finance's deploy.sh targets exactly
+  # that name when sending SIGHUP from outside.
   nginx:
     image: nginx:alpine
-    container_name: rest_menu_nginx
     restart: always
     ports:
       - "80:80"
@@ -80,7 +82,7 @@ services:
     entrypoint: >-
       /bin/sh -c "trap exit TERM;
       while :; do
-        certbot renew --deploy-hook 'docker kill -s HUP rest_menu_nginx';
+        certbot renew --deploy-hook 'docker kill -s HUP menu_rest2-nginx-1';
         sleep 12h & wait $${!};
       done;"
 
