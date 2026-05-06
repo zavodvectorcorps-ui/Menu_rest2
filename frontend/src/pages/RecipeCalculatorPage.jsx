@@ -859,8 +859,17 @@ function CostSandbox({ catalog, costSource, currency, restaurantId, categories, 
                     className="w-full text-left px-3 py-2 hover:bg-muted/40 flex items-start justify-between gap-3"
                   >
                     <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">{p.is_tech_card ? 'Тех. карта' : 'Сырьё'}</div>
+                      <div className="text-sm font-medium truncate flex items-center gap-1.5">
+                        <span className="truncate">{p.name}</span>
+                        {p.is_sub_product && (
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                            п/ф
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {p.is_sub_product ? 'Полуфабрикат' : p.is_tech_card ? 'Тех. карта' : 'Сырьё'}
+                      </div>
                     </div>
                     <div className="text-sm tabular-nums whitespace-nowrap">
                       {Number(source || 0).toFixed(2)} {currency}
@@ -1129,9 +1138,16 @@ function RecipeEditorDialog({ item, catalog, costSource, currency, restaurantId,
                       data-testid={`pick-${p.caffesta_product_id}`}
                     >
                       <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">{p.name}</div>
+                        <div className="text-sm font-medium truncate flex items-center gap-1.5">
+                          <span className="truncate">{p.name}</span>
+                          {p.is_sub_product && (
+                            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                              п/ф
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground">
-                          {p.is_tech_card ? 'Тех. карта' : 'Сырьё'} · ID {p.caffesta_product_id}
+                          {p.is_sub_product ? 'Полуфабрикат' : p.is_tech_card ? 'Тех. карта' : 'Сырьё'} · ID {p.caffesta_product_id}
                         </div>
                       </div>
                       <div className="text-sm tabular-nums whitespace-nowrap">

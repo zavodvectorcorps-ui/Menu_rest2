@@ -583,22 +583,18 @@ async def caffesta_get_balances(restaurant_id: str) -> dict:
 
 # ============ Sub-products (полуфабрикаты) ============
 
-# Caffesta-вские эндпоинты для полуфабрикатов точно не задокументированы публично,
-# поэтому пробуем несколько вероятных URL по аналогии с уже работающими методами.
-# Тот, что вернёт корректный JSON со списком — будем использовать.
+# Caffesta API: полуфабрикаты возвращаются эндпоинтом /v1.0/draft/get_products
+# с query-параметром ?type=sub_product (подтверждено диагностикой 2026-02-05).
+# Прочие угадайки (`get_semi_products`, `get_blanks`, `get_compositions` и т.д.)
+# возвращали HTTP 500 — оставляем только проверенные URL для probe.
 SUBPRODUCT_URL_CANDIDATES = [
-    "v1.0/draft/get_sub_products/{pos_id}/0",
-    "v1.0/draft/get_subproducts/{pos_id}/0",
-    "v1.0/draft/sub_products/{pos_id}/0",
-    "v1.0/draft/subproducts/{pos_id}/0",
-    "v1.0/draft/get_semi_products/{pos_id}/0",
-    "v1.0/draft/semi_products/{pos_id}/0",
-    "v1.0/draft/get_blanks/{pos_id}/0",
-    "v1.0/draft/blanks/{pos_id}/0",
-    "v1.0/draft/get_compositions/{pos_id}/0",
     "v1.0/draft/get_products/{pos_id}/0/0?type=sub_product",
     "v1.0/draft/get_products/{pos_id}/0/1",
     "v1.0/draft/get_products/{pos_id}/0/2",
+    "v1.0/draft/get_sub_products/{pos_id}/0",
+    "v1.0/draft/get_semi_products/{pos_id}/0",
+    "v1.0/draft/get_blanks/{pos_id}/0",
+    "v1.0/draft/get_compositions/{pos_id}/0",
 ]
 
 
@@ -647,8 +643,8 @@ async def caffesta_probe_subproducts(restaurant_id: str) -> dict:
 
 
 async def caffesta_get_sub_products(restaurant_id: str) -> dict:
-    """Универсальный загрузчик полуфабрикатов: пытается несколько URL
-    и возвращает первый успешный список нормализованных полуфабрикатов
+    """Загружает полуфабрикаты Caffesta через get_products?type=sub_product
+    с пагинацией (по 1000 на страницу). Возвращает нормализованный список
     {product_id, title, self_cost, type='sub_product'}."""
     config = await get_caffesta_config(restaurant_id)
     if not config or not config.get("enabled"):
@@ -657,56 +653,67 @@ async def caffesta_get_sub_products(restaurant_id: str) -> dict:
     api_key = config["api_key"]
     pos_id = config.get("pos_id", 1)
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        for tpl in SUBPRODUCT_URL_CANDIDATES:
-            path = tpl.format(pos_id=pos_id)
-            url = f"{_base_url(account_name)}/{path}"
-            try:
+    all_raw = []
+    start_id = 0
+    endpoint_used = None
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            for _ in range(20):  # safety limit
+                url = f"{_base_url(account_name)}/v1.0/draft/get_products/{pos_id}/{start_id}/0?type=sub_product"
+                endpoint_used = url
                 resp = await client.get(url, headers=_headers(api_key))
                 if resp.status_code >= 400:
-                    continue
+                    break
                 data = _safe_json(resp)
-            except Exception:
-                continue
 
-            rows = None
-            if isinstance(data, list):
-                rows = data
-            elif isinstance(data, dict):
-                if data.get("success") or data.get("code") == "ok":
-                    d = data.get("data")
-                    if isinstance(d, list):
-                        rows = d
-            if not rows:
-                continue
+                rows = []
+                if isinstance(data, list):
+                    rows = data
+                elif isinstance(data, dict) and (data.get("success") or data.get("code") == "ok"):
+                    rows = data.get("data", []) or []
 
-            # Нормализуем
-            out = []
-            for r in rows:
+                if not rows:
+                    break
+                all_raw.extend(rows)
+
+                last_id = rows[-1].get("product_id") or rows[-1].get("id") or 0
+                if last_id and last_id != start_id and len(rows) >= 100:
+                    start_id = last_id
+                else:
+                    break
+    except Exception as e:
+        logger.error(f"Caffesta sub-products failed: {e}")
+        return {"ok": False, "message": str(e)}
+
+    # Нормализуем + парсим self_cost из вложенных структур (если есть)
+    out = []
+    for r in all_raw:
+        try:
+            pid = int(r.get("product_id") or r.get("id") or 0)
+        except (ValueError, TypeError):
+            continue
+        if not pid:
+            continue
+        title = r.get("title") or r.get("name") or r.get("product_name") or ""
+        sc = 0.0
+        for key in ("self_cost", "avgInvoicedSelfCost", "cost", "self_price", "cost_price"):
+            v = r.get(key)
+            if v is not None:
                 try:
-                    pid = int(r.get("product_id") or r.get("id") or 0)
+                    sc = float(v)
+                    if sc > 0:
+                        break
                 except (ValueError, TypeError):
                     continue
-                if not pid:
-                    continue
-                title = r.get("title") or r.get("name") or r.get("product_name") or ""
-                try:
-                    sc = float(r.get("self_cost") or r.get("avgInvoicedSelfCost") or r.get("cost") or 0)
-                except (ValueError, TypeError):
-                    sc = 0
-                out.append({
-                    "product_id": pid,
-                    "title": title,
-                    "self_cost": sc,
-                    "type": "sub_product",
-                    "raw_keys": list(r.keys())[:10],
-                })
-            if out:
-                logger.info(f"Caffesta sub-products via {url}: {len(out)} rows")
-                return {"ok": True, "data": out, "endpoint": url}
+        out.append({
+            "product_id": pid,
+            "title": title,
+            "self_cost": sc,
+            "type": "sub_product",
+        })
 
-    logger.warning("Caffesta sub-products: ни один кандидатский URL не вернул данные")
-    return {"ok": True, "data": [], "endpoint": None}
+    logger.info(f"Caffesta sub-products: loaded {len(out)} items via {endpoint_used}")
+    return {"ok": True, "data": out, "endpoint": endpoint_used}
 
 
 # ============ Shop data (stop-list, avgInvoicedSelfCost) ============

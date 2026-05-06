@@ -4,11 +4,13 @@
 ## Последнее обновление: 2026-02-05
 
 ### Изменения 2026-02-05
-- **Полуфабрикаты Caffesta в калькуляторе себестоимости (P0, IN PROGRESS — ждёт диагностику с VPS)**:
-  - **Backend**: добавлены функции `caffesta_get_sub_products()` и `caffesta_probe_subproducts()` в `services/caffesta.py`. Перебирают 12 кандидатских URL Caffesta (`get_sub_products`, `get_subproducts`, `sub_products`, `semi_products`, `get_blanks`, `get_compositions`, `get_products?type=sub_product`, варианты с pos_id/0/1 и /0/2 и т.д.) и используют первый, который вернёт корректный список.
-  - **Endpoint** `GET /api/restaurants/{rid}/cost-catalog` теперь подмешивает полуфабрикаты в каталог: они всегда видны (флаг `is_sub_product=true`), `self_cost` берётся из ответа sub-products. Если полуфабрикат уже есть в основном `get_products`, тип переопределяется на `sub_product`.
-  - **Diagnostic endpoint** `GET /api/restaurants/{rid}/caffesta/probe-subproducts` — суперадмин дёргает на VPS, получает status/sample/row_count для каждого кандидатского URL → можно точно определить рабочий эндпоинт Caffesta для этого аккаунта.
-  - **Дальше**: пользователь запускает probe на проде → присылает результат → фиксируем нужный URL первым в `SUBPRODUCT_URL_CANDIDATES` или удаляем нерабочие.
+- **Полуфабрикаты Caffesta в калькуляторе себестоимости (P0, DONE)**:
+  - **Probe-диагностика выявила** (rest-menu.by на проде): рабочий URL — `/v1.0/draft/get_products/{pos_id}/0/0?type=sub_product` (HTTP 200, 1000 строк). `get_semi_products`, `get_blanks`, `get_compositions`, `semi_products`, `blanks` все возвращают 500.
+  - **Backend**: `caffesta_get_sub_products()` теперь использует только проверенный URL с пагинацией (по 1000), парсит `self_cost`/`avgInvoicedSelfCost`/`cost`/`self_price`/`cost_price` (берёт первое непустое).
+  - **Защита от ложных срабатываний**: в `get_cost_catalog` есть guard — если множество ID полуфабрикатов покрывает >80% обычных продуктов (т.е. фильтр Caffesta игнорируется), sub-products отбрасываются с warning'ом в логах.
+  - **Endpoint** `GET /api/restaurants/{rid}/cost-catalog` отдаёт полуфабрикаты с флагами `is_sub_product=true`, `type='sub_product'`, всегда видны (без зависимости от toggle тех.карт).
+  - **UI**: в picker'е ингредиентов калькулятора рядом с названием появляется бейдж «п/ф» (амбер) для полуфабрикатов; подпись «Полуфабрикат» вместо «Сырьё». Применено в обоих picker-ах (recipe editor + sandbox).
+  - **Diagnostic UI**: кнопка «🔍 Диагностика п/ф» в шапке калькулятора → модалка с результатом probe (HTTP/JSON/rows), для каждой строки можно раскрыть body sample.
 
 ### Изменения 2026-05-04
 - **Share-card для соцсетей (P1, DONE)**:

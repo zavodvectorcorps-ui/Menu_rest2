@@ -270,6 +270,19 @@ async def get_cost_catalog(
     shop_by_id = {s["product_id"]: s for s in (shop_data.get("data") or [])}
     sub_by_id = {s["product_id"]: s for s in (sub_products.get("data") or [])}
 
+    # Защита: если ?type=sub_product Caffesta игнорирует, мы получим тот же список,
+    # что и обычные products. Если пересечение по ID > 80% — значит фильтр не работает.
+    products_ids = {p.get("product_id") for p in (products.get("data") or []) if p.get("product_id")}
+    sub_ids = set(sub_by_id.keys())
+    overlap_pct = (len(products_ids & sub_ids) / max(len(sub_ids), 1)) * 100 if sub_ids else 0
+    if sub_ids and overlap_pct > 80 and len(sub_ids) >= 0.8 * len(products_ids):
+        import logging
+        logging.getLogger(__name__).warning(
+            f"Caffesta sub-products mirrors all products ({overlap_pct:.0f}% overlap). "
+            "Filter ?type=sub_product likely ignored — отбрасываем sub-products fallback."
+        )
+        sub_by_id = {}
+
     out = []
     seen_pids = set()
     for p in products.get("data", []):
