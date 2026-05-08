@@ -42,6 +42,8 @@ async def _collect_for_day(restaurant_id: str, day_date: str):
 def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
     revenue = 0.0
     count = 0
+    cancelled_count = 0
+    cancelled_sum = 0.0
     discount = 0.0
     products = {}
     payments = {}
@@ -65,6 +67,9 @@ def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
         # вычитаются из выручки, но не дублируют счётчик.
         if income > 0:
             count += 1
+        else:
+            cancelled_count += 1
+            cancelled_sum += gross
         discount += abs(float(r.get("discount_sum", 0) or 0))
         # Отменные чеки (income=-1) не добавляют платежи/продукты к статистике —
         # они только нейтрализуют выручку оригинала.
@@ -104,6 +109,8 @@ def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
     return {
         "revenue": revenue,
         "count": count,
+        "cancelled_count": cancelled_count,
+        "cancelled_sum": cancelled_sum,
         "discount": discount,
         "avg_check": revenue / count if count else 0,
         "top": [{"name": n, "qty": v["qty"], "revenue": round(v["rev"], 2)} for n, v in top3],
@@ -185,6 +192,12 @@ async def build_digest_text(restaurant_id: str) -> str:
         lines.append(
             f"🌙 После полуночи (хвост смены): <b>{overflow_count}</b> чеков, "
             f"<b>{overflow_revenue:.2f} BYN</b>"
+        )
+
+    if y_full.get("cancelled_count"):
+        lines.append(
+            f"🚫 Отмены: <b>{y_full['cancelled_count']}</b> чеков, "
+            f"<b>−{y_full['cancelled_sum']:.2f} BYN</b> (вычтено из выручки)"
         )
 
     if y_full["payments"]:
