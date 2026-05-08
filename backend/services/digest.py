@@ -56,10 +56,16 @@ def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
         if not _in_window(dt, wfrom, wto):
             continue
         gross = float(r.get("total_sum", 0) or 0)
-        disc = float(r.get("discount_sum", 0) or 0)
-        bp = float(r.get("back_pay", 0) or 0)
-        # Caffesta админка показывает «после скидок»: total_sum − discount_sum − back_pay.
-        rev = gross - disc - bp
+        disc_raw = float(r.get("discount_sum", 0) or 0)
+        bp_raw = float(r.get("back_pay", 0) or 0)
+        # Caffesta API: total_sum — итог чека (нетто после скидок); скидки и
+        # возвраты отдаются отдельно (могут быть как положительные, так и
+        # отрицательные значения). До получения подтверждения через
+        # /digest/diagnose оставляем revenue = total_sum как было, но
+        # выводим в diagnose сводку под несколькими формулами.
+        rev = gross
+        disc = disc_raw
+        bp = bp_raw
         revenue += rev
         revenue_gross += gross
         discount_total += disc
@@ -166,10 +172,7 @@ async def build_digest_text(restaurant_id: str) -> str:
         dt = r.get("created_dt")
         if dt and dt.strftime("%Y-%m-%d") != y_date:
             overflow_count += 1
-            gross = float(r.get("total_sum", 0) or 0)
-            disc = float(r.get("discount_sum", 0) or 0)
-            bp = float(r.get("back_pay", 0) or 0)
-            overflow_revenue += gross - disc - bp
+            overflow_revenue += float(r.get("total_sum", 0) or 0)
 
     lines = [
         f"🗓️ <b>{rest_name}</b> — смена {y_date}",
@@ -196,17 +199,13 @@ async def build_digest_text(restaurant_id: str) -> str:
     if receipts_with_dt:
         first = min(receipts_with_dt, key=lambda r: r["created_dt"])
         last = max(receipts_with_dt, key=lambda r: r["created_dt"])
-        def _net(r):
-            return (float(r.get("total_sum", 0) or 0)
-                    - float(r.get("discount_sum", 0) or 0)
-                    - float(r.get("back_pay", 0) or 0))
         lines.append(
             f"🟢 Первый чек: <b>{first['created_dt'].strftime('%H:%M')}</b> "
-            f"({_net(first):.0f} BYN)"
+            f"({float(first.get('total_sum', 0) or 0):.0f} BYN)"
         )
         lines.append(
             f"🔴 Последний чек: <b>{last['created_dt'].strftime('%H:%M')}</b> "
-            f"({_net(last):.0f} BYN)"
+            f"({float(last.get('total_sum', 0) or 0):.0f} BYN)"
         )
 
     # Windows breakdown
