@@ -31,13 +31,9 @@ async def probe_transfers(
     current_user: dict = Depends(get_current_user),
 ):
     """Probe: пытаемся найти эндпоинт Caffesta API для «История счетов /
-    Перенос блюд» (тот, что в UI на /admin/orders_history/list). Если найдём —
-    можно вывести в сводку строку «🔄 Переносы блюд: N» для контроля
-    официантов (частые переносы — индикатор подозрительной активности)."""
-    from auth import has_role
-    if not has_role(current_user, "superadmin"):
-        raise HTTPException(403, "Только суперадмин")
-    from services.caffesta import get_caffesta_config, _base_url, _headers, _safe_json
+    Перенос блюд» (тот, что в UI на /admin/orders_history/list)."""
+    await check_restaurant_access(current_user, restaurant_id)
+    from services.caffesta import get_caffesta_config, _base_url, _headers
     import httpx
     config = await get_caffesta_config(restaurant_id)
     if not config or not config.get("enabled"):
@@ -52,6 +48,8 @@ async def probe_transfers(
         f"v1.0/draft/get_dish_transfers/{pos_id}/0",
         f"v1.0/draft/orders_history/{pos_id}/0",
         f"v1.0/draft/get_order_actions/{pos_id}/0",
+        f"v1.1/draft/get_orders_history/{pos_id}/0",
+        f"v1.1/draft/orders_history/{pos_id}/0",
     ]
     findings = []
     async with httpx.AsyncClient(timeout=20) as client:
