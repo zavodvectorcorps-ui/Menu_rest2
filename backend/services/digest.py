@@ -41,6 +41,9 @@ async def _collect_for_day(restaurant_id: str, day_date: str):
 
 def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
     revenue = 0.0
+    revenue_gross = 0.0
+    discount_total = 0.0
+    back_pay_total = 0.0
     count = 0
     discount = 0.0
     products = {}
@@ -52,10 +55,17 @@ def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
         # dt is already in Minsk local time (naive), thanks to caffesta_get_all_receipts normalisation
         if not _in_window(dt, wfrom, wto):
             continue
-        rev = float(r.get("total_sum", 0) or 0)
+        gross = float(r.get("total_sum", 0) or 0)
+        disc = float(r.get("discount_sum", 0) or 0)
+        bp = float(r.get("back_pay", 0) or 0)
+        # Caffesta админка показывает «после скидок»: total_sum − discount_sum − back_pay.
+        rev = gross - disc - bp
         revenue += rev
+        revenue_gross += gross
+        discount_total += disc
+        back_pay_total += bp
         count += 1
-        discount += float(r.get("discount_sum", 0) or 0)
+        discount += disc
         for p in split_receipt_payments(r, payment_methods):
             payments.setdefault(p["name"], 0.0)
             payments[p["name"]] += p["amount"]
@@ -89,6 +99,9 @@ def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
     top3 = sorted(products.items(), key=lambda x: x[1]["rev"], reverse=True)[:3]
     return {
         "revenue": revenue,
+        "revenue_gross": revenue_gross,
+        "discount_total": discount_total,
+        "back_pay_total": back_pay_total,
         "count": count,
         "discount": discount,
         "avg_check": revenue / count if count else 0,
@@ -153,7 +166,10 @@ async def build_digest_text(restaurant_id: str) -> str:
         dt = r.get("created_dt")
         if dt and dt.strftime("%Y-%m-%d") != y_date:
             overflow_count += 1
-            overflow_revenue += float(r.get("total_sum", 0) or 0)
+            gross = float(r.get("total_sum", 0) or 0)
+            disc = float(r.get("discount_sum", 0) or 0)
+            bp = float(r.get("back_pay", 0) or 0)
+            overflow_revenue += gross - disc - bp
 
     lines = [
         f"🗓️ <b>{rest_name}</b> — смена {y_date}",
@@ -180,13 +196,17 @@ async def build_digest_text(restaurant_id: str) -> str:
     if receipts_with_dt:
         first = min(receipts_with_dt, key=lambda r: r["created_dt"])
         last = max(receipts_with_dt, key=lambda r: r["created_dt"])
+        def _net(r):
+            return (float(r.get("total_sum", 0) or 0)
+                    - float(r.get("discount_sum", 0) or 0)
+                    - float(r.get("back_pay", 0) or 0))
         lines.append(
             f"🟢 Первый чек: <b>{first['created_dt'].strftime('%H:%M')}</b> "
-            f"({float(first.get('total_sum', 0) or 0):.0f} BYN)"
+            f"({_net(first):.0f} BYN)"
         )
         lines.append(
             f"🔴 Последний чек: <b>{last['created_dt'].strftime('%H:%M')}</b> "
-            f"({float(last.get('total_sum', 0) or 0):.0f} BYN)"
+            f"({_net(last):.0f} BYN)"
         )
 
     # Windows breakdown
