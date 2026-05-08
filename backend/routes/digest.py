@@ -49,6 +49,34 @@ async def digest_diagnose(
     card = sum(float(r.get("card_pay", 0) or 0) for r in receipts)
     cashless = sum(float(r.get("cashless_pay", 0) or 0) for r in receipts)
 
+    # Несколько формул-кандидатов: пытаемся найти ту, что совпадёт с Caffesta UI
+    f_total_only = sum(float(r.get("total_sum", 0) or 0) for r in receipts)
+    f_total_minus_disc = sum(
+        float(r.get("total_sum", 0) or 0) - abs(float(r.get("discount_sum", 0) or 0))
+        for r in receipts
+    )
+    # Ключевая гипотеза: для чеков с total_sum > 0 — minus discount; для total_sum = 0
+    # (оплата сертификатом) — net = abs(discount_sum)
+    f_split_zero = 0.0
+    for r in receipts:
+        ts = float(r.get("total_sum", 0) or 0)
+        ds = abs(float(r.get("discount_sum", 0) or 0))
+        if ts > 0:
+            f_split_zero += ts - ds
+        else:
+            f_split_zero += ds
+    # Или для total_sum=0 не считаем (т.е. они = 0 в выручке)
+    f_only_paid = sum(
+        float(r.get("total_sum", 0) or 0) - abs(float(r.get("discount_sum", 0) or 0))
+        for r in receipts if float(r.get("total_sum", 0) or 0) > 0
+    )
+    # Или: total + abs(discount) для чеков с total=0 (сертификаты), плюс все остальные total
+    f_certs_added = sum(
+        float(r.get("total_sum", 0) or 0)
+        + (abs(float(r.get("discount_sum", 0) or 0)) if float(r.get("total_sum", 0) or 0) == 0 else 0)
+        for r in receipts
+    )
+
     return {
         "date": date,
         "total_receipts": len(receipts),
@@ -63,7 +91,15 @@ async def digest_diagnose(
             "cashless_pay_sum": round(cashless, 2),
             "payments_total": round(cash + card + cashless, 2),
         },
-        "sample_receipts": [
+        "candidate_formulas": {
+            "F1_total_only": round(f_total_only, 2),
+            "F2_total_minus_abs_disc": round(f_total_minus_disc, 2),
+            "F3_split_zero_certificates": round(f_split_zero, 2),
+            "F4_only_paid_minus_disc": round(f_only_paid, 2),
+            "F5_total_plus_disc_for_zero": round(f_certs_added, 2),
+        },
+        "caffesta_target_hint": "Какая F-формула из candidate_formulas даёт 2186.20 — ту и зафиксируем",
+        "all_receipts": [
             {
                 "id": r.get("id"),
                 "created_at": r.get("created_at"),
@@ -77,7 +113,7 @@ async def digest_diagnose(
                 "cashless_pay": r.get("cashless_pay"),
                 "cashlessPayment_id": r.get("cashlessPayment_id"),
             }
-            for r in receipts[:5]
+            for r in receipts
         ],
     }
 
