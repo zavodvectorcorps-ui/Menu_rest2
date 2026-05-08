@@ -24,6 +24,64 @@ async def digest_preview(restaurant_id: str, current_user: dict = Depends(get_cu
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/restaurants/{restaurant_id}/caffesta/probe-transfers")
+async def probe_transfers(
+    restaurant_id: str,
+    date: str = "",
+    current_user: dict = Depends(get_current_user),
+):
+    """Probe: пытаемся найти эндпоинт Caffesta API для «История счетов /
+    Перенос блюд» (тот, что в UI на /admin/orders_history/list). Если найдём —
+    можно вывести в сводку строку «🔄 Переносы блюд: N» для контроля
+    официантов (частые переносы — индикатор подозрительной активности)."""
+    from auth import has_role
+    if not has_role(current_user, "superadmin"):
+        raise HTTPException(403, "Только суперадмин")
+    from services.caffesta import get_caffesta_config, _base_url, _headers, _safe_json
+    import httpx
+    config = await get_caffesta_config(restaurant_id)
+    if not config or not config.get("enabled"):
+        return {"ok": False, "message": "Caffesta не настроена"}
+    pos_id = config.get("pos_id", 1)
+    candidates = [
+        f"v1.0/draft/get_orders_history/{pos_id}/0",
+        f"v1.0/draft/get_orders_history/{pos_id}",
+        f"v1.0/draft/get_account_history/{pos_id}/0",
+        f"v1.0/draft/get_transfers/{pos_id}/0",
+        f"v1.0/draft/get_account_transfers/{pos_id}/0",
+        f"v1.0/draft/get_dish_transfers/{pos_id}/0",
+        f"v1.0/draft/orders_history/{pos_id}/0",
+        f"v1.0/draft/get_order_actions/{pos_id}/0",
+    ]
+    findings = []
+    async with httpx.AsyncClient(timeout=20) as client:
+        for path in candidates:
+            url = f"{_base_url(config['account_name'])}/{path}"
+            try:
+                resp = await client.get(url, headers=_headers(config["api_key"]))
+                snippet = (resp.text or "")[:600]
+                ok_json, rows = False, 0
+                try:
+                    j = resp.json()
+                    ok_json = True
+                    if isinstance(j, list):
+                        rows = len(j)
+                    elif isinstance(j, dict):
+                        d = j.get("data")
+                        if isinstance(d, list):
+                            rows = len(d)
+                except Exception:
+                    pass
+                findings.append({
+                    "url": url, "status": resp.status_code,
+                    "is_json": ok_json, "row_count": rows,
+                    "body_sample": snippet,
+                })
+            except Exception as e:
+                findings.append({"url": url, "error": str(e)})
+    return {"ok": True, "data": findings}
+
+
 @router.get("/restaurants/{restaurant_id}/digest/diagnose")
 async def digest_diagnose(
     restaurant_id: str,
