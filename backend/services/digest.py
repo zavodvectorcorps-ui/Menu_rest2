@@ -41,9 +41,6 @@ async def _collect_for_day(restaurant_id: str, day_date: str):
 
 def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
     revenue = 0.0
-    revenue_gross = 0.0
-    discount_total = 0.0
-    back_pay_total = 0.0
     count = 0
     discount = 0.0
     products = {}
@@ -56,22 +53,23 @@ def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
         if not _in_window(dt, wfrom, wto):
             continue
         gross = float(r.get("total_sum", 0) or 0)
-        disc_raw = float(r.get("discount_sum", 0) or 0)
-        bp_raw = float(r.get("back_pay", 0) or 0)
-        # Caffesta API: total_sum — итог чека (нетто после скидок); скидки и
-        # возвраты отдаются отдельно (могут быть как положительные, так и
-        # отрицательные значения). До получения подтверждения через
-        # /digest/diagnose оставляем revenue = total_sum как было, но
-        # выводим в diagnose сводку под несколькими формулами.
-        rev = gross
-        disc = disc_raw
-        bp = bp_raw
+        # Caffesta пишет income=1 для продажи и income=-1 для возврата/отмены.
+        # Отменённый чек идёт парой к оригинальному с тем же total_sum, поэтому
+        # `income * total_sum` автоматически нейтрализует пары и даёт ту же
+        # цифру, что Caffesta показывает в колонке «ИТОГИ → После скидок».
+        # Подтверждено diagnose: 2315.20 (income=1) − 129 (income=-1) = 2186.20.
+        income = int(r.get("income") or 1)
+        rev = income * gross
         revenue += rev
-        revenue_gross += gross
-        discount_total += disc
-        back_pay_total += bp
-        count += 1
-        discount += disc
+        # Учёт чеков: только продажи (income=1) считаем как «чек»; отмены
+        # вычитаются из выручки, но не дублируют счётчик.
+        if income > 0:
+            count += 1
+        discount += abs(float(r.get("discount_sum", 0) or 0))
+        # Отменные чеки (income=-1) не добавляют платежи/продукты к статистике —
+        # они только нейтрализуют выручку оригинала.
+        if income < 0:
+            continue
         for p in split_receipt_payments(r, payment_methods):
             payments.setdefault(p["name"], 0.0)
             payments[p["name"]] += p["amount"]
@@ -105,9 +103,6 @@ def _aggregate_window(receipts, wfrom, wto, payment_methods, product_map=None):
     top3 = sorted(products.items(), key=lambda x: x[1]["rev"], reverse=True)[:3]
     return {
         "revenue": revenue,
-        "revenue_gross": revenue_gross,
-        "discount_total": discount_total,
-        "back_pay_total": back_pay_total,
         "count": count,
         "discount": discount,
         "avg_check": revenue / count if count else 0,
@@ -171,8 +166,10 @@ async def build_digest_text(restaurant_id: str) -> str:
     for r in y_receipts:
         dt = r.get("created_dt")
         if dt and dt.strftime("%Y-%m-%d") != y_date:
-            overflow_count += 1
-            overflow_revenue += float(r.get("total_sum", 0) or 0)
+            income = int(r.get("income") or 1)
+            if income > 0:
+                overflow_count += 1
+            overflow_revenue += income * float(r.get("total_sum", 0) or 0)
 
     lines = [
         f"🗓️ <b>{rest_name}</b> — смена {y_date}",
@@ -194,8 +191,11 @@ async def build_digest_text(restaurant_id: str) -> str:
         pay_parts = ", ".join(f"{k}: {v:.0f}" for k, v in y_full["payments"].items())
         lines.append(f"💳 Оплата: {pay_parts}")
 
-    # First/Last receipt of the shift
-    receipts_with_dt = [r for r in y_receipts if r.get("created_dt")]
+    # First/Last receipt of the shift (только валидные продажи, income>0)
+    receipts_with_dt = [
+        r for r in y_receipts
+        if r.get("created_dt") and int(r.get("income") or 1) > 0
+    ]
     if receipts_with_dt:
         first = min(receipts_with_dt, key=lambda r: r["created_dt"])
         last = max(receipts_with_dt, key=lambda r: r["created_dt"])
