@@ -69,9 +69,13 @@ services:
       - backend
 
   # Certbot for SSL (Let's Encrypt)
-  # Auto-renews every 12h AND triggers `nginx -s reload` via docker socket
-  # whenever a certificate is actually renewed (deploy-hook). Without the
-  # reload, nginx would keep serving the old (now-expired) cert from memory.
+  # Auto-renews every 12h AND fully restarts the nginx container via docker
+  # socket whenever a certificate is actually renewed (deploy-hook).
+  # NB: we use `docker restart` (full container restart) instead of
+  # `docker kill -s HUP` (= nginx -s reload) because SIGHUP does not always
+  # re-read freshly issued / rotated certificates and per-domain include
+  # files reliably. A full restart guarantees nginx picks up new certs and
+  # new custom-domain configs.
   certbot:
     build: ./certbot
     restart: always
@@ -82,7 +86,7 @@ services:
     entrypoint: >-
       /bin/sh -c "trap exit TERM;
       while :; do
-        certbot renew --deploy-hook 'docker kill -s HUP menu_rest2-nginx-1';
+        certbot renew --deploy-hook 'docker restart menu_rest2-nginx-1';
         sleep 12h & wait $${!};
       done;"
 
