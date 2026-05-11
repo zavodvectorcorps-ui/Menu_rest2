@@ -4,11 +4,15 @@
 ## Последнее обновление: 2026-02-13
 
 ### Изменения 2026-02-13
-- **SSL/Nginx auto-renew fix (P0, DONE)**:
-  - **Root cause**: certbot `--deploy-hook` использовал `docker kill -s HUP menu_rest2-nginx-1` (= `nginx -s reload`). При обновлении сертификатов SIGHUP не всегда заставлял nginx перечитать свежевыпущенные сертификаты и include-файлы кастомных доменов — в кэше OpenSSL оставался старый сертификат, домен начинал отдавать чужой/просроченный cert.
-  - **Fix**: в `/app/docker-compose.yml` (service `certbot`) deploy-hook заменён на `docker restart menu_rest2-nginx-1` — полный рестарт контейнера гарантирует подхват свежих cert-ов и include-конфигов. Добавлен подробный комментарий, объясняющий выбор restart вместо reload, чтобы будущие правки не откатили фикс.
-  - **VPS**: то же изменение применено напрямую через `sed` на сервере пользователя; certbot-контейнер пересоздан, `certbot renew --dry-run` для всех 4 доменов (catch-menu.by, menu-myatasportivnaya.by, rest-menu.by, wm-finance.pl) прошёл успешно.
-  - **Скрипт `scripts/add-domain.sh`**: уже использует `docker compose restart nginx` — изменений не требовалось.
+- **SSL/Nginx — окончательный фикс рецидивирующего бага (P0, DONE)**:
+  - **Контекст**: на VPS совместно работают два проекта (`Menu_rest2` + `wm-finance`), они шарят один nginx-контейнер `menu_rest2-nginx-1`. Третий раз подряд после деплоя wm-finance клиентские домены `catch-menu.by` и `menu-myatasportivnaya.by` начинали отдавать чужой сертификат `rest-menu.by`.
+  - **Истинный root cause** (раскопан в этой сессии): `wm-finance/deploy.sh` копирует свой шаблон `deploy/menu_rest2-nginx-combined.conf` поверх боевого `/root/Menu_rest2/nginx/nginx.conf`. В этом шаблоне **отсутствовала директива** `include /etc/nginx/custom-domains/*.conf;` — поэтому Nginx переставал «видеть» конфиги клиентских доменов, и все SNI ловил default-сервер (`rest-menu.by` как первый `listen 443`). Симптом «слетел сертификат» = просто отсутствие server-блока для домена.
+  - **Дополнительная проблема**: `deploy.sh` после копирования делал `nginx -s reload` или `docker kill -s HUP` — оба не подхватывают include-файлы корректно. То же касалось certbot deploy-hook.
+  - **Fix №1 — certbot (в репо `/app/docker-compose.yml`)**: deploy-hook `'docker kill -s HUP menu_rest2-nginx-1'` → `'docker restart menu_rest2-nginx-1'`. Гарантирует подхват свежевыпущенных сертификатов после auto-renew.
+  - **Fix №2 — VPS hot-fix**: вставлена директива `include /etc/nginx/custom-domains/*.conf;` в `/root/Menu_rest2/nginx/nginx.conf` (последней в `http {}`); `docker compose restart nginx`. Все 4 домена немедленно начали отдавать корректные сертификаты.
+  - **Fix №3 — VPS wm-finance**: вставлена та же `include` в `/root/wm-finance/deploy/menu_rest2-nginx-combined.conf`; `deploy.sh` поправлен — обе вызовы `nginx -s reload` / `docker kill -s HUP` заменены на `docker restart menu_rest2-nginx-1`.
+  - **Финальная верификация**: `certbot renew --dry-run` успешен для всех 4 доменов; `openssl s_client` подтвердил, что каждый домен (rest-menu.by, catch-menu.by, menu-myatasportivnaya.by, wm-finance.pl) отдаёт собственный валидный cert.
+  - **Repo commit**: фикс docker-compose.yml в `/app` готов к Save to GitHub. Фиксы в репо `wm-finance` (include в combined-конфиге + restart в deploy.sh) пользователь зафиксирует через чат проекта wm-finance (выдано готовое сообщение для агента).
 - **HTML-парсер переносов блюд Caffesta — отклонено пользователем**: API возвращает 500 на все эндпоинты переносов, альтернативный HTML-scraping админки решено не реализовывать. Фича закрыта, из бэклога убрана.
 
 ### Изменения 2026-02-05 (часть 4)
