@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Flame, Star, Sparkles, Tag, Plus, Loader2, RefreshCw, Edit2, Trash2, Check, ChevronsUpDown, X, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -472,3 +472,206 @@ export function LabelDialog({ open, onOpenChange, editing, setEditing, form, set
     </Dialog>
   );
 }
+
+export function BulkRenameCategoriesDialog({ open, onOpenChange, categories, saving, onSave }) {
+  // Map id -> draft name
+  const [drafts, setDrafts] = useState({});
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
+
+  // Initialise drafts when the dialog is opened (or when categories change while open)
+  useEffect(() => {
+    if (open) {
+      const initial = {};
+      categories.forEach((c) => { initial[c.id] = c.name; });
+      setDrafts(initial);
+      setFindText('');
+      setReplaceText('');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const handleClose = (val) => {
+    if (!val) {
+      setDrafts({});
+      setFindText('');
+      setReplaceText('');
+    }
+    onOpenChange(val);
+  };
+
+  const applyFindReplace = () => {
+    if (!findText) return;
+    const next = { ...drafts };
+    let changed = 0;
+    categories.forEach((c) => {
+      const current = next[c.id] ?? c.name;
+      if (current.includes(findText)) {
+        next[c.id] = current.split(findText).join(replaceText);
+        changed++;
+      }
+    });
+    setDrafts(next);
+    return changed;
+  };
+
+  const clearPrefix = (prefix) => {
+    const next = { ...drafts };
+    categories.forEach((c) => {
+      const current = next[c.id] ?? c.name;
+      if (current.startsWith(prefix)) {
+        next[c.id] = current.slice(prefix.length).trim();
+      }
+    });
+    setDrafts(next);
+  };
+
+  const resetAll = () => {
+    const initial = {};
+    categories.forEach((c) => { initial[c.id] = c.name; });
+    setDrafts(initial);
+  };
+
+  // Build payload of actually changed entries
+  const changedEntries = categories
+    .map((c) => ({ id: c.id, original: c.name, name: (drafts[c.id] ?? c.name).trim() }))
+    .filter((e) => e.name && e.name !== e.original);
+
+  const handleSubmit = () => {
+    if (changedEntries.length === 0) {
+      onOpenChange(false);
+      return;
+    }
+    onSave(changedEntries.map(({ id, name }) => ({ id, name })));
+  };
+
+  // Suggest a quick prefix from longest common prefix containing " — "
+  const suggestedPrefixes = (() => {
+    const prefixes = new Set();
+    categories.forEach((c) => {
+      const parts = c.name.split(' — ');
+      if (parts.length >= 2) {
+        prefixes.add(parts[0] + ' — ');
+      }
+    });
+    return Array.from(prefixes).filter((p) => {
+      const count = categories.filter((c) => c.name.startsWith(p)).length;
+      return count >= 2;
+    }).sort();
+  })();
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col" data-testid="bulk-rename-dialog">
+        <DialogHeader>
+          <DialogTitle>Массовое переименование категорий</DialogTitle>
+          <DialogDescription>
+            Найдите и замените подстроку во всех названиях или редактируйте поля вручную.
+            Сохранятся только изменённые строки.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Find/Replace */}
+        <div className="flex flex-col gap-2 border-b pb-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input
+              placeholder="Найти…"
+              value={findText}
+              onChange={(e) => setFindText(e.target.value)}
+              className="flex-1"
+              data-testid="bulk-rename-find-input"
+            />
+            <Input
+              placeholder="Заменить на…"
+              value={replaceText}
+              onChange={(e) => setReplaceText(e.target.value)}
+              className="flex-1"
+              data-testid="bulk-rename-replace-input"
+            />
+            <Button
+              variant="outline"
+              onClick={applyFindReplace}
+              disabled={!findText}
+              data-testid="bulk-rename-apply-btn"
+            >
+              Применить
+            </Button>
+          </div>
+          {suggestedPrefixes.length > 0 && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-xs text-muted-foreground">Быстро убрать префикс:</span>
+              {suggestedPrefixes.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => clearPrefix(p)}
+                  className="text-xs px-2 py-1 rounded-full border bg-muted hover:bg-accent transition-colors"
+                  data-testid={`bulk-rename-prefix-${p.trim().replace(/\s+/g, '-')}`}
+                >
+                  «{p}»
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={resetAll}
+                className="text-xs px-2 py-1 rounded-full border bg-muted hover:bg-accent transition-colors ml-auto"
+                data-testid="bulk-rename-reset-btn"
+              >
+                Сбросить
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 overflow-y-auto -mx-6 px-6">
+          <div className="grid grid-cols-[1fr,1fr] gap-x-3 gap-y-2 text-sm">
+            <div className="text-xs font-medium text-muted-foreground sticky top-0 bg-background pb-1">
+              Текущее название
+            </div>
+            <div className="text-xs font-medium text-muted-foreground sticky top-0 bg-background pb-1">
+              Новое название
+            </div>
+            {categories.map((c) => {
+              const draft = drafts[c.id] ?? c.name;
+              const isChanged = draft.trim() && draft.trim() !== c.name;
+              return (
+                <div key={c.id} className="contents">
+                  <div
+                    className="py-1.5 text-muted-foreground break-words border-b border-border/50"
+                    title={c.name}
+                  >
+                    {c.name}
+                  </div>
+                  <div className="py-1 border-b border-border/50">
+                    <Input
+                      value={draft}
+                      onChange={(e) => setDrafts({ ...drafts, [c.id]: e.target.value })}
+                      className={cn('h-8', isChanged && 'border-mint-500 ring-1 ring-mint-500/30')}
+                      data-testid={`bulk-rename-input-${c.id}`}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-2">
+          <div className="text-sm text-muted-foreground mr-auto" data-testid="bulk-rename-counter">
+            Изменено: <b>{changedEntries.length}</b> из {categories.length}
+          </div>
+          <Button variant="outline" onClick={() => handleClose(false)}>Отмена</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={saving || changedEntries.length === 0}
+            data-testid="bulk-rename-save-btn"
+          >
+            {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Сохранение…</> : `Сохранить ${changedEntries.length || ''}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

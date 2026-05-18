@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, ImageIcon, Tag, Search, Image, Layers, Loader2, FileJson, Download } from 'lucide-react';
+import { Plus, ImageIcon, Tag, Search, Image, Layers, Loader2, FileJson, Download, Edit3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,7 @@ import { SortableMenuItem } from '@/components/menu/SortableMenuItem';
 import {
   CategoryDialog, ItemDialog, DeleteDialog,
   ImportJsonDialog, ImportModeDialog, LabelDialog,
+  BulkRenameCategoriesDialog,
 } from '@/components/menu/MenuDialogs';
 
 export default function MenuPage() {
@@ -46,6 +47,8 @@ export default function MenuPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importModeDialogOpen, setImportModeDialogOpen] = useState(false);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
+  const [bulkRenameDialogOpen, setBulkRenameDialogOpen] = useState(false);
+  const [bulkRenameSaving, setBulkRenameSaving] = useState(false);
   
   // Form states
   const [editingCategory, setEditingCategory] = useState(null);
@@ -351,6 +354,25 @@ export default function MenuPage() {
     catch { toast.error('Ошибка удаления'); }
   };
 
+  // Bulk rename categories
+  const handleBulkRename = async (renames) => {
+    setBulkRenameSaving(true);
+    try {
+      const resp = await axios.post(
+        `${API}/restaurants/${currentRestaurantId}/categories/bulk-rename`,
+        renames,
+        authHeaders
+      );
+      toast.success(`Обновлено категорий: ${resp.data.updated}`);
+      setBulkRenameDialogOpen(false);
+      fetchData();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Ошибка массового переименования');
+    } finally {
+      setBulkRenameSaving(false);
+    }
+  };
+
   // Download images
   const downloadAllImages = async () => {
     setDownloadingImages(true);
@@ -403,6 +425,15 @@ export default function MenuPage() {
           </Button>
           <Button variant="outline" className="gap-2 rounded-full" onClick={openLabelDialog} data-testid="manage-labels-btn">
             <Tag className="w-4 h-4" />Ярлыки
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2 rounded-full"
+            onClick={() => setBulkRenameDialogOpen(true)}
+            disabled={categories.length === 0}
+            data-testid="bulk-rename-categories-btn"
+          >
+            <Edit3 className="w-4 h-4" />Переименовать
           </Button>
           {hasExternalImages && (
             <Button variant="outline" className="gap-2 rounded-full" onClick={downloadAllImages} disabled={downloadingImages} data-testid="download-images-btn">
@@ -489,6 +520,13 @@ export default function MenuPage() {
       <ImportJsonDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} importJson={importJson} setImportJson={setImportJson} importing={importing} onImport={handleImportMenu} />
       <ImportModeDialog open={importModeDialogOpen} onOpenChange={(open) => { if (!open) { setImportModeDialogOpen(false); setPendingImportFile(null); } }} pendingFile={pendingImportFile} importing={importing} onExecute={executeImport} />
       <LabelDialog open={labelDialogOpen} onOpenChange={setLabelDialogOpen} editing={editingLabel} setEditing={setEditingLabel} form={labelForm} setForm={setLabelForm} labels={labels} onSave={saveLabelHandler} onDelete={deleteLabelHandler} />
+      <BulkRenameCategoriesDialog
+        open={bulkRenameDialogOpen}
+        onOpenChange={setBulkRenameDialogOpen}
+        categories={categories}
+        saving={bulkRenameSaving}
+        onSave={handleBulkRename}
+      />
     </div>
   );
 }

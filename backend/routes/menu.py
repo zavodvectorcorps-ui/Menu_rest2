@@ -182,6 +182,40 @@ async def reorder_categories(restaurant_id: str, order: List[str], current_user:
     return {"message": "Reordered"}
 
 
+@router.post("/restaurants/{restaurant_id}/categories/bulk-rename")
+async def bulk_rename_categories(
+    restaurant_id: str,
+    renames: List[dict],
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Массовое переименование категорий. Принимает список [{id, name}].
+    Имена тримятся, пустые игнорируются. Для каждой изменённой категории
+    сбрасываются переводы (name_en, name_zh) и ставится фоновая задача
+    на повторный перевод.
+    """
+    await check_restaurant_access(current_user, restaurant_id)
+    updated = 0
+    skipped = 0
+    for entry in renames:
+        cat_id = (entry or {}).get("id")
+        new_name = ((entry or {}).get("name") or "").strip()
+        if not cat_id or not new_name:
+            skipped += 1
+            continue
+        result = await db.categories.update_one(
+            {"id": cat_id, "restaurant_id": restaurant_id},
+            {"$set": {"name": new_name, "name_en": "", "name_zh": ""}},
+        )
+        if result.matched_count:
+            updated += 1
+            background_tasks.add_task(_translate_category_bg, cat_id, new_name, restaurant_id)
+        else:
+            skipped += 1
+    return {"updated": updated, "skipped": skipped}
+
+
 # ============ MENU ITEMS ============
 
 @router.get("/restaurants/{restaurant_id}/menu-items")
