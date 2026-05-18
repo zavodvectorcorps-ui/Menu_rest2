@@ -630,6 +630,115 @@ def strip_html(text: str) -> str:
     return _re.sub(r'<[^>]+>', '', text).strip()
 
 
+def _parse_lunchpad_price(prices_raw):
+    """Возвращает (price: float, weight: str). Поддерживает первое валидное значение из массива prices."""
+    price = 0.0
+    weight = ""
+    if not prices_raw:
+        return price, weight
+    p = prices_raw[0] or {}
+    raw_price = p.get("price", 0)
+    if isinstance(raw_price, (int, float)):
+        price = float(raw_price)
+    elif isinstance(raw_price, str):
+        cleaned = raw_price.replace(',', '.').strip()
+        match = _re.search(r'[\d]+[.]?[\d]*', cleaned)
+        if match:
+            try:
+                price = float(match.group())
+            except ValueError:
+                price = 0.0
+    weight = p.get("measure", "") or ""
+    return price, weight
+
+
+def _parse_lunchpad_dish(item: dict) -> dict:
+    """Преобразует Lunchpad-объект type=4 в dict нашего MenuItem."""
+    name = strip_html(item.get("name", "")).strip()
+    desc = strip_html(item.get("description", ""))
+    price, weight = _parse_lunchpad_price(item.get("prices", []))
+    foto = item.get("foto", {}) or {}
+    image_url = foto.get("image_url", "") or ""
+    return {
+        "name": name,
+        "description": desc,
+        "price": price,
+        "weight": weight,
+        "image_url": image_url,
+        "is_available": not item.get("in_stop_list", False),
+    }
+
+
+def _parse_lunchpad_banner(item: dict) -> dict | None:
+    """type=2 → баннер. Возвращает None, если у баннера нет картинки."""
+    foto = item.get("foto", {}) or {}
+    img = foto.get("image_url", "") or ""
+    if not img:
+        return None
+    bn = strip_html(item.get("name", "")).strip()
+    if bn == "--":
+        bn = ""
+    return {
+        "name": bn,
+        "description": strip_html(item.get("description", "")),
+        "image_url": img,
+        "is_banner": True,
+        "price": 0,
+    }
+
+
+def _walk_lunchpad_items(items_raw: list, parent_path: str, parent_display: str):
+    """
+    Рекурсивно обходит дерево Lunchpad-items.
+
+    Lunchpad-экспорт хранит до 3 уровней вложенности:
+      cat (type=0) → subcat (type=0) → sub-subcat (type=0) → dish (type=4)
+
+    Эта функция сплющивает дерево в плоский список категорий (наша БД-модель —
+    одноуровневая «категория → блюда»). Каждый «лист»-узел (узел type=0,
+    у которого среди детей есть type=4 или баннеры) превращается в отдельную
+    категорию с конкатенированным именем вида "Родитель — Дитя — Внук".
+
+    Возвращает (dishes_at_this_level, list_of_flattened_subcats):
+      • dishes_at_this_level — type=4 и баннеры (type=2 с картинкой) текущего уровня
+      • list_of_flattened_subcats — все вложенные категории, уже сплющенные
+    """
+    dishes = []
+    subcats = []
+    for item in items_raw or []:
+        t = item.get("type")
+        if t == 2:
+            banner = _parse_lunchpad_banner(item)
+            if banner:
+                dishes.append(banner)
+            continue
+        if t == 4:
+            d = _parse_lunchpad_dish(item)
+            if d["name"]:
+                dishes.append(d)
+            continue
+        if t == 0:
+            sub_name = strip_html(item.get("name", "")).strip()
+            if not sub_name:
+                continue
+            sub_display = item.get("display", "") or parent_display
+            sub_display_mode = "compact" if sub_display == "list" else "card"
+            full_name = f"{parent_path} — {sub_name}"
+            child_dishes, child_subcats = _walk_lunchpad_items(
+                item.get("items", []), full_name, sub_display
+            )
+            if child_dishes:
+                subcats.append({
+                    "name": full_name,
+                    "display_mode": sub_display_mode,
+                    "items": child_dishes,
+                })
+            subcats.extend(child_subcats)
+            continue
+        # type=1 и прочие — игнорируем (это инфо-блоки типа «Оставить отзыв»)
+    return dishes, subcats
+
+
 def parse_lunchpad_data(raw_data: list) -> dict:
     categories = []
     pending_banners = []
@@ -638,17 +747,9 @@ def parse_lunchpad_data(raw_data: list) -> dict:
         entry_type = entry.get("type")
 
         if entry_type == 2:
-            foto = entry.get("foto", {}) or {}
-            image_url = foto.get("image_url", "") or ""
-            if image_url:
-                banner_name = strip_html(entry.get("name", "")).strip()
-                banner_desc = strip_html(entry.get("description", "")).strip()
-                if banner_name == "--":
-                    banner_name = ""
-                pending_banners.append({
-                    "name": banner_name, "description": banner_desc,
-                    "image_url": image_url, "is_banner": True, "price": 0,
-                })
+            banner = _parse_lunchpad_banner(entry)
+            if banner:
+                pending_banners.append(banner)
             continue
 
         if entry_type != 0:
@@ -658,104 +759,28 @@ def parse_lunchpad_data(raw_data: list) -> dict:
         if not cat_name:
             continue
 
-        items_raw = entry.get("items", [])
         display = entry.get("display", "")
         display_mode = "compact" if display == "list" else "card"
-        items = []
-        sub_categories = []
 
-        for banner in pending_banners:
-            items.append(banner)
+        # Рекурсивно собираем все блюда + вложенные подкатегории (до 3-х уровней)
+        own_dishes, nested_subcats = _walk_lunchpad_items(
+            entry.get("items", []), cat_name, display
+        )
+
+        items = list(pending_banners) + own_dishes
         pending_banners = []
 
-        for item in items_raw:
-            item_type = item.get("type")
-
-            if item_type == 2:
-                item_foto = item.get("foto", {}) or {}
-                item_img = item_foto.get("image_url", "") or ""
-                if item_img:
-                    banner_name = strip_html(item.get("name", "")).strip()
-                    if banner_name == "--":
-                        banner_name = ""
-                    items.append({
-                        "name": banner_name, "description": strip_html(item.get("description", "")),
-                        "image_url": item_img, "is_banner": True, "price": 0,
-                    })
-                continue
-
-            if item_type == 0:
-                sub_name = strip_html(item.get("name", "")).strip()
-                sub_items_raw = item.get("items", [])
-                if sub_name and sub_items_raw:
-                    sub_items = []
-                    for sub_item in sub_items_raw:
-                        if sub_item.get("type") != 4:
-                            continue
-                        si_name = strip_html(sub_item.get("name", "")).strip()
-                        if not si_name:
-                            continue
-                        si_desc = strip_html(sub_item.get("description", ""))
-                        si_prices = sub_item.get("prices", [])
-                        si_price = 0
-                        si_weight = ""
-                        if si_prices:
-                            sp = si_prices[0]
-                            raw_p = sp.get("price", 0)
-                            if isinstance(raw_p, (int, float)):
-                                si_price = float(raw_p)
-                            elif isinstance(raw_p, str):
-                                cleaned = raw_p.replace(',', '.').strip()
-                                match = _re.search(r'[\d]+[.]?[\d]*', cleaned)
-                                si_price = float(match.group()) if match else 0
-                            si_weight = sp.get("measure", "")
-                        si_foto = sub_item.get("foto", {}) or {}
-                        si_img = si_foto.get("image_url", "") or ""
-                        sub_items.append({
-                            "name": si_name, "description": si_desc, "price": si_price,
-                            "weight": si_weight, "image_url": si_img,
-                            "is_available": not sub_item.get("in_stop_list", False),
-                        })
-                    if sub_items:
-                        sub_categories.append({
-                            "name": f"{cat_name} — {sub_name}",
-                            "display_mode": display_mode, "items": sub_items,
-                        })
-                continue
-
-            if item_type != 4:
-                continue
-
-            item_name = strip_html(item.get("name", "")).strip()
-            if not item_name:
-                continue
-
-            description = strip_html(item.get("description", ""))
-            prices = item.get("prices", [])
-            price = 0
-            weight = ""
-            if prices:
-                p = prices[0]
-                raw_price = p.get("price", 0)
-                if isinstance(raw_price, (int, float)):
-                    price = float(raw_price)
-                elif isinstance(raw_price, str):
-                    cleaned = raw_price.replace(',', '.').strip()
-                    match = _re.search(r'[\d]+[.]?[\d]*', cleaned)
-                    price = float(match.group()) if match else 0
-                weight = p.get("measure", "")
-
-            foto = item.get("foto", {}) or {}
-            image_url = foto.get("image_url", "") or ""
-            in_stop = item.get("in_stop_list", False)
-
-            items.append({
-                "name": item_name, "description": description, "price": price,
-                "weight": weight, "image_url": image_url, "is_available": not in_stop,
+        # Пропускаем «оболочечные» категории без собственного содержимого
+        # (например, «Барное меню» — все её позиции уехали во вложенные
+        # категории «Барное меню — Пиво» и т.п.). Если хотя бы один баннер
+        # или блюдо есть — категорию создаём.
+        if items:
+            categories.append({
+                "name": cat_name,
+                "display_mode": display_mode,
+                "items": items,
             })
-
-        categories.append({"name": cat_name, "display_mode": display_mode, "items": items})
-        categories.extend(sub_categories)
+        categories.extend(nested_subcats)
 
     return {"categories": categories}
 
