@@ -70,6 +70,21 @@ async def _translate_category_bg(category_id: str, name: str, restaurant_id: str
         await db.categories.update_one({"id": category_id}, {"$set": update})
 
 
+async def _translate_categories_batch_bg(queue: list, restaurant_id: str = ""):
+    """
+    Последовательно переводит список (cat_id, name).
+    Между категориями делается короткая пауза, чтобы не залпом дёргать LLM.
+    """
+    import asyncio
+    for cat_id, name in queue:
+        try:
+            await _translate_category_bg(cat_id, name, restaurant_id)
+        except Exception:
+            # Один сбой не должен останавливать остальные
+            pass
+        await asyncio.sleep(0.2)
+
+
 async def _translate_section_bg(section_id: str, name: str, restaurant_id: str = ""):
     if not name:
         return
@@ -192,12 +207,14 @@ async def bulk_rename_categories(
     """
     Массовое переименование категорий. Принимает список [{id, name}].
     Имена тримятся, пустые игнорируются. Для каждой изменённой категории
-    сбрасываются переводы (name_en, name_zh) и ставится фоновая задача
-    на повторный перевод.
+    сбрасываются переводы (name_en, name_zh) и ставится ОДНА фоновая
+    задача, которая последовательно переводит все обновлённые категории
+    (с небольшой задержкой между запросами, чтобы не перегружать LLM API).
     """
     await check_restaurant_access(current_user, restaurant_id)
     updated = 0
     skipped = 0
+    translation_queue: list[tuple[str, str]] = []  # (cat_id, name)
     for entry in renames:
         cat_id = (entry or {}).get("id")
         new_name = ((entry or {}).get("name") or "").strip()
@@ -210,9 +227,14 @@ async def bulk_rename_categories(
         )
         if result.matched_count:
             updated += 1
-            background_tasks.add_task(_translate_category_bg, cat_id, new_name, restaurant_id)
+            translation_queue.append((cat_id, new_name))
         else:
             skipped += 1
+
+    if translation_queue:
+        background_tasks.add_task(
+            _translate_categories_batch_bg, translation_queue, restaurant_id
+        )
     return {"updated": updated, "skipped": skipped}
 
 
