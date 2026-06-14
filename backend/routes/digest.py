@@ -9,7 +9,14 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from auth import check_restaurant_access, get_current_user
 from services.digest import build_digest_text, send_daily_digest
-from services.caffesta import caffesta_get_all_receipts
+from services.caffesta import (
+    caffesta_get_all_receipts,
+    caffesta_get_terminals,
+    get_caffesta_config,
+    _base_url,
+    _headers,
+    _safe_json,
+)
 
 router = APIRouter()
 
@@ -182,3 +189,95 @@ async def digest_send(restaurant_id: str, current_user: dict = Depends(get_curre
     if not result.get("sent"):
         raise HTTPException(400, f"Не отправлено: {result.get('reason')}")
     return {"sent": True}
+
+
+@router.get("/restaurants/{restaurant_id}/digest/terminals-diagnose")
+async def digest_terminals_diagnose(
+    restaurant_id: str,
+    date: str | None = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Расширенная диагностика: показывает, какие именно терминалы Caffesta
+    отдаёт за день, и сравнивает выручку по каждому терминалу с тем,
+    что отдаёт сам Caffesta через export_sales_totals.
+
+    Помогает понять, не теряет ли наш digest терминалы (если у ресторана
+    больше одного POS — кальянка / кухня / бар и т.п.).
+    """
+    import httpx
+    await check_restaurant_access(current_user, restaurant_id)
+    if not date:
+        d = (datetime.now(timezone.utc) + timedelta(hours=3)).date() - timedelta(days=1)
+        date = d.strftime("%Y-%m-%d")
+
+    config = await get_caffesta_config(restaurant_id)
+    if not config or not config.get("enabled"):
+        raise HTTPException(400, "Caffesta не настроена")
+    account_name = config["account_name"]
+    api_key = config["api_key"]
+    configured_pos = config.get("pos_id")
+
+    # 1) Терминалы, найденные через export_sales_totals
+    found_terminals = await caffesta_get_terminals(restaurant_id, date, date)
+
+    # 2) Сырой ответ export_sales_totals (per-terminal) — для сверки сумм
+    per_terminal_totals = []
+    try:
+        url = (
+            f"{_base_url(account_name)}/v1.0/product/export_sales_totals"
+            f"?start={date}&end={date}&add_gr_by=terminal_id"
+        )
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(url, headers=_headers(api_key))
+            data = _safe_json(resp)
+            if data.get("success"):
+                per_terminal_totals = data.get("data", []) or []
+    except Exception as e:
+        per_terminal_totals = [{"error": str(e)}]
+
+    # 3) Те же чеки, что грузит digest, разбитые по terminal_id
+    res = await caffesta_get_all_receipts(restaurant_id, date, date)
+    receipts = res.get("data", []) if res.get("ok") else []
+    digest_per_terminal = {}
+    for r in receipts:
+        tid = r.get("_terminal_id") or r.get("terminal_id") or "?"
+        b = digest_per_terminal.setdefault(str(tid), {"count": 0, "gross": 0.0, "net_with_returns": 0.0})
+        gross = float(r.get("total_sum", 0) or 0)
+        income = int(r.get("income") or 1)
+        b["count"] += 1 if income > 0 else 0
+        b["gross"] += gross
+        b["net_with_returns"] += income * gross
+
+    # 4) Тотал из Caffesta UI (всё, что было в этот день, без фильтра по pos)
+    caffesta_ui_totals = {}
+    try:
+        url = (
+            f"{_base_url(account_name)}/v1.0/product/export_sales_totals"
+            f"?start={date}&end={date}"
+        )
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(url, headers=_headers(api_key))
+            data = _safe_json(resp)
+            if data.get("success"):
+                rows = data.get("data", []) or []
+                if rows:
+                    caffesta_ui_totals = rows[0] if len(rows) == 1 else {"rows": rows}
+    except Exception as e:
+        caffesta_ui_totals = {"error": str(e)}
+
+    return {
+        "date": date,
+        "configured_pos_id": configured_pos,
+        "terminals_discovered_by_export": found_terminals,
+        "per_terminal_export_totals": per_terminal_totals,
+        "digest_per_terminal_summary": digest_per_terminal,
+        "caffesta_ui_summary_for_day": caffesta_ui_totals,
+        "hint": (
+            "Если terminals_discovered_by_export содержит несколько ID, "
+            "но digest_per_terminal_summary показывает только один — "
+            "значит receipts_by_shift_day отдаёт пустоту для остальных. "
+            "Если ID только один, но в реальности есть несколько касс — "
+            "проблема в export_sales_totals discovery."
+        ),
+    }
