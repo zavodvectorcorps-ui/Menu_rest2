@@ -64,11 +64,17 @@ async def main():
     client = AsyncIOMotorClient(mongo_url)
     db = client[db_name]
 
-    # Берём первый ресторан с включённым Caffesta
-    cfg = await db.caffesta_configs.find_one({"enabled": True})
+    # Берём первый ресторан с включённым Caffesta (collection name: caffesta_config — без 's')
+    cfg = await db.caffesta_config.find_one({"enabled": True})
     if not cfg:
-        print("Caffesta-конфигурация не найдена в БД (collection caffesta_configs).")
-        sys.exit(3)
+        # Fallback: посмотреть вообще все, что есть
+        any_cfg = await db.caffesta_config.find_one({})
+        if any_cfg:
+            print(f"Найден конфиг, но enabled != True. Используем его. Поля: {list(any_cfg.keys())}")
+            cfg = any_cfg
+        else:
+            print("Caffesta-конфигурация не найдена в БД (collection caffesta_config).")
+            sys.exit(3)
 
     account = cfg.get("account_name")
     api_key = cfg.get("api_key")
@@ -82,8 +88,8 @@ async def main():
     print(f"Configured pos_id:   {configured_pos}")
     print("=" * 80)
 
-    base = f"https://{account}.caffesta.app"
-    headers = {"Authorization": f"Bearer {api_key}"}
+    base = f"https://{account}.caffesta.com/a"
+    headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
 
     async with httpx.AsyncClient(timeout=30, headers=headers) as http:
         # 1) Per-terminal totals от Caffesta UI
