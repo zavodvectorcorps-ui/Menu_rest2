@@ -12,6 +12,7 @@ import ItemDetailsDialog from '@/components/ItemDetailsDialog';
 import MenuImage from '@/components/MenuImage';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useI18n, getLocalized } from '@/lib/i18n';
+import { slugify } from '@/lib/slugify';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -244,6 +245,59 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
       isProgrammaticScrollRef.current = false;
     }, 700);
   }, []);
+
+  // ==== Deep-link support (anchor links to categories) ==========================
+  // Supports both `?cat=<id-or-slug>` / `?category=<id-or-slug>` in the query
+  // string and a `#slug` in the URL hash. Runs once when the menu data first
+  // loads. If the category is in another section, that section is activated
+  // first and the scroll happens shortly after so refs are already attached.
+  const initialAnchorHandledRef = useRef(false);
+  useEffect(() => {
+    if (initialAnchorHandledRef.current) return;
+    const cats = data?.categories || [];
+    if (cats.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const rawAnchor = (
+      params.get('cat') || params.get('category') || window.location.hash.replace(/^#/, '')
+    ).trim();
+    if (!rawAnchor) {
+      initialAnchorHandledRef.current = true;
+      return;
+    }
+    const normalized = slugify(decodeURIComponent(rawAnchor));
+    const target = cats.find((c) => c.id === rawAnchor || slugify(c.name) === normalized);
+    if (!target) {
+      initialAnchorHandledRef.current = true;
+      return;
+    }
+    initialAnchorHandledRef.current = true;
+    if (target.section_id && target.section_id !== selectedSection) {
+      setSelectedSection(target.section_id);
+    }
+    // Wait for the section switch + first render so categoryRefs are populated
+    setTimeout(() => scrollToCategory(target.id), 250);
+  }, [data?.categories]);
+
+  // Keep the URL hash in sync with the currently active category, so users
+  // can copy a shareable deep-link straight from the address bar.
+  // Uses replaceState — no new history entries, no page reload.
+  useEffect(() => {
+    if (!selectedCategory) return;
+    const cats = data?.categories || [];
+    const cat = cats.find((c) => c.id === selectedCategory);
+    if (!cat) return;
+    const slug = slugify(cat.name) || cat.id;
+    const currentHash = window.location.hash.replace(/^#/, '');
+    if (currentHash === slug) return;
+    try {
+      const url = new URL(window.location.href);
+      url.hash = slug;
+      window.history.replaceState(null, '', url);
+    } catch {
+      // Silently ignore in exotic environments (about:blank, sandboxed iframes)
+    }
+  }, [selectedCategory, data?.categories]);
+  // ==============================================================================
 
   // ScrollSpy — подсветка активной категории при прокрутке.
   // Реализация через scroll-listener вместо IntersectionObserver: для каждой

@@ -1,7 +1,9 @@
-import { Edit2, Trash2, GripVertical, Eye, EyeOff, LayoutGrid, List, LayoutList } from 'lucide-react';
+import { Edit2, Trash2, GripVertical, Eye, EyeOff, LayoutGrid, List, LayoutList, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { toast } from 'sonner';
+import { slugify } from '@/lib/slugify';
 
 export function SortableCategoryItem({ category, isSelected, itemCount, sectionName, onSelect, onEdit, onDelete, onToggleActive, onToggleDisplay }) {
   const {
@@ -50,6 +52,40 @@ export function SortableCategoryItem({ category, isSelected, itemCount, sectionN
           <span className={`text-xs w-5 text-center ${isSelected ? 'text-white/80' : 'text-muted-foreground'}`}>
             {itemCount}
           </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-6 w-6 ${isSelected ? 'hover:bg-white/20' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              const slug = slugify(category.name) || category.id;
+              // Try to build a public menu URL — the admin doesn't know the
+              // customer-facing menu path here, so we copy just "#slug".
+              // The user can then paste it after any menu URL like
+              // https://menu-mine.by/1#slug or use only the fragment.
+              const fragment = `#${slug}`;
+              const clipboardText = fragment;
+              const copyPromise = navigator.clipboard?.writeText
+                ? navigator.clipboard.writeText(clipboardText)
+                : Promise.reject(new Error('no clipboard'));
+              copyPromise
+                .then(() => toast.success(`Скопировано: ${fragment} — добавьте к URL меню`))
+                .catch(() => {
+                  // Fallback for older browsers / non-HTTPS previews
+                  const ta = document.createElement('textarea');
+                  ta.value = clipboardText;
+                  document.body.appendChild(ta);
+                  ta.select();
+                  try { document.execCommand('copy'); toast.success(`Скопировано: ${fragment}`); }
+                  catch { toast.error('Не удалось скопировать'); }
+                  document.body.removeChild(ta);
+                });
+            }}
+            title={`Копировать якорь #${slugify(category.name) || category.id}`}
+            data-testid={`copy-category-anchor-${category.id}`}
+          >
+            <LinkIcon className="w-3 h-3" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
