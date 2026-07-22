@@ -67,7 +67,9 @@ export default function MenuPage() {
     category_id: '', name: '', description: '', price: '', weight: '', image_url: '',
     is_available: true, is_business_lunch: false, is_promotion: false,
     is_hit: false, is_new: false, is_spicy: false, is_takeaway: false, is_banner: false,
-    sort_order: 0, label_ids: [], caffesta_product_id: ''
+    sort_order: 0, label_ids: [], caffesta_product_id: '',
+    nutrition_protein: '', nutrition_fat: '', nutrition_carbs: '',
+    nutrition_kcal: '', nutrition_kj: '',
   });
 
   const jsonFileRef = useRef(null);
@@ -202,7 +204,12 @@ export default function MenuPage() {
         is_available: item.is_available, is_business_lunch: item.is_business_lunch,
         is_promotion: item.is_promotion, is_hit: item.is_hit, is_new: item.is_new,
         is_spicy: item.is_spicy, is_banner: item.is_banner, sort_order: item.sort_order,
-        label_ids: item.label_ids || [], caffesta_product_id: item.caffesta_product_id ?? ''
+        label_ids: item.label_ids || [], caffesta_product_id: item.caffesta_product_id ?? '',
+        nutrition_protein: item.nutrition_protein ?? '',
+        nutrition_fat: item.nutrition_fat ?? '',
+        nutrition_carbs: item.nutrition_carbs ?? '',
+        nutrition_kcal: item.nutrition_kcal ?? '',
+        nutrition_kj: item.nutrition_kj ?? '',
       });
     } else {
       setEditingItem(null);
@@ -211,7 +218,9 @@ export default function MenuPage() {
         image_url: '', is_available: true, is_business_lunch: false, is_promotion: false,
         is_hit: false, is_new: false, is_spicy: false, is_takeaway: false, is_banner: isBanner,
         sort_order: menuItems.filter(i => i.category_id === selectedCategory).length, label_ids: [],
-        caffesta_product_id: ''
+        caffesta_product_id: '',
+        nutrition_protein: '', nutrition_fat: '', nutrition_carbs: '',
+        nutrition_kcal: '', nutrition_kj: '',
       });
     }
     setItemDialogOpen(true);
@@ -219,11 +228,23 @@ export default function MenuPage() {
 
   const saveItemHandler = async () => {
     try {
+      // Nutrition fields: convert empty string / non-numeric to null so we don't
+      // store 0 by mistake and can hide the badge if user leaves fields blank.
+      const nutParse = (v) => {
+        if (v === '' || v === null || v === undefined) return null;
+        const n = parseFloat(v);
+        return Number.isFinite(n) ? n : null;
+      };
       const data = {
         ...itemForm,
         price: parseFloat(itemForm.price) || 0,
         sort_order: parseInt(itemForm.sort_order) || 0,
-        caffesta_product_id: itemForm.caffesta_product_id ? parseInt(itemForm.caffesta_product_id) : null
+        caffesta_product_id: itemForm.caffesta_product_id ? parseInt(itemForm.caffesta_product_id) : null,
+        nutrition_protein: nutParse(itemForm.nutrition_protein),
+        nutrition_fat: nutParse(itemForm.nutrition_fat),
+        nutrition_carbs: nutParse(itemForm.nutrition_carbs),
+        nutrition_kcal: nutParse(itemForm.nutrition_kcal),
+        nutrition_kj: nutParse(itemForm.nutrition_kj),
       };
       if (editingItem) {
         await axios.put(`${API}/restaurants/${currentRestaurantId}/menu-items/${editingItem.id}`, data, authHeaders);

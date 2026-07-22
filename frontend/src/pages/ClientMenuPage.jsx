@@ -13,6 +13,7 @@ import MenuImage from '@/components/MenuImage';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useI18n, getLocalized } from '@/lib/i18n';
 import { slugify } from '@/lib/slugify';
+import { NutritionBadge } from '@/components/menu/NutritionBadge';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -608,6 +609,13 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
               >
                 <Search className="w-4 h-4" />
               </button>
+              <LanguageSwitcher
+                lang={lang}
+                setLang={setLang}
+                availableLangs={enabledLangs}
+                variant="icon"
+                className="md:hidden"
+              />
               {settings.staff_call_enabled && call_types && call_types.length > 0 && (
                 <Button
                   variant="outline"
@@ -899,6 +907,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                               {item.weight && (
                                 <span className="text-xs text-muted-foreground mt-0.5 inline-block">{item.weight}</span>
                               )}
+                              <NutritionBadge item={item} variant="block" className="mt-0.5" />
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0">
                               <span className="font-bold text-mint-500 whitespace-nowrap">{item.price} {currency}</span>
@@ -1002,6 +1011,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                                   {item.weight && (
                                     <div className="text-[11px] text-muted-foreground">{item.weight}</div>
                                   )}
+                                  <NutritionBadge item={item} variant="block" />
                                 </div>
                                 {cartEnabled && (
                                   <Button
@@ -1111,6 +1121,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                                     {item.weight && (
                                       <span className="text-xs text-muted-foreground ml-2">{item.weight}</span>
                                     )}
+                                    <NutritionBadge item={item} variant="block" className="mt-0.5" />
                                   </div>
 
                                   {cartEnabled && (

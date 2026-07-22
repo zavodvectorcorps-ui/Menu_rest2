@@ -176,6 +176,12 @@ class MenuItem(BaseModel):
     sort_order: int = 0
     label_ids: list = []
     caffesta_product_id: Optional[int] = None
+    # Nutrition per 100g. Все опциональны; None = не указано и не показываем.
+    nutrition_protein: Optional[float] = None
+    nutrition_fat: Optional[float] = None
+    nutrition_carbs: Optional[float] = None
+    nutrition_kcal: Optional[float] = None
+    nutrition_kj: Optional[float] = None
     # Cost/recipe tracking (cost_control module). `recipe` is a list of
     # ingredients: [{caffesta_product_id, name, qty, unit, unit_cost, line_cost}].
     # When a recipe is set, cost_price is recomputed from it; otherwise
@@ -204,6 +210,11 @@ class MenuItemCreate(BaseModel):
     sort_order: int = 0
     label_ids: list = []
     caffesta_product_id: Optional[int] = None
+    nutrition_protein: Optional[float] = None
+    nutrition_fat: Optional[float] = None
+    nutrition_carbs: Optional[float] = None
+    nutrition_kcal: Optional[float] = None
+    nutrition_kj: Optional[float] = None
 
 class MenuItemUpdate(BaseModel):
     category_id: Optional[str] = None
@@ -223,6 +234,11 @@ class MenuItemUpdate(BaseModel):
     sort_order: Optional[int] = None
     label_ids: Optional[list] = None
     caffesta_product_id: Optional[int] = None
+    nutrition_protein: Optional[float] = None
+    nutrition_fat: Optional[float] = None
+    nutrition_carbs: Optional[float] = None
+    nutrition_kcal: Optional[float] = None
+    nutrition_kj: Optional[float] = None
 
 class Label(BaseModel):
     model_config = ConfigDict(extra="ignore")

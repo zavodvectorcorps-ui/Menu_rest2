@@ -134,6 +134,71 @@ export function ItemDialog({ open, onOpenChange, editing, form, setForm, categor
           )}
 
           {!form.is_banner && (
+            <div className="space-y-2 border border-border/60 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-foreground">Пищевая ценность <span className="text-muted-foreground font-normal">(на 100 г, необязательно)</span></Label>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Белки, г</Label>
+                  <Input
+                    type="number" step="0.1" inputMode="decimal"
+                    value={form.nutrition_protein ?? ''}
+                    onChange={(e) => setForm({ ...form, nutrition_protein: e.target.value })}
+                    placeholder="20"
+                    className="h-9"
+                    data-testid="nutrition-protein-input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Жиры, г</Label>
+                  <Input
+                    type="number" step="0.1" inputMode="decimal"
+                    value={form.nutrition_fat ?? ''}
+                    onChange={(e) => setForm({ ...form, nutrition_fat: e.target.value })}
+                    placeholder="12"
+                    className="h-9"
+                    data-testid="nutrition-fat-input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Углеводы, г</Label>
+                  <Input
+                    type="number" step="0.1" inputMode="decimal"
+                    value={form.nutrition_carbs ?? ''}
+                    onChange={(e) => setForm({ ...form, nutrition_carbs: e.target.value })}
+                    placeholder="5"
+                    className="h-9"
+                    data-testid="nutrition-carbs-input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Ккал</Label>
+                  <Input
+                    type="number" step="0.1" inputMode="decimal"
+                    value={form.nutrition_kcal ?? ''}
+                    onChange={(e) => setForm({ ...form, nutrition_kcal: e.target.value })}
+                    placeholder="210"
+                    className="h-9"
+                    data-testid="nutrition-kcal-input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">кДж</Label>
+                  <Input
+                    type="number" step="0.1" inputMode="decimal"
+                    value={form.nutrition_kj ?? ''}
+                    onChange={(e) => setForm({ ...form, nutrition_kj: e.target.value })}
+                    placeholder="880"
+                    className="h-9"
+                    data-testid="nutrition-kj-input"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!form.is_banner && (
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Привязка к Caffesta</Label>
               {caffestaProducts.length > 0 ? (
