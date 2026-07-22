@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, ImageIcon, Tag, Search, Image, Layers, Loader2, FileJson, Download, Edit3 } from 'lucide-react';
+import { Plus, ImageIcon, Tag, Search, Image, Layers, Loader2, FileJson, Download, Edit3, Zap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +27,7 @@ import { SortableMenuItem } from '@/components/menu/SortableMenuItem';
 import {
   CategoryDialog, ItemDialog, DeleteDialog,
   ImportJsonDialog, ImportModeDialog, LabelDialog,
-  BulkRenameCategoriesDialog,
+  BulkRenameCategoriesDialog, NutritionImportDialog,
 } from '@/components/menu/MenuDialogs';
 
 export default function MenuPage() {
@@ -49,6 +49,7 @@ export default function MenuPage() {
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [bulkRenameDialogOpen, setBulkRenameDialogOpen] = useState(false);
   const [bulkRenameSaving, setBulkRenameSaving] = useState(false);
+  const [nutritionImportOpen, setNutritionImportOpen] = useState(false);
   
   // Form states
   const [editingCategory, setEditingCategory] = useState(null);
@@ -394,6 +395,29 @@ export default function MenuPage() {
     }
   };
 
+  // Import nutrition (БЖУ) from .docx — used by NutritionImportDialog
+  const handleNutritionImport = async ({ file, dryRun, applyIds, finalCount }) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const qs = new URLSearchParams({ dry_run: String(dryRun) });
+    if (!dryRun && applyIds) qs.append('apply_ids', applyIds);
+    try {
+      const resp = await axios.post(
+        `${API}/restaurants/${currentRestaurantId}/menu-items/nutrition-import?${qs.toString()}`,
+        fd,
+        { headers: { ...authHeaders.headers, 'Content-Type': 'multipart/form-data' } }
+      );
+      if (!dryRun) {
+        toast.success(`Обновлено позиций: ${resp.data.applied} из ${finalCount ?? '?'}`);
+        fetchData();
+      }
+      return resp.data;
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Ошибка импорта БЖУ');
+      throw e;
+    }
+  };
+
   // Download images
   const downloadAllImages = async () => {
     setDownloadingImages(true);
@@ -455,6 +479,14 @@ export default function MenuPage() {
             data-testid="bulk-rename-categories-btn"
           >
             <Edit3 className="w-4 h-4" />Переименовать
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2 rounded-full"
+            onClick={() => setNutritionImportOpen(true)}
+            data-testid="nutrition-import-btn"
+          >
+            <Zap className="w-4 h-4" />Импорт БЖУ
           </Button>
           {hasExternalImages && (
             <Button variant="outline" className="gap-2 rounded-full" onClick={downloadAllImages} disabled={downloadingImages} data-testid="download-images-btn">
@@ -547,6 +579,11 @@ export default function MenuPage() {
         categories={categories}
         saving={bulkRenameSaving}
         onSave={handleBulkRename}
+      />
+      <NutritionImportDialog
+        open={nutritionImportOpen}
+        onOpenChange={setNutritionImportOpen}
+        onImport={handleNutritionImport}
       />
     </div>
   );

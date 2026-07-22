@@ -304,11 +304,100 @@ async def delete_menu_item(restaurant_id: str, item_id: str, current_user: dict 
     return {"message": "Item deleted"}
 
 
+@router.post("/restaurants/{restaurant_id}/menu-items/nutrition-import")
+async def import_nutrition_docx(
+    restaurant_id: str,
+    file: UploadFile = File(...),
+    dry_run: bool = True,
+    apply_ids: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Импорт значений БЖУ (Белки/Жиры/Углеводы/ккал/кДж на 100 г) из .docx
+    файла в существующие блюда меню. Матчинг по имени через RapidFuzz.
+
+    Параметры:
+      - dry_run=True (default): возвращает preview matched/ambiguous/unmatched
+        без записи в БД.
+      - dry_run=False: применяет обновления для matched-записей.
+        Если задан apply_ids (csv строка item_id), обновление ограничивается
+        этим списком (используется когда пользователь снял галку с некоторых
+        строк в preview UI).
+
+    Возвращает:
+      {
+        "matched":    [{source, item_id, item_name, score, values}],
+        "ambiguous":  [{source, candidates: [...], values}],
+        "unmatched":  [{source, values, best_score}],
+        "records_total": int,
+        "applied": int  # only when dry_run=False
+      }
+    """
+    from services.nutrition_import import parse_docx_nutrition, match_records_to_items
+
+    await check_restaurant_access(current_user, restaurant_id)
+
+    filename = (file.filename or "").lower()
+    if not filename.endswith(".docx"):
+        raise HTTPException(400, "Ожидается .docx файл")
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(400, "Пустой файл")
+
+    try:
+        records = parse_docx_nutrition(file_bytes)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(400, f"Не удалось разобрать docx: {exc}")
+
+    if not records:
+        raise HTTPException(400, "В файле не найдено ни одной строки с БЖУ")
+
+    items_cursor = db.menu_items.find(
+        {"restaurant_id": restaurant_id, "is_banner": {"$ne": True}},
+        {"_id": 0, "id": 1, "name": 1},
+    )
+    items = await items_cursor.to_list(length=5000)
+
+    match_result = match_records_to_items(records, items)
+
+    if dry_run:
+        return {**match_result, "records_total": len(records), "applied": 0}
+
+    # apply mode: обновляем matched, опционально фильтруя по apply_ids
+    allowed_ids: Optional[set] = None
+    if apply_ids:
+        allowed_ids = {aid.strip() for aid in apply_ids.split(",") if aid.strip()}
+
+    applied = 0
+    for m in match_result["matched"]:
+        if allowed_ids is not None and m["item_id"] not in allowed_ids:
+            continue
+        v = m["values"]
+        update = {
+            "nutrition_protein": v.get("protein"),
+            "nutrition_fat": v.get("fat"),
+            "nutrition_carbs": v.get("carbs"),
+            "nutrition_kcal": v.get("kcal"),
+            "nutrition_kj": v.get("kj"),
+        }
+        # Не перетираем существующее значение на None (если строка пришла без числа)
+        update = {k: val for k, val in update.items() if val is not None}
+        if update:
+            result = await db.menu_items.update_one(
+                {"id": m["item_id"], "restaurant_id": restaurant_id},
+                {"$set": update},
+            )
+            if result.matched_count:
+                applied += 1
+
+    return {**match_result, "records_total": len(records), "applied": applied}
+
+
 @router.post("/restaurants/{restaurant_id}/menu-items/reorder")
 async def reorder_items(restaurant_id: str, order: List[str], current_user: dict = Depends(get_current_user)):
     await check_restaurant_access(current_user, restaurant_id)
-    for idx, item_id in enumerate(order):
-        await db.menu_items.update_one({"id": item_id, "restaurant_id": restaurant_id}, {"$set": {"sort_order": idx}})
+    for idx, item_id in enumerate(order):        await db.menu_items.update_one({"id": item_id, "restaurant_id": restaurant_id}, {"$set": {"sort_order": idx}})
     return {"message": "Reordered"}
 
 

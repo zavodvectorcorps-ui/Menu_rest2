@@ -1,0 +1,25 @@
+{
+  "summary": "Full backend + frontend testing of nutrition (БЖУ) import from .docx. Parser correctly handles per-dish tables (real file: 67 records) and flat tables. Matcher correctly identifies matched/ambiguous/unmatched. Endpoint edge cases (non-.docx, empty, no tables) return 400. Apply flow persists nutrition_* fields. Frontend NutritionImportDialog shows preview with correct counts (46 matched / 17 ambiguous / 4 unmatched), counter decreases on uncheck.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_nutrition_import.py",
+    "/app/test_reports/pytest/nutrition_import.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Parser edge quirk (not user-facing today): the 'per-dish table' branch triggers whenever a table has 3..5 rows. If a user ever supplies a flat header+data table with only 2-4 data rows (total 3-5), parser would treat it as per-dish and lose data. Real user file uses per-dish format so not affected. Consider tightening the heuristic (e.g. only take per-dish branch when row0 spans <=1 column with text and last row has >=5 numeric cells).",
+    "nutrition_import endpoint uses HTTPException(400, msg) positional signature — works but non-standard; prefer HTTPException(status_code=400, detail=msg) for consistency.",
+    "In apply loop, when apply_ids is provided, item_id belonging to matched but excluded is silently skipped. No feedback in response about skipped items — could be useful ('skipped: N')."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_nutrition_import.py"
+  ],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100%"},
+  "test_credentials": "admin / 220066",
+  "seed_data_creation": "Tests create TEST_ prefixed dishes and clean them up via delete in finally blocks.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Nutrition import feature verified end-to-end. Real user file /tmp/bzu.docx contains 67 records → 46 matched / 17 ambiguous / 4 unmatched against admin's live restaurant menu. All new tests live at /app/backend/tests/test_nutrition_import.py and cover parser (per-dish + flat + real file), matcher (exact + ambiguous + unmatched), endpoint edge cases (400 for non-.docx / empty / no-tables), dry-run preview shape, apply persistence with apply_ids filter. Frontend UI dialog verified: correctly opens from admin/menu → shows 3 sections (matched with checkboxes, ambiguous chips, unmatched list) + live counter + apply button.",
+  "rca of the issue": "N/A — no bugs found."
+}

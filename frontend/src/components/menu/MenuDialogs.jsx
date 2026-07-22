@@ -740,3 +740,227 @@ export function BulkRenameCategoriesDialog({ open, onOpenChange, categories, sav
   );
 }
 
+
+
+
+export function NutritionImportDialog({ open, onOpenChange, onImport }) {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);   // { matched, ambiguous, unmatched, records_total }
+  const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [checkedMatched, setCheckedMatched] = useState({});      // { [source_key]: true/false }
+  const [ambiguousChoice, setAmbiguousChoice] = useState({});   // { [source_key]: item_id }
+
+  useEffect(() => {
+    if (!open) {
+      setFile(null); setPreview(null); setLoading(false); setApplying(false);
+      setCheckedMatched({}); setAmbiguousChoice({});
+    }
+  }, [open]);
+
+  // On preview: default all matched checked, no ambiguous selected
+  useEffect(() => {
+    if (preview) {
+      const cm = {};
+      preview.matched.forEach((m) => { cm[m.source] = true; });
+      setCheckedMatched(cm);
+      setAmbiguousChoice({});
+    }
+  }, [preview]);
+
+  const runPreview = async () => {
+    if (!file) return;
+    setLoading(true);
+    try {
+      const result = await onImport({ file, dryRun: true });
+      setPreview(result);
+    } catch (e) {
+      // handled by parent toast
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Rows the user will actually apply
+  const finalRows = (() => {
+    if (!preview) return [];
+    const rows = [];
+    preview.matched.forEach((m) => {
+      if (checkedMatched[m.source]) {
+        rows.push({ item_id: m.item_id, source: m.source, item_name: m.item_name, score: m.score });
+      }
+    });
+    preview.ambiguous.forEach((a) => {
+      const chosen = ambiguousChoice[a.source];
+      if (chosen) {
+        const cand = a.candidates.find((c) => c.item_id === chosen);
+        rows.push({ item_id: chosen, source: a.source, item_name: cand?.name, score: cand?.score });
+      }
+    });
+    return rows;
+  })();
+
+  const applyImport = async () => {
+    if (!file || finalRows.length === 0) return;
+    setApplying(true);
+    try {
+      const ids = finalRows.map((r) => r.item_id).join(',');
+      await onImport({ file, dryRun: false, applyIds: ids, finalCount: finalRows.length });
+      onOpenChange(false);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col" data-testid="nutrition-import-dialog">
+        <DialogHeader>
+          <DialogTitle>Импорт БЖУ из .docx</DialogTitle>
+          <DialogDescription>
+            Загрузите документ с таблицами Белки/Жиры/Углеводы/Ккал/кДж на 100 г. Система найдёт блюда в вашем меню по названию и предложит проставить значения.
+          </DialogDescription>
+        </DialogHeader>
+
+        {!preview && (
+          <div className="flex flex-col items-center gap-4 py-8">
+            <input
+              type="file"
+              accept=".docx"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              className="block text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-mint-500 file:text-white file:font-semibold hover:file:bg-mint-600 cursor-pointer"
+              data-testid="nutrition-file-input"
+            />
+            {file && (
+              <div className="text-xs text-muted-foreground">Выбран: {file.name} ({Math.round(file.size / 1024)} KB)</div>
+            )}
+            <Button onClick={runPreview} disabled={!file || loading} data-testid="nutrition-preview-btn">
+              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Разбираю…</> : 'Показать предпросмотр'}
+            </Button>
+          </div>
+        )}
+
+        {preview && (
+          <div className="flex-1 overflow-y-auto -mx-6 px-6 space-y-4">
+            <div className="text-xs text-muted-foreground">
+              Всего строк в файле: <b>{preview.records_total}</b> · Найдено точно: <b>{preview.matched.length}</b> · Требуют выбора: <b>{preview.ambiguous.length}</b> · Не найдено: <b>{preview.unmatched.length}</b>
+            </div>
+
+            {preview.matched.length > 0 && (
+              <section>
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <Check className="w-4 h-4 text-mint-500" />
+                  Автоматически сматчено ({preview.matched.length})
+                </h3>
+                <div className="border border-border rounded-lg divide-y">
+                  {preview.matched.map((m) => (
+                    <label key={m.source} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/40 cursor-pointer text-sm">
+                      <input
+                        type="checkbox"
+                        checked={!!checkedMatched[m.source]}
+                        onChange={(e) => setCheckedMatched({ ...checkedMatched, [m.source]: e.target.checked })}
+                        className="w-4 h-4"
+                        data-testid={`nutrition-match-cb-${m.item_id}`}
+                      />
+                      <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+                        <div className="truncate">
+                          <span className="text-muted-foreground text-xs">Из файла:</span> {m.source}
+                        </div>
+                        <div className="truncate">
+                          <span className="text-muted-foreground text-xs">Блюдо:</span> {m.item_name}
+                        </div>
+                      </div>
+                      <span className={cn(
+                        "text-[10px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap",
+                        m.score >= 95 ? 'bg-mint-500 text-white' : m.score >= 80 ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'
+                      )}>{m.score}%</span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {preview.ambiguous.length > 0 && (
+              <section>
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2 text-amber-600">
+                  <Sparkles className="w-4 h-4" />
+                  Требуется выбор ({preview.ambiguous.length})
+                </h3>
+                <div className="border border-amber-300/50 rounded-lg divide-y">
+                  {preview.ambiguous.map((a) => (
+                    <div key={a.source} className="px-3 py-2 text-sm">
+                      <div className="mb-1.5 text-muted-foreground">
+                        Из файла: <b className="text-foreground">{a.source}</b>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setAmbiguousChoice({ ...ambiguousChoice, [a.source]: '__skip__' })}
+                          className={cn(
+                            "px-2 py-1 rounded-full text-xs border transition-colors",
+                            ambiguousChoice[a.source] === '__skip__' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                          )}
+                        >
+                          Пропустить
+                        </button>
+                        {a.candidates.map((c) => (
+                          <button
+                            key={c.item_id}
+                            type="button"
+                            onClick={() => setAmbiguousChoice({ ...ambiguousChoice, [a.source]: c.item_id })}
+                            className={cn(
+                              "px-2 py-1 rounded-full text-xs border transition-colors",
+                              ambiguousChoice[a.source] === c.item_id ? 'bg-mint-500 text-white border-mint-500' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                            )}
+                            data-testid={`nutrition-ambig-choice-${c.item_id}`}
+                          >
+                            {c.name} <span className="opacity-60">({c.score}%)</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {preview.unmatched.length > 0 && (
+              <section>
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2 text-muted-foreground">
+                  <X className="w-4 h-4" />
+                  Не найдены в меню ({preview.unmatched.length})
+                </h3>
+                <div className="text-xs text-muted-foreground">
+                  Добавьте эти позиции в меню вручную или переименуйте существующие, чтобы совпало с файлом.
+                </div>
+                <ul className="mt-1.5 text-sm space-y-0.5">
+                  {preview.unmatched.map((u) => (
+                    <li key={u.source} className="text-muted-foreground">• {u.source}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+        )}
+
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          {preview && (
+            <div className="text-sm text-muted-foreground mr-auto" data-testid="nutrition-final-counter">
+              Будет применено: <b>{finalRows.length}</b>
+            </div>
+          )}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Отмена</Button>
+          {preview && (
+            <Button
+              onClick={applyImport}
+              disabled={applying || finalRows.length === 0}
+              data-testid="nutrition-apply-btn"
+            >
+              {applying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Применяю…</> : `Применить ${finalRows.length || ''}`}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
