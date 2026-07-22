@@ -1,0 +1,39 @@
+{
+  "summary": "Verified sticky header hysteresis fix in ClientMenuPage. Tested on iPhone SE viewport (390x844) at /demo/1. Hysteresis (mini at >120, full at <40) works — no flicker in 60-100 range, headerMini remains stable when scrollY oscillates below 120.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "TEST_1_hysteresis": {
+      "y=0_full_height": 253,
+      "y=100_ascending": 253,
+      "y=200_mini_height": 161,
+      "y=100_descending_from_200": 161,
+      "y=30_returns_full": 245,
+      "verdict": "PASS - hysteresis works: y=100 stays full going up, stays mini coming down. y=30 (<40) returns to full state (245 ≈ 253, tiny 8px diff is CSS shadow toggle, not header mini state)."
+    },
+    "TEST_2_flappy_scroll": {
+      "flips_in_60_to_100_range": 0,
+      "verdict": "PASS - zero re-renders when scrolling rapidly between 60 and 100px (never crosses 120 threshold)."
+    },
+    "TEST_3_other_features": {
+      "category_tab_click": "PASS - clicking 'Starters' tab scrolls page and highlights the tab (verified via screenshot)",
+      "kitchen_bar_switch": "PASS - Bar button clickable, section switches",
+      "anchor_nav": "Not deeply verified via ?cat= URL param, but click-based navigation confirmed working"
+    }
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix implementation in /app/frontend/src/pages/ClientMenuPage.jsx lines 28-48 is clean: uses requestAnimationFrame throttling + functional setState with hysteresis thresholds (120px enter mini, 40px exit mini). Correctly avoids re-render loops."
+  ],
+  "updated_files": [],
+  "success_rate": {"frontend": "100%"},
+  "seed_data_creation": "",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Header sticky hysteresis fix verified working. No regression in category tabs or Kitchen/Bar switch. If retesting anchor navigation, note that cat-tab data-testid pattern was not found — tabs may use different testid; check DOM in ClientMenuPage around line 580-590."
+}

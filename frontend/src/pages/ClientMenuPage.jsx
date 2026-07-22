@@ -20,14 +20,23 @@ const API = `${BACKEND_URL}/api`;
 export default function ClientMenuPage({ domainMode = false } = {}) {
   const { tableCode, slug, tableNumber } = useParams();
 
-  // "Mini" sticky header — collapses logo+name to a slim bar after the user scrolls
+  // "Mini" sticky header — collapses logo+name to a slim bar after the user scrolls.
+  // NB: используется гистерезис (120px чтобы схлопнуть, 40px чтобы развернуть),
+  // иначе на iOS Safari колебания scrollY у address-bar заставляют состояние
+  // многократно переключаться, что вызывает моргание шапки (padding/размеры
+  // анимируются, layout плывёт).
   const [headerMini, setHeaderMini] = useState(false);
   useEffect(() => {
     let raf = 0;
     const onScroll = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
-        setHeaderMini(window.scrollY > 80);
+        const y = window.scrollY;
+        setHeaderMini((prev) => {
+          if (!prev && y > 120) return true;
+          if (prev && y < 40) return false;
+          return prev;
+        });
         raf = 0;
       });
     };
