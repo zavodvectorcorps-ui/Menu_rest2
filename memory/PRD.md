@@ -4,6 +4,18 @@
 ## Последнее обновление: 2026-02-13 (часть 3)
 
 ### Изменения 2026-02-13 (часть 3)
+### Изменения 2026-02-13 (часть 5)
+- **Импорт БЖУ из .docx с fuzzy-matching (P1, DONE)**:
+  - **Пользовательский сценарий**: у ресторана уже есть Word-документ с пищевой ценностью на 100 г для каждого блюда (67 позиций в реальном файле). Ручной ввод — часы работы. Fuzzy-импорт по названиям решает за секунды.
+  - **Backend `services/nutrition_import.py`** (новый файл):
+    - `parse_docx_nutrition`: поддерживает 2 формата — «одно блюдо на таблицу» (row0=имя, row3=P/F/C/kcal/kj) и «плоская таблица N строк». В реальном файле — первый формат (67 таблиц).
+    - `match_records_to_items`: вместо `WRatio` (даёт ложные срабатывания на «с»/«и») использует `max(token_set_ratio, partial_ratio-5)`. Порог 65, ambiguity gap 8. Возвращает 3 корзины: `matched`/`ambiguous`/`unmatched`.
+    - Тест на реальном файле: 67 записей → 46 matched (score 65-100), 17 ambiguous (близкие кандидаты), 4 unmatched (нет в меню).
+  - **Backend endpoint** `POST /api/restaurants/{rid}/menu-items/nutrition-import`: multipart `file` + `?dry_run=1|0` + `?apply_ids=csv`. Возвращает `{matched, ambiguous, unmatched, records_total, applied, skipped}`. Не перезаписывает существующие значения на None (если из docx пришла пустая клетка).
+  - **Frontend `NutritionImportDialog`**: 2-этапный flow. Шаг 1 — загрузка `.docx` + preview. Шаг 2 — интерактивный выбор: чекбоксы для matched (все по умолчанию checked), chip-selector для ambiguous с опцией «Пропустить», просмотр unmatched-списка. Счётчик «Будет применено: N» обновляется live. Кнопка «Применить N» отправляет `apply_ids`.
+  - **Verification**: end-to-end на реальном файле → 46 позиций обновлены за один клик (Гранола: P=5.24 F=16.32 C=29.36, Шакшука: P=7.09 F=11.56 C=18.76 — совпадает с docx). NutritionBadge немедленно отображается в клиентском меню.
+  - **Testing agent iteration_25**: 100% pass, никаких issues, action_items пустой. Небольшое улучшение из code review (`skipped` в ответе) применено.
+
 ### Изменения 2026-02-13 (часть 4)
 - **Пищевая ценность блюд (БЖУ) + Language Switcher как иконка на mobile (P1, DONE)**:
   - **Backend** (`models.py`): 5 новых `Optional[float]` полей в `MenuItem`/`Create`/`Update`: `nutrition_protein`, `nutrition_fat`, `nutrition_carbs`, `nutrition_kcal`, `nutrition_kj` (все на 100 г). `None` по умолчанию — обратная совместимость с legacy items. Verified через curl: CRUD работает, null сохраняется как null (не 0).

@@ -370,8 +370,10 @@ async def import_nutrition_docx(
         allowed_ids = {aid.strip() for aid in apply_ids.split(",") if aid.strip()}
 
     applied = 0
+    skipped = 0
     for m in match_result["matched"]:
         if allowed_ids is not None and m["item_id"] not in allowed_ids:
+            skipped += 1
             continue
         v = m["values"]
         update = {
@@ -391,7 +393,7 @@ async def import_nutrition_docx(
             if result.matched_count:
                 applied += 1
 
-    return {**match_result, "records_total": len(records), "applied": applied}
+    return {**match_result, "records_total": len(records), "applied": applied, "skipped": skipped}
 
 
 @router.post("/restaurants/{restaurant_id}/menu-items/reorder")
