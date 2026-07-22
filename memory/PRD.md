@@ -4,6 +4,15 @@
 ## Последнее обновление: 2026-02-13 (часть 3)
 
 ### Изменения 2026-02-13 (часть 3)
+### Изменения 2026-02-13 (часть 4)
+- **Пищевая ценность блюд (БЖУ) + Language Switcher как иконка на mobile (P1, DONE)**:
+  - **Backend** (`models.py`): 5 новых `Optional[float]` полей в `MenuItem`/`Create`/`Update`: `nutrition_protein`, `nutrition_fat`, `nutrition_carbs`, `nutrition_kcal`, `nutrition_kj` (все на 100 г). `None` по умолчанию — обратная совместимость с legacy items. Verified через curl: CRUD работает, null сохраняется как null (не 0).
+  - **Frontend `NutritionBadge.jsx`** (новый компонент): рендерит "Б 20 • Ж 12 • У 5 • 210 ккал / 880 кДж" в 11px muted-foreground. Возвращает null если все поля пусты. Пропускает индивидуально пустые поля (не показывает "Б null").
+  - **`ItemDialog`** (админка): секция «Пищевая ценность (на 100 г, необязательно)» с 5 numeric-input'ами (data-testid `nutrition-{field}-input`). В `MenuPage.saveItemHandler` — helper `nutParse('' | non-numeric) → null`, чтобы админ не заводил случайные нули.
+  - **`ClientMenuPage`**: `<NutritionBadge item={item} variant="block" />` в 3 варианта карточек (compact list, grid card, detailed).
+  - **`LanguageSwitcher`** переработан: два варианта — `pill` (старое поведение, десктоп) и `icon` (глобус с бейджем текущего языка + popover с флагами RU/EN/中文 на клик). В mobile-шапке сразу видна иконка `variant="icon"` с `md:hidden`; desktop показывает pill в `hidden md:flex`.
+  - **Verified** testing agent iteration_24: 100% pass backend + frontend. Никаких регрессий (якорные ссылки, header stability всё работает).
+
 - **Fix — моргание sticky-хедера клиентского меню (P0, DONE)**:
   - **Bug**: пользователь заснял на видео (`IMG_5967.MOV`), что на мобильном (iOS Safari) при скролле около верхней границы шапка меню начинает моргать — logo и tabs секций дёргаются.
   - **Root cause**: `setHeaderMini(window.scrollY > 80)` имел ЕДИНЫЙ порог. На iOS Safari адрес-бар авто-сворачивается/разворачивается при скролле, что создаёт микро-колебания `window.scrollY`. Если пользователь оказывается около 80px, эти колебания вызывают ложные переключения `headerMini` true↔false → `padding`/`width`/`height` анимируются через transition-[padding,width,height] → layout плывёт → sticky-содержимое ниже сдвигается → cascade re-renders → визуальное моргание.
