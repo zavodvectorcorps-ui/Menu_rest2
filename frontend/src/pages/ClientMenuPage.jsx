@@ -20,32 +20,6 @@ const API = `${BACKEND_URL}/api`;
 export default function ClientMenuPage({ domainMode = false } = {}) {
   const { tableCode, slug, tableNumber } = useParams();
 
-  // "Mini" sticky header — collapses logo+name to a slim bar after the user scrolls.
-  // NB: используется гистерезис (120px чтобы схлопнуть, 40px чтобы развернуть),
-  // иначе на iOS Safari колебания scrollY у address-bar заставляют состояние
-  // многократно переключаться, что вызывает моргание шапки (padding/размеры
-  // анимируются, layout плывёт).
-  const [headerMini, setHeaderMini] = useState(false);
-  useEffect(() => {
-    let raf = 0;
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        const y = window.scrollY;
-        setHeaderMini((prev) => {
-          if (!prev && y > 120) return true;
-          if (prev && y < 40) return false;
-          return prev;
-        });
-        raf = 0;
-      });
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, []);
   const isSlugMode = !!slug && !!tableNumber;
   const isDomainMode = !!domainMode && !!tableNumber && !slug;
   const storageKey = isDomainMode
@@ -587,33 +561,32 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
         </div>
       )}
 
-      {/* Header — sticky with mini mode on scroll */}
+      {/* Header — sticky. На мобильной версии всегда в компактном режиме,
+          на md+ разворачивается в полный размер. Без scroll-based schrink,
+          чтобы не было моргания при колебаниях viewport (iOS Safari). */}
       <header
         ref={headerRef}
-        className={`sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border overflow-x-clip transition-[padding,background] duration-200 ${headerMini ? 'shadow-sm' : ''}`}
-        data-mini={headerMini ? '1' : '0'}
+        className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border overflow-x-clip"
       >
-        <div className={`px-4 transition-[padding] duration-200 ${headerMini ? 'pt-2 pb-1.5' : 'pt-4 pb-2'}`}>
+        <div className="px-4 pt-2 pb-1.5 md:pt-4 md:pb-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               {restaurant.logo_url ? (
                 <img
                   src={restaurant.logo_url}
                   alt={restaurant.name}
-                  className={`rounded-xl object-cover flex-shrink-0 transition-[width,height] duration-200 ${headerMini ? 'w-7 h-7' : 'w-10 h-10'}`}
+                  className="rounded-xl object-cover flex-shrink-0 w-7 h-7 md:w-10 md:h-10"
                 />
               ) : (
-                <div className={`rounded-xl bg-mint-500 flex items-center justify-center text-white font-bold flex-shrink-0 transition-[width,height,font-size] duration-200 ${headerMini ? 'w-7 h-7 text-sm' : 'w-10 h-10'}`}>
+                <div className="rounded-xl bg-mint-500 flex items-center justify-center text-white font-bold flex-shrink-0 w-7 h-7 text-sm md:w-10 md:h-10 md:text-base">
                   {restaurant.name?.charAt(0)}
                 </div>
               )}
               <div className="min-w-0">
-                <h1 className={`font-heading font-bold text-foreground truncate transition-[font-size,line-height] duration-200 ${headerMini ? 'text-sm leading-tight' : ''}`}>
+                <h1 className="font-heading font-bold text-foreground truncate text-sm leading-tight md:text-base md:leading-normal">
                   {restaurant.name}
                 </h1>
-                {!headerMini && (
-                  <p className="text-xs text-muted-foreground">{t('table_label')} №{table.number}</p>
-                )}
+                <p className="hidden md:block text-xs text-muted-foreground">{t('table_label')} №{table.number}</p>
               </div>
             </div>
 
@@ -625,7 +598,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                   if (!next) setSearchQuery('');
                   if (next) setTimeout(() => searchInputRef.current?.focus(), 50);
                 }}
-                className={`rounded-full flex items-center justify-center transition-all ${headerMini ? 'w-8 h-8' : 'w-9 h-9'} ${
+                className={`rounded-full flex items-center justify-center w-8 h-8 md:w-9 md:h-9 ${
                   searchOpen
                     ? 'bg-mint-500 text-white'
                     : 'border border-border text-foreground/70 hover:bg-muted'
@@ -639,7 +612,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`rounded-full border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 px-3 whitespace-nowrap transition-[height] duration-200 ${headerMini ? 'h-8' : 'h-9'}`}
+                  className="rounded-full border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 px-3 whitespace-nowrap h-8 md:h-9"
                   onClick={() => setCallModalOpen(true)}
                   data-testid="call-staff-btn"
                 >
@@ -650,15 +623,13 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
             </div>
           </div>
 
-          {/* Language switcher — secondary row, hidden in mini mode */}
-          {!headerMini && (
-            <div className="flex justify-end mt-2">
-              <LanguageSwitcher lang={lang} setLang={setLang} availableLangs={enabledLangs} />
-            </div>
-          )}
+          {/* Language switcher + slogan — только desktop */}
+          <div className="hidden md:flex justify-end mt-2">
+            <LanguageSwitcher lang={lang} setLang={setLang} availableLangs={enabledLangs} />
+          </div>
 
-          {restaurant.slogan && !headerMini && (
-            <p className="text-sm text-muted-foreground mt-2 italic">{restaurant.slogan}</p>
+          {restaurant.slogan && (
+            <p className="hidden md:block text-sm text-muted-foreground mt-2 italic">{restaurant.slogan}</p>
           )}
         </div>
 
