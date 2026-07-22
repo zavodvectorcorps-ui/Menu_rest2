@@ -1,0 +1,33 @@
+{
+  "summary": "Regression tests for nutrition-import fuzzy-matcher stop-words fix. Real /tmp/bzu.docx (67 records) preview returns 200 with matched+ambiguous+unmatched summing to 67, and 'Сырники с ванильным кремом' is NOT in matched. Apply flow now returns 'skipped' counter. However, isolated matcher unit test reveals stop-word fix is data-dependent — with only 'Чизбургер с вишневым соусом' as a candidate (no competing item to trigger ambiguity_gap), Сырники still lands in matched with score=75 via partial_ratio.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "services/nutrition_import.match_records_to_items", "issue": "Stop-word fix is INCOMPLETE for isolated candidate sets. When a source has NO competing close candidate, fuzz.partial_ratio still lands 'Сырники с ванильным кремом и вишневым соусом' onto 'Чизбургер с вишневым соусом' with score=75 → matched (not ambiguous). On real dataset it works because ambiguity_gap catches it, but the guarantee is not robust. Consider (a) raising score_threshold, (b) dropping the partial_ratio branch entirely, or (c) requiring a minimum first-token / lemma overlap between source and best candidate before allowing auto-match."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_nutrition_import.py",
+    "/app/test_reports/pytest/iteration_26.xml"
+  ],
+  "action_items": [
+    "Optional: harden fuzzy matcher so 'Сырники с … вишневым соусом' vs 'Чизбургер с … вишневым соусом' is safe even in isolation (e.g. require first-token overlap or drop partial_ratio-5 branch). Real user file already routes it correctly.",
+    "Production 500: rebuild container / redeploy on rest-menu.by so python-docx and new services are picked up (owner action, outside preview scope)."
+  ],
+  "critical_code_review_comments": [
+    "match_records_to_items uses max(token_set_ratio, partial_ratio-5). partial_ratio is a substring-scorer and is precisely what re-introduces the Сырники↔Чизбургер collision when the shared tail 'вишневым соусом' is present. Stopwords don't affect substring scoring.",
+    "ambiguity_gap=8 makes 'is this ambiguous?' depend on presence of a second close candidate — safety guarantee for a single source name changes based on other menu items. Fragile.",
+    "records_total=67 stable, endpoint returns HTTP 200 on preview with valid schema."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_nutrition_import.py"
+  ],
+  "success_rate": {"backend": "93% (13/14)", "frontend": "not tested this iteration (backend focus per request)"},
+  "test_credentials": "admin / 220066",
+  "seed_data_creation": "TEST_ prefixed dishes created + deleted per test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "iteration_26 added 4 new tests: (1) stopword regression Сырники vs Чизбургер [FAILS in isolation, data-dependent], (2) exact-match guard Гранола/Шакшука [PASS], (3) real-file counts sum to 67 + Сырники not in matched [PASS], (4) skipped field in apply response [PASS]. Preview backend on /tmp/bzu.docx returns 200 with 67 records correctly split. The apply endpoint now correctly returns skipped counter. The stopword fix is effective on real data but not bulletproof against contrived isolated candidate sets — main agent may consider hardening.",
+  "rca of the issue": "Fuzzy scoring formula max(token_set_ratio, partial_ratio-5): stopword removal only affects token_set_ratio; partial_ratio still finds 'чизбургер вишневым соусом' as a near-substring of 'сырники ванильным кремом вишневым соусом' → score 80-5=75 ≥ threshold 65. Auto-match protection then relies on ambiguity_gap requiring a second close candidate, which is present in real 300-item menu but absent in a 2-item test. In production data the fix works; in adversarial small-menu configurations it does not."
+}

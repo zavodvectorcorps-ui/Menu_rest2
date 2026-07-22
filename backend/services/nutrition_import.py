@@ -158,6 +158,22 @@ def _record_from_name_and_nums(name: str, nums: list[Optional[float]]) -> dict:
     }
 
 
+_STOPWORDS_RU = {
+    # Короткие частицы/предлоги/союзы, которые не несут смысла и
+    # искусственно завышают fuzzy score между не-родственными блюдами
+    # (напр. «сырники С вишневым соусом» ↔ «чизбургер С вишневым соусом»).
+    "с", "со", "и", "а", "но", "из", "в", "во", "на", "по", "к", "ко",
+    "у", "о", "об", "обо", "за", "от", "до", "или", "же", "то", "ли",
+}
+
+
+def _tokenize_for_match(text: str) -> str:
+    """Нормализует и удаляет стоп-слова. Возвращает 'сырники ванильным кремом вишневым соусом'."""
+    s = _clean_name(text or "").lower()
+    tokens = [tok for tok in re.split(r"[^\wёЁ]+", s) if tok and tok not in _STOPWORDS_RU]
+    return " ".join(tokens)
+
+
 def match_records_to_items(
     records: list[dict],
     items: list[dict],
@@ -167,11 +183,11 @@ def match_records_to_items(
     """
     Для каждой записи из docx находит лучший MenuItem по имени.
 
-    Scorer: комбинация token_set_ratio (устойчива к перестановке и разной длине)
-    + partial_ratio (ловит подстроки). Итоговый score = max(token_set_ratio,
-    partial_ratio − 5). Такой подход даёт стабильные оценки для русских
-    многословных названий блюд и не завышает score из-за общих коротких слов
-    вроде «с», «и», «а», как это делает WRatio.
+    Scorer: комбинация token_set_ratio (устойчива к перестановке) + partial_ratio
+    (ловит подстроки). Итоговый score = max(token_set_ratio, partial_ratio − 5).
+    Перед подсчётом из строк удаляются короткие русские стоп-слова
+    («с», «и», «а», «в» и т.п.), чтобы они не завышали IoU при пересечении
+    не-родственных блюд (напр. «Сырники с … соусом» vs «Чизбургер с … соусом»).
     """
     if not items:
         return {"matched": [], "ambiguous": [], "unmatched": [
@@ -179,16 +195,16 @@ def match_records_to_items(
             for r in records
         ]}
 
-    choices = [_clean_name(it["name"]).lower() for it in items]
+    choices = [_tokenize_for_match(it["name"]) for it in items]
 
     def _score(a: str, b: str, **_kwargs) -> float:
         ts = fuzz.token_set_ratio(a, b)
-        pr = fuzz.partial_ratio(a, b) - 5  # slight penalty against pure substring
+        pr = fuzz.partial_ratio(a, b) - 5
         return max(ts, pr)
 
     matched, ambiguous, unmatched = [], [], []
     for rec in records:
-        query = _clean_name(rec["name"]).lower()
+        query = _tokenize_for_match(rec["name"])
         if not query:
             continue
 

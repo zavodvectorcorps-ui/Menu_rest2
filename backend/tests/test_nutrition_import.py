@@ -141,6 +141,106 @@ def test_matcher_exact_and_ambiguous():
     assert "Совершенно другое блюдо xyz" in unmatched_sources
 
 
+# ---------- stop-word / fuzzy regression tests ----------
+def test_matcher_stopwords_no_false_match_syrniki_vs_cheeseburger():
+    """REGRESSION: 'Сырники с ванильным кремом и вишневым соусом' must NOT be
+    auto-matched with 'Чизбургер с вишневым соусом'. Should land in ambiguous
+    or unmatched — never in matched auto-apply."""
+    from services.nutrition_import import match_records_to_items
+    items = [
+        {"id": "cb", "name": "Чизбургер с вишневым соусом"},
+        {"id": "other", "name": "Паста Карбонара"},
+    ]
+    records = [
+        {"name": "Сырники с ванильным кремом и вишневым соусом",
+         "protein": 11.15, "fat": 16.37, "carbs": 28.74, "kcal": 306, "kj": 1285},
+    ]
+    res = match_records_to_items(records, items)
+    matched_sources = [m["source"] for m in res["matched"]]
+    assert "Сырники с ванильным кремом и вишневым соусом" not in matched_sources, (
+        f"Regression: Сырники auto-matched to Чизбургер. matched={res['matched']}"
+    )
+
+
+def test_matcher_exact_matches_still_work():
+    """REGRESSION guard: real exact/near-exact matches must still land in matched."""
+    from services.nutrition_import import match_records_to_items
+    items = [
+        {"id": "g", "name": "Гранола с сезонными фруктами"},
+        {"id": "s", "name": "Шакшука"},
+        {"id": "o", "name": "Совсем другое блюдо"},
+    ]
+    records = [
+        {"name": "Гранола с сезонными фруктами", "protein": 9, "fat": 14, "carbs": 60, "kcal": 410, "kj": 1717},
+        {"name": "Шакшука", "protein": 7.8, "fat": 8.1, "carbs": 5.4, "kcal": 125, "kj": 523},
+    ]
+    res = match_records_to_items(records, items)
+    matched_sources = [m["source"] for m in res["matched"]]
+    assert "Гранола с сезонными фруктами" in matched_sources
+    assert "Шакшука" in matched_sources
+    for m in res["matched"]:
+        assert m["score"] >= 65
+
+
+def test_endpoint_real_file_counts_sum_to_total(auth_headers, restaurant_id):
+    """REGRESSION: real /tmp/bzu.docx → 67 records, matched+ambiguous+unmatched == 67."""
+    if not os.path.exists(SAMPLE_DOCX):
+        pytest.skip("no sample file")
+    with open(SAMPLE_DOCX, "rb") as f:
+        blob = f.read()
+    files = {"file": ("bzu.docx", blob,
+                      "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+    r = requests.post(
+        f"{API}/restaurants/{restaurant_id}/menu-items/nutrition-import",
+        headers=auth_headers, files=files, params={"dry_run": "true"}, timeout=60,
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    total = data["records_total"]
+    assert total == 67, f"expected 67 records, got {total}"
+    s = len(data["matched"]) + len(data["ambiguous"]) + len(data["unmatched"])
+    assert s == total, f"matched({len(data['matched'])})+ambiguous({len(data['ambiguous'])})+unmatched({len(data['unmatched'])})={s} != {total}"
+    # Regression: Сырники must NOT be in matched
+    for m in data["matched"]:
+        src = m["source"].lower()
+        if "сырники" in src and "ванильн" in src:
+            pytest.fail(f"Сырники с ванильным кремом still in matched: {m}")
+
+
+def test_endpoint_apply_returns_skipped_field(auth_headers, restaurant_id, category_id):
+    """Apply flow with apply_ids should now return 'skipped' counter."""
+    ids = []
+    for name in ["TEST_SkipA", "TEST_SkipB"]:
+        r = requests.post(f"{API}/restaurants/{restaurant_id}/menu-items", headers=auth_headers,
+                          json={"name": name, "price": 100, "category_id": category_id}, timeout=15)
+        assert r.status_code in (200, 201)
+        ids.append(r.json()["id"])
+    try:
+        doc_bytes = _make_flat_docx([
+            ("TEST_SkipA", [1.0, 2.0, 3.0, 50, 209]),
+            ("TEST_SkipB", [4.0, 5.0, 6.0, 80, 335]),
+            ("Filler1", [1, 1, 1, 1, 1]),
+            ("Filler2", [1, 1, 1, 1, 1]),
+            ("Filler3", [1, 1, 1, 1, 1]),
+        ])
+        files = {"file": ("skip.docx", doc_bytes,
+                          "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+        r = requests.post(
+            f"{API}/restaurants/{restaurant_id}/menu-items/nutrition-import",
+            headers=auth_headers, files=files,
+            params={"dry_run": "false", "apply_ids": ids[0]},
+            timeout=30,
+        )
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert "skipped" in data, f"'skipped' field missing from apply response: {data}"
+        assert data["applied"] == 1
+        assert data["skipped"] >= 1, f"expected >=1 skipped (SkipB filtered out), got {data['skipped']}"
+    finally:
+        for iid in ids:
+            requests.delete(f"{API}/restaurants/{restaurant_id}/menu-items/{iid}", headers=auth_headers, timeout=15)
+
+
 # ---------- endpoint edge cases ----------
 def _make_flat_docx(dish_names_with_vals):
     doc = Document()
