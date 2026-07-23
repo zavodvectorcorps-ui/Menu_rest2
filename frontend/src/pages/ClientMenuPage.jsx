@@ -953,9 +953,9 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             data-testid={`menu-item-${item.id}`}
                             onClick={() => setDetailsItem(item)}
                           >
-                            <div className="aspect-square w-full bg-muted relative">
+                            <div className="aspect-square w-full bg-black/40 relative">
                               {item.image_url ? (
-                                <MenuImage src={item.image_url} alt={localizedName(item)} className="w-full h-full object-cover" />
+                                <MenuImage src={item.image_url} alt={localizedName(item)} className="w-full h-full object-contain" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
                                   <ImageIcon className="w-10 h-10 text-muted-foreground/30" />
@@ -1060,9 +1060,9 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                             onClick={() => setDetailsItem(item)}
                           >
                             <div className="flex">
-                              <div className="w-28 h-28 flex-shrink-0 bg-muted relative">
+                              <div className="w-28 h-28 flex-shrink-0 bg-black/40 relative">
                                 {item.image_url ? (
-                                  <MenuImage src={item.image_url} alt={localizedName(item)} className="w-full h-full object-cover" />
+                                  <MenuImage src={item.image_url} alt={localizedName(item)} className="w-full h-full object-contain" />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
                                     <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
