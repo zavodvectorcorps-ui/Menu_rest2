@@ -37,9 +37,13 @@ export function ImageUpload({ value, onChange, restaurantId }) {
       toast.error('Сначала загрузите фото');
       return;
     }
-    // Convert full URL back to path for backend (fal.ai нужен public URL — backend его сам построит)
-    const imgPath = value.startsWith(BACKEND_URL) ? value.slice(BACKEND_URL.length) : value;
-    if (!imgPath) {
+    // Отправляем абсолютный URL. fal.ai должен скачать картинку с публичного домена.
+    let imgPath = value;
+    if (imgPath.startsWith('/')) {
+      // относительный путь — префиксуем текущим origin браузера
+      imgPath = window.location.origin + imgPath;
+    }
+    if (!imgPath || !/^https?:\/\//i.test(imgPath)) {
       toast.error('Некорректный URL изображения');
       return;
     }

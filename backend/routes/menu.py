@@ -781,14 +781,16 @@ async def generate_video(
     if not payload.image_url:
         raise HTTPException(400, "image_url обязателен")
 
-    # fal.ai нужен PUBLIC url. Если это относительный /api/uploads/... —
-    # префиксуем публичным доменом через REACT_APP_BACKEND_URL (или PUBLIC_BASE_URL).
+    # fal.ai нужен PUBLIC url. Абсолютные http(s) URL пропускаем как есть; для относительных
+    # (/api/uploads/...) — префиксуем PUBLIC_BASE_URL или REACT_APP_BACKEND_URL.
     img = payload.image_url
     if img.startswith("/"):
         base = os.environ.get("PUBLIC_BASE_URL") or os.environ.get("REACT_APP_BACKEND_URL", "")
         if not base:
             raise HTTPException(400, "Не задан PUBLIC_BASE_URL — fal.ai не сможет скачать изображение")
         img = base.rstrip("/") + img
+    elif not img.lower().startswith(("http://", "https://")):
+        raise HTTPException(400, "image_url должен быть абсолютным http(s) URL")
 
     try:
         rid = await submit_image_to_video(img, payload.prompt, payload.duration)
