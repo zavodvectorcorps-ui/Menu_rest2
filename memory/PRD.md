@@ -4,6 +4,12 @@
 ## Последнее обновление: 2026-02-13 (часть 3)
 
 ### Изменения 2026-02-13 (часть 3)
+### Изменения 2026-02-13 (часть 6)
+- **Кадрирование изображений при загрузке (P1, DONE)**:
+  - **`ImageCropperDialog`** (новый компонент): react-easy-crop 6.2.2. Модалка открывается сразу после выбора файла в ImageUpload. Функционал: пресеты aspect (1:1, 4:5, 3:4, 16:9, свободно), zoom slider (1-5×), rotation slider (-180°..+180°), кнопка «Сбросить». Выход — JPEG (quality 0.92, макс сторона 2048px, canvas.toBlob).
+  - **`ImageUpload`** переработан: file-select больше не грузит напрямую, а открывает cropper. После save — POST /api/upload с обрезанным blob. Лимит 15MB (соответствует backend). Copy `'или перетащите файл'` убрана (drag-drop не реализован — избегаем misleading UX).
+  - **Тесты** через testing-agent iteration_28 → нашёл 2 bugs (state не сбрасывался при re-open, hint text '5MB' vs 15MB) + 3 code-review замечания (null-guard в getCroppedBlob, cleanup cropSrc, removed drag-drop hint) → все 5 фиксов применены → iteration_29 подтвердил 100% pass, `retest_needed=false`, никаких issues.
+
 ### Изменения 2026-02-13 (часть 5)
 - **Импорт БЖУ из .docx с fuzzy-matching (P1, DONE)**:
   - **Пользовательский сценарий**: у ресторана уже есть Word-документ с пищевой ценностью на 100 г для каждого блюда (67 позиций в реальном файле). Ручной ввод — часы работы. Fuzzy-импорт по названиям решает за секунды.
