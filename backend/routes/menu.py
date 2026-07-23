@@ -20,8 +20,11 @@ from services.translation import (
 )
 
 UPLOADS_DIR = Path(__file__).parent.parent / "uploads"
-ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
-MAX_FILE_SIZE = 5 * 1024 * 1024
+ALLOWED_IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+ALLOWED_VIDEO_EXTS = {'.mp4', '.webm', '.mov'}
+ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTS | ALLOWED_VIDEO_EXTS
+MAX_IMAGE_SIZE = 15 * 1024 * 1024   # 15 MB
+MAX_VIDEO_SIZE = 30 * 1024 * 1024   # 30 MB
 
 router = APIRouter()
 
@@ -739,18 +742,22 @@ async def delete_label(restaurant_id: str, label_id: str, current_user: dict = D
 async def upload_file(file: UploadFile = File(...)):
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail=f"Недопустимый формат. Разрешены: {', '.join(ALLOWED_EXTENSIONS)}")
+        raise HTTPException(status_code=400, detail=f"Недопустимый формат. Разрешены: {', '.join(sorted(ALLOWED_EXTENSIONS))}")
+
+    is_video = ext in ALLOWED_VIDEO_EXTS
+    limit = MAX_VIDEO_SIZE if is_video else MAX_IMAGE_SIZE
 
     content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=400, detail="Файл слишком большой. Максимум 5MB")
+    if len(content) > limit:
+        max_mb = limit // (1024 * 1024)
+        raise HTTPException(status_code=400, detail=f"Файл слишком большой. Максимум {max_mb}MB")
 
     filename = f"{uuid.uuid4()}{ext}"
     filepath = UPLOADS_DIR / filename
     with open(filepath, "wb") as f:
         f.write(content)
 
-    return {"url": f"/api/uploads/{filename}", "filename": filename}
+    return {"url": f"/api/uploads/{filename}", "filename": filename, "is_video": is_video}
 
 
 @router.post("/restaurants/{restaurant_id}/download-images")

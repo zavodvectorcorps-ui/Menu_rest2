@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Image as ImageIcon } from 'lucide-react';
 
+const VIDEO_RE = /\.(mp4|webm|mov)(\?|$)/i;
+
+function isVideo(src) {
+  return typeof src === 'string' && VIDEO_RE.test(src);
+}
+
 /**
- * <img> wrapper with two reliability features:
- *   1. Auto-retry up to 2 times on load error with a cache-busting `?_r=N`
- *      query param. Helps with transient HTTP/2 stream resets and
- *      occasional nginx upstream hiccups when many menu items load in
- *      parallel (which we frequently see on initial menu open).
- *   2. Skeleton-fallback placeholder while loading or after permanent error.
+ * Universal media wrapper: renders <video> for .mp4/.webm/.mov URLs
+ * (autoplay + muted + loop + playsInline — behaves like an animated GIF),
+ * otherwise renders an <img> with the existing auto-retry + skeleton logic.
  *
- * Drop-in replacement for `<img src=... className=... />`.
+ * Drop-in replacement for `<img src=... className=... />` — signature not changed.
  */
 export default function MenuImage({ src, alt = '', className = '', wrapperClassName = '' }) {
   const [attempt, setAttempt] = useState(0);
@@ -32,6 +35,24 @@ export default function MenuImage({ src, alt = '', className = '', wrapperClassN
     );
   }
 
+  // Video branch — no cache-busting retries; browsers handle stalled loads themselves.
+  if (isVideo(src)) {
+    return (
+      <video
+        src={src}
+        className={className}
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        aria-label={alt}
+        onError={() => setFailed(true)}
+        data-testid="menu-video"
+      />
+    );
+  }
+
   // Append `?_r=N` only on retries; don't pollute URLs on the happy path.
   const finalSrc = attempt === 0 ? src : `${src}${src.includes('?') ? '&' : '?'}_r=${attempt}`;
 
@@ -45,8 +66,6 @@ export default function MenuImage({ src, alt = '', className = '', wrapperClassN
       onLoad={() => setLoaded(true)}
       onError={() => {
         if (attempt < 2) {
-          // Wait a bit before retrying — usually the issue is a transient
-          // upstream hiccup that clears in <500ms.
           const delay = 300 + attempt * 400;
           setTimeout(() => setAttempt((n) => n + 1), delay);
         } else {
