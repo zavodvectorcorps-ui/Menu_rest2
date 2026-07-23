@@ -198,9 +198,16 @@ def match_records_to_items(
     choices = [_tokenize_for_match(it["name"]) for it in items]
 
     def _score(a: str, b: str, **_kwargs) -> float:
-        ts = fuzz.token_set_ratio(a, b)
-        pr = fuzz.partial_ratio(a, b) - 5
-        return max(ts, pr)
+        # Взвешенная комбинация двух метрик:
+        #   - token_sort_ratio (60%) — сравнивает отсортированные токены целиком,
+        #     штрафует за лишние/недостающие слова. Устойчив к перестановке.
+        #   - token_set_ratio (40%) — терпимее к дополнительным словам, но
+        #     сам по себе даёт 75% для «Сырники...» ↔ «Чизбургер с ... соусом»
+        #     из-за 2 общих слов.
+        # Оба + удаление стоп-слов дают: «Сырники...» vs «Чизбургер...»≈61%
+        # (< 65, unmatched), «Сырники длинное» vs «Сырники» ≈67% (matched),
+        # точное совпадение / перестановка = 100.
+        return 0.6 * fuzz.token_sort_ratio(a, b) + 0.4 * fuzz.token_set_ratio(a, b)
 
     matched, ambiguous, unmatched = [], [], []
     for rec in records:

@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 27: hardened fuzzy-matcher (0.6*token_sort_ratio + 0.4*token_set_ratio, no partial_ratio) fully validated. All 14 pre-existing tests + 4 new regression tests pass (18/18). Real /tmp/bzu.docx returns matched=46, ambiguous=4, unmatched=17 (sum=67 total), with 33 matched items scoring >=95, and 'Сырники с ванильным кремом и вишневым соусом' correctly lands in unmatched. Isolated 2-item edge case from iter_26 is now fixed: Сырники vs Чизбургер+Паста Карбонара → NOT in matched.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_nutrition_import.py",
+    "/app/backend/tests/test_nutrition_import_iter27.py",
+    "/app/test_reports/pytest/iteration_27.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "New scoring formula is cleaner and more predictable — token_sort_ratio (60%) is a hard constraint against reordered/extra words, while token_set_ratio (40%) tolerates minor lexical differences. Documented tradeoffs in the code comment are accurate.",
+    "Threshold 65 + ambiguity_gap 8 produce good real-world distribution on the 67-record test file. High-confidence bucket (score>=95) covers 33/46 matched items — indicates exact/near-exact matches dominate as expected.",
+    "Prod 500 (deployment) issue remains a container rebuild concern outside preview scope — untouched here."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_nutrition_import_iter27.py (new)"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "not tested (backend only per request)"},
+  "test_credentials": "admin / 220066",
+  "seed_data_creation": "TEST_ prefixed dishes created + deleted per test (in existing suite).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration 27 added /app/backend/tests/test_nutrition_import_iter27.py with 4 focused regressions on the new scoring formula: (1) short query vs long choice matches (score>=65), (2) word permutation ролл калифорния matches with score>=95, (3) isolated Сырники vs Чизбургер NO false match — this is the case that failed in iter_26 and now passes because partial_ratio was removed, (4) real /tmp/bzu.docx distribution exact expectations (46/4/17, >=30 score>=95). All 18 tests pass end-to-end. No open issues.",
+  "rca of the issue": "iter_26 identified that fuzz.partial_ratio was rescuing 'Сырники с … вишневым соусом' onto 'Чизбургер с … вишневым соусом' with substring score=80-5=75 in isolated 2-item candidate sets. Main agent replaced the formula with 0.6*token_sort_ratio + 0.4*token_set_ratio — token_sort_ratio penalises for length/extra tokens, so the Сырники/Чизбургер pair scores ~0.6*30 + 0.4*75 ≈ 48 < 65 → unmatched. All previous properties preserved: exact matches, word permutations, and short-query-vs-long-choice all still cross threshold. Verified end-to-end on both isolated matcher unit tests and the real 67-record file endpoint."
+}
