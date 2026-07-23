@@ -6,15 +6,22 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { API } from '@/App';
 import axios from 'axios';
+import { ImageCropperDialog } from './ImageCropperDialog';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 export function ImageUpload({ value, onChange }) {
   const [uploading, setUploading] = useState(false);
+  const [cropSrc, setCropSrc] = useState(null);     // data URL передаваемая в cropper
+  const [cropOpen, setCropOpen] = useState(false);
+  const [origName, setOrigName] = useState('image');
   const fileInputRef = useRef(null);
 
-  const handleFileSelect = async (e) => {
+  // Read the file into a data URL and open the cropper.
+  const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
+    // reset the input so re-selecting the same file re-triggers onChange
+    if (e.target) e.target.value = '';
     if (!file) return;
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -22,19 +29,29 @@ export function ImageUpload({ value, onChange }) {
       toast.error('Недопустимый формат. Разрешены: JPG, PNG, GIF, WebP');
       return;
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Файл слишком большой. Максимум 5MB');
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error('Файл слишком большой. Максимум 15MB');
       return;
     }
 
-    setUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropSrc(reader.result);
+      setOrigName(file.name || 'image');
+      setCropOpen(true);
+    };
+    reader.onerror = () => toast.error('Не удалось прочитать файл');
+    reader.readAsDataURL(file);
+  };
 
+  // Called by ImageCropperDialog once the user confirms.
+  const uploadCroppedBlob = async (blob, filename) => {
+    setUploading(true);
     try {
-      const response = await axios.post(`${API}/upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const fd = new FormData();
+      fd.append('file', blob, filename || 'image.jpg');
+      const response = await axios.post(`${API}/upload`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       const imageUrl = `${BACKEND_URL}${response.data.url}`;
       onChange(imageUrl);
@@ -107,6 +124,14 @@ export function ImageUpload({ value, onChange }) {
           className="text-sm"
         />
       </div>
+
+      <ImageCropperDialog
+        open={cropOpen}
+        onOpenChange={setCropOpen}
+        imageSrc={cropSrc}
+        filename={origName}
+        onCropped={uploadCroppedBlob}
+      />
     </div>
   );
 }

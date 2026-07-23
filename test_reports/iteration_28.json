@@ -1,0 +1,41 @@
+{
+  "summary": "Frontend-only smoke test of new ImageCropperDialog integration in Admin Menu → Add Item flow. Login → /admin/menu → click 'Позиция' → file input inside item dialog → cropper dialog appears with all controls → aspect presets, zoom/rotation sliders, save all functional → POST /api/upload succeeds, image URL populated in form. One functional bug found: cropper state NOT reset between opens (contradicts spec). One minor UI copy inconsistency.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ImageCropperDialog",
+        "issue": "State (zoom/rotation/aspect/crop) is not reset when dialog is closed. Requirement states: 'Диалог cropper при отмене — состояние сбрасывается (следующий open начинается с zoom=1, rotation=0)'. After closing (Отмена or Save), re-opening cropper with a new image retains previous zoom (e.g. 1.4) and rotation (e.g. 10°). Fix: reset state in a useEffect keyed on `open` (when open becomes true or false, reset zoom=1, rotation=0, crop={0,0}, aspect=1). Verified by test: after save with zoom=1.4/rot=10, cleared image, re-uploaded — aria-valuenow was still 1.4 and 10.",
+        "selector": "[data-testid=\"image-cropper-dialog\"] [data-testid=\"cropper-zoom-slider\"]",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "ImageUpload dropzone hint text",
+        "issue": "Dropzone caption says 'JPG, PNG, GIF, WebP до 5MB' but the file-size validator in handleFileSelect enforces 15MB. Update copy to '... до 15MB' or reduce validator limit for consistency.",
+        "selector": "div.border-dashed p.text-xs",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Reset cropper local state (zoom, rotation, crop, aspect, croppedAreaPixels) on dialog open. Simplest: add useEffect(() => { if (open) { setZoom(1); setRotation(0); setCrop({x:0,y:0}); setAspect(1); setCroppedAreaPixels(null); } }, [open]).",
+    "Fix dropzone hint text '5MB' → '15MB' (or lower validator) in ImageUpload.jsx line ~103."
+  ],
+  "critical_code_review_comments": [
+    "ImageCropperDialog does not clean up object state on close — memory-lightweight but breaks UX expectation.",
+    "getCroppedBlob resolves with null if canvas.toBlob fails; handleSave then calls onCropped(null, ...) which axios would send as empty. Consider guarding: if (!blob) { toast.error('Не удалось создать изображение'); return; }",
+    "ImageCropperDialog file receives raw imageSrc (data URL up to 15MB base64 ≈ 20MB string) — kept in state indefinitely after close. Also see cropSrc in ImageUpload retains full base64 in memory. Consider clearing cropSrc on dialog close/save.",
+    "ImageUpload.jsx: no drag-and-drop handler is wired despite hint text 'или перетащите файл' — misleading. Either add onDrop or remove hint."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "85%"},
+  "test_credentials": "admin / 220066",
+  "seed_data_creation": "Generated /tmp/test400.png (400x300 gradient PNG) via PIL for upload smoke test.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "ImageCropperDialog + ImageUpload wiring works E2E (login → /admin/menu → 'Позиция' btn → hidden file input with accept=image/jpeg,... → cropper opens → save posts to /api/upload → returns {url} → preview appears). data-testids present: image-cropper-dialog, cropper-aspect-{1:1|4:5|3:4|16:9|Свободно}, cropper-reset, cropper-zoom-slider, cropper-rotation-slider, cropper-save-btn. When automating, target the file input via accept=image/jpeg (page has 2 file inputs; first is import-menu .json). WS 400 errors in console are pre-existing, unrelated.",
+  "rca of the issue": "State-reset bug: In ImageCropperDialog.jsx, useState initial values (zoom=1, rotation=0, aspect=1, crop={0,0}) are only used at component mount. Since ImageUpload keeps the component mounted (only toggles `open` via cropOpen), the state persists across open cycles. The `reset` helper exists but is only called by the 'Сбросить' button, not on open/close of the dialog. Fix: add useEffect(() => { if (open) reset(); setCroppedAreaPixels(null); }, [open])."
+}
