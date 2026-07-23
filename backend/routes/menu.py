@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
 from typing import List, Optional
 from pathlib import Path
+from pydantic import BaseModel
+import os
 import uuid
 import re as _re
 
@@ -758,6 +760,56 @@ async def upload_file(file: UploadFile = File(...)):
         f.write(content)
 
     return {"url": f"/api/uploads/{filename}", "filename": filename, "is_video": is_video}
+
+
+class VideoGenRequest(BaseModel):
+    image_url: str
+    prompt: str = ""
+    duration: str = "5"
+
+
+@router.post("/restaurants/{restaurant_id}/videos/generate")
+async def generate_video(
+    restaurant_id: str,
+    payload: VideoGenRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Запуск image-to-video через fal.ai. Возвращает request_id для polling."""
+    from services.video_gen import submit_image_to_video
+
+    await check_restaurant_access(current_user, restaurant_id)
+    if not payload.image_url:
+        raise HTTPException(400, "image_url обязателен")
+
+    # fal.ai нужен PUBLIC url. Если это относительный /api/uploads/... —
+    # префиксуем публичным доменом через REACT_APP_BACKEND_URL (или PUBLIC_BASE_URL).
+    img = payload.image_url
+    if img.startswith("/"):
+        base = os.environ.get("PUBLIC_BASE_URL") or os.environ.get("REACT_APP_BACKEND_URL", "")
+        if not base:
+            raise HTTPException(400, "Не задан PUBLIC_BASE_URL — fal.ai не сможет скачать изображение")
+        img = base.rstrip("/") + img
+
+    try:
+        rid = await submit_image_to_video(img, payload.prompt, payload.duration)
+    except Exception as exc:
+        raise HTTPException(502, f"Ошибка fal.ai: {exc}")
+    return {"request_id": rid}
+
+
+@router.get("/restaurants/{restaurant_id}/videos/status/{request_id}")
+async def get_video_status(
+    restaurant_id: str,
+    request_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    from services.video_gen import check_status
+
+    await check_restaurant_access(current_user, restaurant_id)
+    try:
+        return await check_status(request_id)
+    except Exception as exc:
+        raise HTTPException(502, f"Ошибка проверки статуса: {exc}")
 
 
 @router.post("/restaurants/{restaurant_id}/download-images")

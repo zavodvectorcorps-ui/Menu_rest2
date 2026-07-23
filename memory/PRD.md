@@ -1,9 +1,19 @@
 # PRD: Личный кабинет ресторана
 
 ## Дата создания: 2026-01-26
-## Последнее обновление: 2026-02-13 (часть 3)
+## Последнее обновление: 2026-02-14 (fal.ai video)
 
-### Изменения 2026-02-13 (часть 3)
+### Изменения 2026-02-14 — Fix HTTP 400 в /animate-image + доведение fal.ai flow (P0, DONE)
+- **Bug**: `POST /api/restaurants/{rid}/videos/generate` возвращал 400 `image_url обязателен` / 401 без токена — фронтенд `ImageUpload.jsx` не отправлял JWT в `startVideoGeneration` и `pollVideoStatus` (стояли голые `axios.post/get` без `Authorization: Bearer`), а также не валидировал пустой `imgPath`.
+- **Fix**:
+  - `ImageUpload.jsx`: добавлен helper `getAuthHeaders()`, все запросы `videos/generate` и `videos/status/{id}` теперь включают Bearer-токен из localStorage. Добавлена валидация: если `value`/`restaurantId`/`imgPath` пустые — тост «Сначала загрузите фото», без запроса на сервер.
+  - `services/video_gen.py`: обёрнуты `status_async` и `result_async` в try/except — если fal.ai падает с 422/сетевой ошибкой, возвращаем `{status:"failed", error:...}` вместо необработанного исключения (которое давало 502 через `HTTPException(502)` → Cloudflare edge иногда возвращал HTML 502).
+- **Verified E2E (curl)**:
+  1. POST `/videos/generate` с реальным изображением fal.ai (`kling_input.jpeg`) → `request_id: 019f9151-...`
+  2. Polling `/videos/status/{req}` каждые 10с → `in_progress` 4×, затем `completed` через ~50с
+  3. Backend скачал mp4 (18MB) и отдал через `/api/uploads/xxx.mp4` — статус 200, `content-type: video/mp4`, длительность 5s
+- **Итог**: полный flow «загрузка фото → кадрирование → «Оживить (AI)» → mp4 в карточке блюда» работает end-to-end.
+
 ### Изменения 2026-02-13 (часть 6)
 - **Кадрирование изображений при загрузке (P1, DONE)**:
   - **`ImageCropperDialog`** (новый компонент): react-easy-crop 6.2.2. Модалка открывается сразу после выбора файла в ImageUpload. Функционал: пресеты aspect (1:1, 4:5, 3:4, 16:9, свободно), zoom slider (1-5×), rotation slider (-180°..+180°), кнопка «Сбросить». Выход — JPEG (quality 0.92, макс сторона 2048px, canvas.toBlob).

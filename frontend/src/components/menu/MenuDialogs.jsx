@@ -73,7 +73,7 @@ export function CategoryDialog({ open, onOpenChange, editing, form, setForm, men
   );
 }
 
-export function ItemDialog({ open, onOpenChange, editing, form, setForm, categories, labels, currency, onSave, onToggleLabel, caffestaProducts = [] }) {
+export function ItemDialog({ open, onOpenChange, editing, form, setForm, categories, labels, currency, onSave, onToggleLabel, caffestaProducts = [], restaurantId = null }) {
   const [caffestaOpen, setCaffestaOpen] = useState(false);
 
   const selectedCafProduct = caffestaProducts.find(p => p.product_id === Number(form.caffesta_product_id));
@@ -263,7 +263,7 @@ export function ItemDialog({ open, onOpenChange, editing, form, setForm, categor
             </div>
           )}
 
-          <ImageUpload value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} />
+          <ImageUpload value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} restaurantId={restaurantId} />
 
           {!form.is_banner && (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-2">

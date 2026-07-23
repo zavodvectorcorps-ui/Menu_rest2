@@ -568,7 +568,7 @@ export default function MenuPage() {
 
       {/* Dialogs */}
       <CategoryDialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen} editing={editingCategory} form={categoryForm} setForm={setCategoryForm} menuSections={menuSections} onSave={saveCategoryHandler} />
-      <ItemDialog open={itemDialogOpen} onOpenChange={setItemDialogOpen} editing={editingItem} form={itemForm} setForm={setItemForm} categories={categories} labels={labels} currency={currency} onSave={saveItemHandler} onToggleLabel={toggleItemLabel} caffestaProducts={caffestaProducts} />
+      <ItemDialog open={itemDialogOpen} onOpenChange={setItemDialogOpen} editing={editingItem} form={itemForm} setForm={setItemForm} categories={categories} labels={labels} currency={currency} onSave={saveItemHandler} onToggleLabel={toggleItemLabel} caffestaProducts={caffestaProducts} restaurantId={currentRestaurantId} />
       <DeleteDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} target={deleteTarget} onConfirm={confirmDelete} />
       <ImportJsonDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} importJson={importJson} setImportJson={setImportJson} importing={importing} onImport={handleImportMenu} />
       <ImportModeDialog open={importModeDialogOpen} onOpenChange={(open) => { if (!open) { setImportModeDialogOpen(false); setPendingImportFile(null); } }} pendingFile={pendingImportFile} importing={importing} onExecute={executeImport} />

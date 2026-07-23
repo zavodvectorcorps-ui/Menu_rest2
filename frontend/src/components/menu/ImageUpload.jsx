@@ -1,8 +1,12 @@
 import { useState, useRef } from 'react';
-import { Upload, X, Loader2 } from 'lucide-react';
+import { Upload, X, Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { API } from '@/App';
 import axios from 'axios';
@@ -10,12 +14,93 @@ import { ImageCropperDialog } from './ImageCropperDialog';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
-export function ImageUpload({ value, onChange }) {
+export function ImageUpload({ value, onChange, restaurantId }) {
   const [uploading, setUploading] = useState(false);
-  const [cropSrc, setCropSrc] = useState(null);     // data URL передаваемая в cropper
+  const [cropSrc, setCropSrc] = useState(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [origName, setOrigName] = useState('image');
+  const [videoDialogOpen, setVideoDialogOpen] = useState(false);
+  const [videoPrompt, setVideoPrompt] = useState('');
+  const [videoDuration, setVideoDuration] = useState('5');
+  const [videoJob, setVideoJob] = useState(null); // { request_id, status }
   const fileInputRef = useRef(null);
+
+  const isCurrentVideo = /\.(mp4|webm|mov)(\?|$)/i.test(value || '');
+
+  const getAuthHeaders = () => ({
+    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+  });
+
+  // Start image-to-video generation
+  const startVideoGeneration = async () => {
+    if (!value || !restaurantId) {
+      toast.error('Сначала загрузите фото');
+      return;
+    }
+    // Convert full URL back to path for backend (fal.ai нужен public URL — backend его сам построит)
+    const imgPath = value.startsWith(BACKEND_URL) ? value.slice(BACKEND_URL.length) : value;
+    if (!imgPath) {
+      toast.error('Некорректный URL изображения');
+      return;
+    }
+    setVideoJob({ status: 'submitting' });
+    try {
+      const resp = await axios.post(
+        `${API}/restaurants/${restaurantId}/videos/generate`,
+        { image_url: imgPath, prompt: videoPrompt, duration: videoDuration },
+        getAuthHeaders()
+      );
+      const requestId = resp.data.request_id;
+      setVideoJob({ request_id: requestId, status: 'queued' });
+      toast.info('Задача отправлена. Обычно 30–90 секунд…');
+      pollVideoStatus(requestId);
+    } catch (e) {
+      setVideoJob(null);
+      toast.error(e.response?.data?.detail || 'Ошибка запуска генерации');
+    }
+  };
+
+  const pollVideoStatus = async (requestId) => {
+    let attempts = 0;
+    const maxAttempts = 60; // ~ 5 минут при интервале 5 сек
+    const interval = 5000;
+
+    const tick = async () => {
+      attempts++;
+      try {
+        const resp = await axios.get(
+          `${API}/restaurants/${restaurantId}/videos/status/${requestId}`,
+          getAuthHeaders()
+        );
+        const data = resp.data;
+        setVideoJob({ request_id: requestId, status: data.status });
+
+        if (data.status === 'completed' && data.video_url) {
+          const fullUrl = `${BACKEND_URL}${data.video_url}`;
+          onChange(fullUrl);
+          setVideoJob(null);
+          setVideoDialogOpen(false);
+          toast.success('Видео готово!');
+          return;
+        }
+        if (data.status === 'failed') {
+          setVideoJob(null);
+          toast.error(`Ошибка генерации: ${data.error || 'неизвестно'}`);
+          return;
+        }
+        if (attempts < maxAttempts) {
+          setTimeout(tick, interval);
+        } else {
+          setVideoJob(null);
+          toast.error('Слишком долго. Попробуйте позже.');
+        }
+      } catch (e) {
+        setVideoJob(null);
+        toast.error(e.response?.data?.detail || 'Ошибка проверки статуса');
+      }
+    };
+    setTimeout(tick, interval);
+  };
 
   // Read the file. Image → open cropper; video → upload directly.
   const handleFileSelect = (e) => {
@@ -120,6 +205,18 @@ export function ImageUpload({ value, onChange }) {
           >
             <X className="w-4 h-4" />
           </Button>
+          {!isCurrentVideo && restaurantId && (
+            <Button
+              size="sm"
+              className="absolute bottom-2 left-2 h-8 rounded-full gap-1.5 bg-purple-600 hover:bg-purple-700 text-white shadow-md"
+              onClick={() => { setVideoPrompt(''); setVideoDialogOpen(true); }}
+              disabled={!!videoJob}
+              data-testid="animate-photo-btn"
+            >
+              <Wand2 className="w-3.5 h-3.5" />
+              {videoJob ? `${videoJob.status}…` : 'Оживить (AI)'}
+            </Button>
+          )}
         </div>
       ) : (
         <div 
@@ -173,6 +270,74 @@ export function ImageUpload({ value, onChange }) {
         filename={origName}
         onCropped={uploadCroppedBlob}
       />
+
+      <Dialog open={videoDialogOpen} onOpenChange={(v) => !videoJob && setVideoDialogOpen(v)}>
+        <DialogContent className="max-w-lg" data-testid="animate-photo-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-600" />
+              Оживить фото (AI видео)
+            </DialogTitle>
+            <DialogDescription>
+              fal.ai Kling 2.5 создаст короткое видео на основе загруженного фото. Опишите желаемое движение камеры или анимацию.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Промт (на английском работает лучше)</Label>
+              <Textarea
+                value={videoPrompt}
+                onChange={(e) => setVideoPrompt(e.target.value)}
+                placeholder="smooth camera rotation around the cocktail, light steam rising, cinematic lighting"
+                rows={3}
+                disabled={!!videoJob}
+                data-testid="animate-prompt-input"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs">Длительность:</Label>
+              {['5', '10'].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setVideoDuration(d)}
+                  disabled={!!videoJob}
+                  className={
+                    'text-xs px-3 py-1 rounded-full border transition-colors ' +
+                    (videoDuration === d
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100')
+                  }
+                  data-testid={`animate-duration-${d}`}
+                >
+                  {d} сек
+                </button>
+              ))}
+            </div>
+            {videoJob && (
+              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Статус: <b>{videoJob.status}</b>. Обычно занимает 30–90 секунд.
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVideoDialogOpen(false)} disabled={!!videoJob}>
+              Отмена
+            </Button>
+            <Button
+              onClick={startVideoGeneration}
+              disabled={!!videoJob}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              data-testid="animate-start-btn"
+            >
+              {videoJob ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Генерирую…</> : 'Создать видео'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
