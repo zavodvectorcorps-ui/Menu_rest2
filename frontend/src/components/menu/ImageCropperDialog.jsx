@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Cropper from 'react-easy-crop';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import { Slider } from '@/components/ui/slider';
+import { toast } from 'sonner';
 
 const ASPECT_PRESETS = [
   { label: '1:1', value: 1 },
@@ -66,6 +67,18 @@ export function ImageCropperDialog({ open, onOpenChange, imageSrc, filename, onC
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  // Reset all local state on dialog open, so each new image starts fresh
+  // (previous zoom/rotation/aspect must not leak between uploads).
+  useEffect(() => {
+    if (open) {
+      setCrop({ x: 0, y: 0 });
+      setZoom(1);
+      setRotation(0);
+      setAspect(1);
+      setCroppedAreaPixels(null);
+    }
+  }, [open]);
+
   const onCropComplete = useCallback((_area, areaPixels) => {
     setCroppedAreaPixels(areaPixels);
   }, []);
@@ -81,6 +94,10 @@ export function ImageCropperDialog({ open, onOpenChange, imageSrc, filename, onC
     setSaving(true);
     try {
       const blob = await getCroppedBlob(imageSrc, croppedAreaPixels);
+      if (!blob) {
+        toast.error('Не удалось создать изображение (браузер отказал в canvas)');
+        return;
+      }
       // Preserve extension where possible — cropper always outputs JPEG.
       const base = (filename || 'image').replace(/\.[^.]+$/, '');
       onCropped(blob, `${base}.jpg`);

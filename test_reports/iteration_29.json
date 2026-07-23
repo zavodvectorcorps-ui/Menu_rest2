@@ -1,0 +1,26 @@
+{
+  "summary": "Retest ImageCropperDialog + ImageUpload fixes from iteration_28. All 5 fixes (2 bugs + 3 code-review comments) verified end-to-end via Playwright.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "fixes_verified": [
+    {"id": "FIX1", "desc": "Cropper state resets on open (useEffect [open])", "status": "PASS", "evidence": "After save with zoom=1.4/rotation=10, reopening cropper with new file shows aria-valuenow=1 for zoom and aria-valuenow=0 for rotation. Aspect returns to 1:1."},
+    {"id": "FIX2", "desc": "Dropzone hint text '15MB'", "status": "PASS", "evidence": "text 'JPG, PNG, GIF, WebP до 15MB' visible (count=1); '5MB' no longer present (count=0)."},
+    {"id": "FIX3", "desc": "getCroppedBlob null-guard in handleSave with toast", "status": "PASS (static review)", "evidence": "ImageCropperDialog.jsx lines 96-100: if (!blob) toast.error(...); return;"},
+    {"id": "FIX4", "desc": "cropSrc cleared onOpenChange(false) in ImageUpload", "status": "PASS (static review)", "evidence": "ImageUpload.jsx lines 130-133: onOpenChange callback calls setCropSrc(null) when v is false."},
+    {"id": "FIX5", "desc": "Removed misleading 'или перетащите файл'; new copy 'Нажмите для загрузки изображения'", "status": "PASS", "evidence": "'перетащите файл' count=0; 'Нажмите для загрузки изображения' count=1."}
+  ],
+  "regression_flow": "PASS — Login admin/220066 → /admin/menu → 'Позиция' → file input (accept=image/*) → cropper opens with 5 aspect presets (1:1, 4:5, 3:4, 16:9, Свободно), zoom slider, rotation slider, Сбросить, Отмена, Сохранить и загрузить → save triggers POST /api/upload → toast 'Изображение загружено' → preview image rendered.",
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Console warning: 'Missing Description or aria-describedby for {DialogContent}' still appears for the parent 'Новая позиция' menu-item dialog (not for cropper — cropper already has DialogDescription). Consider adding DialogDescription to the item edit dialog for a11y.",
+    "Pre-existing WebSocket 400 errors on /api/ws/{id} unrelated to this feature."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100%"},
+  "test_credentials": "admin / 220066",
+  "seed_data_creation": "/tmp/test400.png and /tmp/test500.png (PIL solid-color images for two-file upload flow).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All ImageCropperDialog fixes confirmed. Test flow: login → /admin/menu → click first 'Позиция' button → image file input is the one with accept starting 'image/jpeg' (page still has 2 file inputs; the other is menu-import JSON). Use Radix slider [role=slider] + ArrowRight key to bump values (zoom step=0.05, rotation step=1). aria-valuenow reflects state."
+}

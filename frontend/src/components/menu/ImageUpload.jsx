@@ -97,10 +97,10 @@ export function ImageUpload({ value, onChange }) {
             <div className="flex flex-col items-center gap-2">
               <Upload className="w-8 h-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                Нажмите для загрузки или перетащите файл
+                Нажмите для загрузки изображения
               </p>
               <p className="text-xs text-muted-foreground">
-                JPG, PNG, GIF, WebP до 5MB
+                JPG, PNG, GIF, WebP до 15MB
               </p>
             </div>
           )}
@@ -127,7 +127,10 @@ export function ImageUpload({ value, onChange }) {
 
       <ImageCropperDialog
         open={cropOpen}
-        onOpenChange={setCropOpen}
+        onOpenChange={(v) => {
+          setCropOpen(v);
+          if (!v) setCropSrc(null); // release base64 memory when closed
+        }}
         imageSrc={cropSrc}
         filename={origName}
         onCropped={uploadCroppedBlob}
