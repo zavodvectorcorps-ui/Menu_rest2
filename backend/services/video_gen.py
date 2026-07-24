@@ -10,6 +10,7 @@ Uses fal_client's async queue API. Все запросы async. Ключ чит�
 """
 import os
 import asyncio
+import shutil
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -79,12 +80,36 @@ async def check_status(request_id: str) -> dict:
     if not remote_url:
         return {"status": "failed", "error": "no video in fal.ai result"}
 
-    # Скачиваем себе
-    local_name = f"{uuid.uuid4()}.mp4"
-    local_path = UPLOADS_DIR / local_name
+    # Скачиваем себе (raw из fal.ai)
+    raw_name = f"{uuid.uuid4()}.raw.mp4"
+    raw_path = UPLOADS_DIR / raw_name
     async with httpx.AsyncClient(timeout=120) as client:
         resp = await client.get(remote_url)
         resp.raise_for_status()
-        local_path.write_bytes(resp.content)
+        raw_path.write_bytes(resp.content)
 
-    return {"status": "completed", "video_url": f"/api/uploads/{local_name}"}
+    # Сжимаем через ffmpeg (H.264 CRF 28, макс 720p, faststart для стрима, без звука).
+    # Если ffmpeg недоступен — оставляем исходник.
+    local_name = f"{uuid.uuid4()}.mp4"
+    local_path = UPLOADS_DIR / local_name
+    if shutil.which("ffmpeg"):
+        proc = await asyncio.create_subprocess_exec(
+            "ffmpeg", "-y", "-i", str(raw_path),
+            "-vcodec", "libx264", "-preset", "veryfast", "-crf", "28",
+            "-vf", "scale='min(1280,iw)':-2",
+            "-movflags", "+faststart",
+            "-an",
+            str(local_path),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await proc.wait()
+        if proc.returncode == 0 and local_path.exists():
+            raw_path.unlink(missing_ok=True)
+        else:
+            # Fallback — используем исходник
+            local_path = raw_path.rename(local_path)
+    else:
+        local_path = raw_path.rename(local_path)
+
+    return {"status": "completed", "video_url": f"/api/uploads/{local_path.name}"}
