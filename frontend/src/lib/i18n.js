@@ -207,10 +207,8 @@ export function useI18n(availableLangs = null) {
   const [lang, setLangState] = useState(() => {
     const saved = (typeof localStorage !== 'undefined' && localStorage.getItem(STORAGE_KEY)) || '';
     if (saved && STRINGS[saved] && (!allowed || allowed.has(saved))) return saved;
-    // Auto-detect from navigator
-    const nav = (typeof navigator !== 'undefined' && (navigator.language || '').toLowerCase()) || '';
-    if (nav.startsWith('zh') && (!allowed || allowed.has('zh'))) return 'zh';
-    if (nav.startsWith('en') && (!allowed || allowed.has('en'))) return 'en';
+    // По умолчанию — русский. Не смотрим navigator.language, потому что у
+    // многих телефонов системный язык English → авто-перевод Chrome ломает меню.
     return 'ru';
   });
 
