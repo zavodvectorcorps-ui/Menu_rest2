@@ -13,7 +13,7 @@ export default function ItemDetailsDialog({ open, onOpenChange, item, currency, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md p-0 overflow-hidden max-h-[92vh] flex flex-col" data-testid="item-details-dialog">
+      <DialogContent className="max-w-md p-0 overflow-hidden max-h-[92vh] flex flex-col [&>button.absolute]:hidden" data-testid="item-details-dialog">
         {/* Image */}
         <div className="relative w-full bg-muted">
           {item.image_url ? (
