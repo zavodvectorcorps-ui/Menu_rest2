@@ -310,7 +310,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     const name = data?.restaurant?.name;
     if (!name) return;
     const prev = document.title;
-    document.title = `Меню ресторана ${name}`;
+    document.title = `Меню ${name}`;
     return () => { document.title = prev; };
   }, [data?.restaurant?.name]);
 
@@ -1483,8 +1483,8 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
           data-testid="call-staff-fab"
           className={`md:hidden fixed left-1/2 -translate-x-1/2 z-40 h-12 px-6 rounded-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-semibold shadow-lg shadow-amber-500/30 flex items-center gap-2 transition-all ${cartEnabled && cart.length > 0 ? 'bottom-24' : 'bottom-4'}`}
         >
-          <Bell className="w-5 h-5" />
-          <span>{t('call_waiter')}</span>
+          <Bell className="w-5 h-5 flex-shrink-0" />
+          <span className="leading-[1.05] text-[15px]">{t('call_waiter')}</span>
         </button>
       )}
 
