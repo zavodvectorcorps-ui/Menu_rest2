@@ -265,10 +265,12 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
   }, [data?.categories]);
 
   // Синхронизация URL hash с активной категорией + история в браузере.
-  // Пушим новую history entry с debounce 700ms — то есть только после того, как
-  // пользователь «остановился» на категории (скроллом или кликом). Так «Назад»
-  // в браузере плавно возвращает по посещённым категориям, но при быстром
-  // свайпе через 5 категорий не создаётся 5 мусорных entries.
+  // Пушим новую history entry с небольшой задержкой (~350мс) — этого достаточно,
+  // чтобы очень быстрый свайп на 2-3 категории не создавал по entry на каждую,
+  // но каждая категория, на которой юзер задержался, попадала в историю.
+  // Таймер НЕ отменяется при смене категории (мы хотим последовательно пушнуть
+  // A→B→C, даже если пользователь листает без остановки, чтобы «Назад» вернул
+  // ровно по тому же маршруту).
   const suppressNextPushRef = useRef(false);
   useEffect(() => {
     if (!selectedCategory) return;
@@ -278,21 +280,19 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     const slug = slugify(cat.name) || cat.id;
     const currentHash = window.location.hash.replace(/^#/, '');
     if (currentHash === slug) return;
-    // Не пушить, если категория была активирована из popstate (браузерный Back).
     if (suppressNextPushRef.current) {
       suppressNextPushRef.current = false;
       return;
     }
-    const timer = window.setTimeout(() => {
-      // На момент срабатывания hash могли поменять — перепроверим.
+    window.setTimeout(() => {
+      // Перепроверяем — вдруг кто-то (popstate/другой effect) уже поставил такой hash.
       if (window.location.hash.replace(/^#/, '') === slug) return;
       try {
         const url = new URL(window.location.href);
         url.hash = slug;
         window.history.pushState(null, '', url);
       } catch { /* noop */ }
-    }, 700);
-    return () => window.clearTimeout(timer);
+    }, 350);
   }, [selectedCategory, data?.categories]);
 
   // Кнопка «Наверх» — floating pill в правом нижнем углу.
