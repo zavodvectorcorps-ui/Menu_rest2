@@ -306,6 +306,8 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
   }, []);
 
   // Заголовок вкладки браузера: «Меню <название>» + favicon = логотип ресторана.
+  // Инжектим и <link rel="icon">, и <link rel="apple-touch-icon"> — iOS Safari
+  // использует именно apple-touch-icon для превью вкладки.
   useEffect(() => {
     const name = data?.restaurant?.name;
     const logo = data?.restaurant?.logo_url;
@@ -313,26 +315,38 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     const prevTitle = document.title;
     document.title = `Меню ${name}`;
 
-    // Меняем favicon только если у ресторана задан логотип.
-    let injectedLink = null;
-    let prevHrefs = [];
+    const injected = [];
+    const hidden = [];
     if (logo) {
-      const existing = document.querySelectorAll("link[rel~='icon']");
-      prevHrefs = Array.from(existing).map((l) => ({ el: l, href: l.href }));
-      // Удаляем старые icon-links (иначе браузер может использовать первый).
-      existing.forEach((l) => l.parentNode.removeChild(l));
-      injectedLink = document.createElement('link');
-      injectedLink.rel = 'icon';
-      injectedLink.href = logo;
-      document.head.appendChild(injectedLink);
+      // Прячем существующие icon-links (не удаляем, чтобы восстановить при уходе).
+      document
+        .querySelectorAll(
+          'link[rel="icon"], link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]'
+        )
+        .forEach((l) => {
+          hidden.push({ el: l, parent: l.parentNode, next: l.nextSibling });
+          l.parentNode.removeChild(l);
+        });
+
+      const mkLink = (rel) => {
+        const el = document.createElement('link');
+        el.rel = rel;
+        el.href = logo;
+        document.head.appendChild(el);
+        injected.push(el);
+      };
+      mkLink('icon');
+      mkLink('shortcut icon');
+      mkLink('apple-touch-icon');
+      mkLink('apple-touch-icon-precomposed');
     }
 
     return () => {
       document.title = prevTitle;
-      if (injectedLink && injectedLink.parentNode) {
-        injectedLink.parentNode.removeChild(injectedLink);
-      }
-      prevHrefs.forEach(({ el }) => document.head.appendChild(el));
+      injected.forEach((el) => el.parentNode && el.parentNode.removeChild(el));
+      hidden.forEach(({ el, parent, next }) => {
+        if (parent) parent.insertBefore(el, next);
+      });
     };
   }, [data?.restaurant?.name, data?.restaurant?.logo_url]);
 
