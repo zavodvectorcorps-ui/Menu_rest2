@@ -305,14 +305,36 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     return () => window.removeEventListener('scroll', on);
   }, []);
 
-  // Заголовок вкладки браузера: «Меню ресторана <название>».
+  // Заголовок вкладки браузера: «Меню <название>» + favicon = логотип ресторана.
   useEffect(() => {
     const name = data?.restaurant?.name;
+    const logo = data?.restaurant?.logo_url;
     if (!name) return;
-    const prev = document.title;
+    const prevTitle = document.title;
     document.title = `Меню ${name}`;
-    return () => { document.title = prev; };
-  }, [data?.restaurant?.name]);
+
+    // Меняем favicon только если у ресторана задан логотип.
+    let injectedLink = null;
+    let prevHrefs = [];
+    if (logo) {
+      const existing = document.querySelectorAll("link[rel~='icon']");
+      prevHrefs = Array.from(existing).map((l) => ({ el: l, href: l.href }));
+      // Удаляем старые icon-links (иначе браузер может использовать первый).
+      existing.forEach((l) => l.parentNode.removeChild(l));
+      injectedLink = document.createElement('link');
+      injectedLink.rel = 'icon';
+      injectedLink.href = logo;
+      document.head.appendChild(injectedLink);
+    }
+
+    return () => {
+      document.title = prevTitle;
+      if (injectedLink && injectedLink.parentNode) {
+        injectedLink.parentNode.removeChild(injectedLink);
+      }
+      prevHrefs.forEach(({ el }) => document.head.appendChild(el));
+    };
+  }, [data?.restaurant?.name, data?.restaurant?.logo_url]);
 
   // Back/Forward кнопка браузера — переключаем категорию согласно новому hash.
   // Ставим suppress-флаг, чтобы debounce-effect выше НЕ создал новую history entry
