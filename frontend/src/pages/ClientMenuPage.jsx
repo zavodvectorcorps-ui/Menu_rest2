@@ -305,6 +305,15 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     return () => window.removeEventListener('scroll', on);
   }, []);
 
+  // Заголовок вкладки браузера: «Меню ресторана <название>».
+  useEffect(() => {
+    const name = data?.restaurant?.name;
+    if (!name) return;
+    const prev = document.title;
+    document.title = `Меню ресторана ${name}`;
+    return () => { document.title = prev; };
+  }, [data?.restaurant?.name]);
+
   // Back/Forward кнопка браузера — переключаем категорию согласно новому hash.
   // Ставим suppress-флаг, чтобы debounce-effect выше НЕ создал новую history entry
   // сразу после того, как браузер её удалил.

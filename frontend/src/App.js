@@ -151,6 +151,13 @@ function App() {
     }
   }, [theme]);
 
+  // Title вкладки браузера: «Личный кабинет ресторана <название>»
+  useEffect(() => {
+    document.title = restaurant?.name
+      ? `Личный кабинет ресторана ${restaurant.name}`
+      : 'Личный кабинет ресторана';
+  }, [restaurant?.name]);
+
   const handleLogin = (accessToken, userData, restaurantsList) => {
     setToken(accessToken);
     setUser(userData);
