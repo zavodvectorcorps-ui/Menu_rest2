@@ -1472,7 +1472,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           aria-label="Наверх"
           data-testid="scroll-to-top-btn"
-          className="fixed bottom-24 right-4 z-40 w-11 h-11 rounded-full bg-mint-500 hover:bg-mint-600 text-white shadow-lg flex items-center justify-center transition-opacity"
+          className="fixed bottom-4 right-4 z-40 w-11 h-11 rounded-full bg-mint-500 hover:bg-mint-600 text-white shadow-lg flex items-center justify-center transition-opacity"
         >
           <ArrowUp className="w-5 h-5" />
         </button>
