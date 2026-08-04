@@ -215,7 +215,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
   }, [selectedSection]);
 
   // Scroll to category section (with sticky header offset)
-  const scrollToCategory = useCallback((catId, opts = {}) => {
+  const scrollToCategory = useCallback((catId) => {
     setSelectedCategory(catId);
     setShowSwipeHint(false);
     const el = categoryRefs.current[catId];
@@ -228,22 +228,9 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     scrollToCategory._t = window.setTimeout(() => {
       isProgrammaticScrollRef.current = false;
     }, 700);
-    // При явном клике по табу пушим новую history entry — чтобы кнопка "назад"
-    // в браузере возвращала на предыдущую категорию без перезагрузки страницы.
-    if (opts.push !== false) {
-      try {
-        const cat = (data?.categories || []).find((c) => c.id === catId);
-        if (cat) {
-          const slug = slugify(cat.name) || cat.id;
-          if (window.location.hash.replace(/^#/, '') !== slug) {
-            const url = new URL(window.location.href);
-            url.hash = slug;
-            window.history.pushState(null, '', url);
-          }
-        }
-      } catch { /* noop */ }
-    }
-  }, [data?.categories]);
+    // Note: pushState для новой категории делает единый debounce-эффект ниже,
+    // так что клик по табу тоже попадает в историю (через 700ms).
+  }, []);
 
   // ==== Deep-link support (anchor links to categories) ==========================
   // Supports both `?cat=<id-or-slug>` / `?category=<id-or-slug>` in the query
@@ -277,9 +264,12 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     setTimeout(() => scrollToCategory(target.id), 250);
   }, [data?.categories]);
 
-  // Keep the URL hash in sync with the currently active category, so users
-  // can copy a shareable deep-link straight from the address bar.
-  // Uses replaceState — no new history entries, no page reload.
+  // Синхронизация URL hash с активной категорией + история в браузере.
+  // Пушим новую history entry с debounce 700ms — то есть только после того, как
+  // пользователь «остановился» на категории (скроллом или кликом). Так «Назад»
+  // в браузере плавно возвращает по посещённым категориям, но при быстром
+  // свайпе через 5 категорий не создаётся 5 мусорных entries.
+  const suppressNextPushRef = useRef(false);
   useEffect(() => {
     if (!selectedCategory) return;
     const cats = data?.categories || [];
@@ -288,13 +278,21 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     const slug = slugify(cat.name) || cat.id;
     const currentHash = window.location.hash.replace(/^#/, '');
     if (currentHash === slug) return;
-    try {
-      const url = new URL(window.location.href);
-      url.hash = slug;
-      window.history.replaceState(null, '', url);
-    } catch {
-      // Silently ignore in exotic environments (about:blank, sandboxed iframes)
+    // Не пушить, если категория была активирована из popstate (браузерный Back).
+    if (suppressNextPushRef.current) {
+      suppressNextPushRef.current = false;
+      return;
     }
+    const timer = window.setTimeout(() => {
+      // На момент срабатывания hash могли поменять — перепроверим.
+      if (window.location.hash.replace(/^#/, '') === slug) return;
+      try {
+        const url = new URL(window.location.href);
+        url.hash = slug;
+        window.history.pushState(null, '', url);
+      } catch { /* noop */ }
+    }, 700);
+    return () => window.clearTimeout(timer);
   }, [selectedCategory, data?.categories]);
 
   // Кнопка «Наверх» — floating pill в правом нижнем углу.
@@ -307,8 +305,9 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     return () => window.removeEventListener('scroll', on);
   }, []);
 
-  // Back/Forward кнопка браузера — переключаем категорию согласно новому hash
-  // без создания новой history entry (push:false).
+  // Back/Forward кнопка браузера — переключаем категорию согласно новому hash.
+  // Ставим suppress-флаг, чтобы debounce-effect выше НЕ создал новую history entry
+  // сразу после того, как браузер её удалил.
   useEffect(() => {
     const onPop = () => {
       const cats = data?.categories || [];
@@ -321,7 +320,8 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
       if (target.section_id && target.section_id !== selectedSection) {
         setSelectedSection(target.section_id);
       }
-      setTimeout(() => scrollToCategory(target.id, { push: false }), 100);
+      suppressNextPushRef.current = true;
+      setTimeout(() => scrollToCategory(target.id), 100);
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
