@@ -1481,7 +1481,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
           onClick={() => setCallModalOpen(true)}
           aria-label={t('call_waiter')}
           data-testid="call-staff-fab"
-          className={`md:hidden fixed left-4 z-40 h-12 px-5 rounded-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-semibold shadow-lg shadow-amber-500/30 flex items-center gap-2 transition-all ${cartEnabled && cart.length > 0 ? 'bottom-24' : 'bottom-4'}`}
+          className={`md:hidden fixed left-1/2 -translate-x-1/2 z-40 h-12 px-6 rounded-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-semibold shadow-lg shadow-amber-500/30 flex items-center gap-2 transition-all ${cartEnabled && cart.length > 0 ? 'bottom-24' : 'bottom-4'}`}
         >
           <Bell className="w-5 h-5" />
           <span>{t('call_waiter')}</span>
