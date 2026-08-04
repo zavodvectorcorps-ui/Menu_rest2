@@ -665,7 +665,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-full border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 px-3 whitespace-nowrap h-8 md:h-9"
+                  className="hidden md:inline-flex rounded-full border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 px-3 whitespace-nowrap h-8 md:h-9"
                   onClick={() => setCallModalOpen(true)}
                   data-testid="call-staff-btn"
                 >
@@ -1466,13 +1466,26 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
 
       <Toaster position="top-center" richColors />
 
+      {/* Mobile-only floating «Вызвать» — крупная амбер pill в левом нижнем углу */}
+      {settings.staff_call_enabled && call_types && call_types.length > 0 && (
+        <button
+          onClick={() => setCallModalOpen(true)}
+          aria-label={t('call_waiter')}
+          data-testid="call-staff-fab"
+          className={`md:hidden fixed left-4 z-40 h-12 px-5 rounded-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-semibold shadow-lg shadow-amber-500/30 flex items-center gap-2 transition-all ${cartEnabled && cart.length > 0 ? 'bottom-24' : 'bottom-4'}`}
+        >
+          <Bell className="w-5 h-5" />
+          <span>{t('call_waiter')}</span>
+        </button>
+      )}
+
       {/* Scroll to top — floating button, появляется после 400px скролла */}
       {showTopBtn && (
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           aria-label="Наверх"
           data-testid="scroll-to-top-btn"
-          className="fixed bottom-4 right-4 z-40 w-11 h-11 rounded-full bg-mint-500 hover:bg-mint-600 text-white shadow-lg flex items-center justify-center transition-opacity"
+          className={`fixed right-4 z-40 w-11 h-11 rounded-full bg-mint-500 hover:bg-mint-600 text-white shadow-lg flex items-center justify-center transition-all ${cartEnabled && cart.length > 0 ? 'bottom-24' : 'bottom-4'}`}
         >
           <ArrowUp className="w-5 h-5" />
         </button>
