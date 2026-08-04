@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ImageIcon, Clock, MapPin, Phone, ChevronDown, Loader2, Hand, Search, ShoppingBag } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Bell, X, Send, Check, Flame, Star, Sparkles, Tag, ChevronRight, ChevronLeft, ChevronsRight, ChevronsLeft, ImageIcon, Clock, MapPin, Phone, ChevronDown, Loader2, Hand, Search, ShoppingBag, ArrowUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -215,7 +215,7 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
   }, [selectedSection]);
 
   // Scroll to category section (with sticky header offset)
-  const scrollToCategory = useCallback((catId) => {
+  const scrollToCategory = useCallback((catId, opts = {}) => {
     setSelectedCategory(catId);
     setShowSwipeHint(false);
     const el = categoryRefs.current[catId];
@@ -228,7 +228,22 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
     scrollToCategory._t = window.setTimeout(() => {
       isProgrammaticScrollRef.current = false;
     }, 700);
-  }, []);
+    // При явном клике по табу пушим новую history entry — чтобы кнопка "назад"
+    // в браузере возвращала на предыдущую категорию без перезагрузки страницы.
+    if (opts.push !== false) {
+      try {
+        const cat = (data?.categories || []).find((c) => c.id === catId);
+        if (cat) {
+          const slug = slugify(cat.name) || cat.id;
+          if (window.location.hash.replace(/^#/, '') !== slug) {
+            const url = new URL(window.location.href);
+            url.hash = slug;
+            window.history.pushState(null, '', url);
+          }
+        }
+      } catch { /* noop */ }
+    }
+  }, [data?.categories]);
 
   // ==== Deep-link support (anchor links to categories) ==========================
   // Supports both `?cat=<id-or-slug>` / `?category=<id-or-slug>` in the query
@@ -281,6 +296,36 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
       // Silently ignore in exotic environments (about:blank, sandboxed iframes)
     }
   }, [selectedCategory, data?.categories]);
+
+  // Кнопка «Наверх» — floating pill в правом нижнем углу.
+  // Показываем после того, как пользователь пролистал > 400px.
+  const [showTopBtn, setShowTopBtn] = useState(false);
+  useEffect(() => {
+    const on = () => setShowTopBtn(window.scrollY > 400);
+    on();
+    window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
+  }, []);
+
+  // Back/Forward кнопка браузера — переключаем категорию согласно новому hash
+  // без создания новой history entry (push:false).
+  useEffect(() => {
+    const onPop = () => {
+      const cats = data?.categories || [];
+      if (!cats.length) return;
+      const rawAnchor = window.location.hash.replace(/^#/, '').trim();
+      if (!rawAnchor) return;
+      const normalized = slugify(decodeURIComponent(rawAnchor));
+      const target = cats.find((c) => c.id === rawAnchor || slugify(c.name) === normalized);
+      if (!target) return;
+      if (target.section_id && target.section_id !== selectedSection) {
+        setSelectedSection(target.section_id);
+      }
+      setTimeout(() => scrollToCategory(target.id, { push: false }), 100);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [data?.categories, selectedSection, scrollToCategory]);
   // ==============================================================================
 
   // ScrollSpy — подсветка активной категории при прокрутке.
@@ -1420,6 +1465,18 @@ export default function ClientMenuPage({ domainMode = false } = {}) {
       </Dialog>
 
       <Toaster position="top-center" richColors />
+
+      {/* Scroll to top — floating button, появляется после 400px скролла */}
+      {showTopBtn && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label="Наверх"
+          data-testid="scroll-to-top-btn"
+          className="fixed bottom-24 right-4 z-40 w-11 h-11 rounded-full bg-mint-500 hover:bg-mint-600 text-white shadow-lg flex items-center justify-center transition-opacity"
+        >
+          <ArrowUp className="w-5 h-5" />
+        </button>
+      )}
 
       <ItemDetailsDialog
         open={!!detailsItem}
