@@ -73,6 +73,8 @@ async def caffesta_register_client(
     client_name: str,
     client_phone: str,
     card_number: Optional[int] = None,
+    birthday: Optional[str] = None,
+    sex: Optional[str] = None,
 ) -> tuple[Optional[str], str]:
     """
     Создать клиента в Caffesta через фиктивный заказ доставки на "Карта лояльности" (цена 0).
@@ -91,6 +93,15 @@ async def caffesta_register_client(
     # Caffesta ожидает phone в формате E.164 (+7…). Мы храним phone_norm — только
     # цифры, поэтому добавляем префикс + для запроса.
     phone_for_caffesta = client_phone if client_phone.startswith("+") else f"+{client_phone}"
+    # Caffesta ожидает дату рождения в формате DD.MM.YYYY (RU-локаль).
+    # В БД мы храним YYYY-MM-DD — конвертируем.
+    bday_ru = ""
+    if birthday:
+        try:
+            y, m, d = birthday.split("-")
+            bday_ru = f"{d}.{m}.{y}"
+        except Exception:
+            bday_ru = birthday  # если уже в DD.MM.YYYY — оставим как есть
     url = f"https://{account_name}.caffesta.com/a/v1.1/draft/receipts"
     body = {
         "bill": {
@@ -115,6 +126,10 @@ async def caffesta_register_client(
                 "last_name": last_name,
                 "phone": phone_for_caffesta,
                 "email": "",
+                # Пробуем разные варианты имён поля — Caffesta принимает
+                # разные ключи в зависимости от версии API/аккаунта.
+                **({"birthday": bday_ru, "birth_date": bday_ru, "birthDate": bday_ru} if bday_ru else {}),
+                **({"sex": sex} if sex else {}),
                 # Явный card_number обходит их автогенерацию (баг с "code, code")
                 "card_number": f"{int(card_number):012d}" if card_number else f"{int(_time.time()) % 10**12:012d}",
             },
