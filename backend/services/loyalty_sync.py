@@ -73,6 +73,8 @@ async def caffesta_register_client(
     client_name: str,
     client_phone: str,
     card_number: Optional[int] = None,
+    birthday: Optional[str] = None,
+    sex: Optional[str] = None,
 ) -> tuple[Optional[str], str]:
     """
     Создать клиента в Caffesta через фиктивный заказ доставки на "Карта лояльности" (цена 0).
@@ -115,9 +117,8 @@ async def caffesta_register_client(
                 "last_name": last_name,
                 "phone": phone_for_caffesta,
                 "email": "",
-                "birthday": "2000-01-01",  # заглушка, обязательное поле в Caffesta
-                "sex": "M",                # заглушка, обязательное поле
-                "discount_group": {"id": 1},  # 1 = дефолтная бонусная группа
+                **({"birthday": birthday} if birthday else {}),
+                **({"sex": sex} if sex else {}),
                 # Явный card_number обходит их автогенерацию (баг с "code, code")
                 "card_number": f"{int(card_number):012d}" if card_number else f"{int(_time.time()) % 10**12:012d}",
             },

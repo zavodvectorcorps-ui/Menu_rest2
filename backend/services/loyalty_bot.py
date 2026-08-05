@@ -90,6 +90,7 @@ async def _try_caffesta_auto_register(cfg: dict, client_doc: dict) -> None:
 
     receipt_uuid, err = await caffesta_register_client(
         account, api_key, pos_id, product_id, name, phone, card_number=card_no,
+        birthday=client_doc.get("birthday"), sex=client_doc.get("sex"),
     )
     now = datetime.now(timezone.utc)
     if receipt_uuid:
@@ -175,11 +176,16 @@ async def _welcome_after_link(bot_token: str, chat_id: int, client_doc: dict, cf
 
     name = client_doc.get("name") or "друг"
     if client_doc.get("last_synced_at"):
-        text = f"✅ Готово, {name}! Ваша карта закреплена сверху — там всегда виден актуальный баланс. Мы будем уведомлять об изменениях."
+        text = (
+            f"✅ Готово, {name}! Ваша карта закреплена сверху — там всегда актуальный баланс. "
+            "Мы будем уведомлять об изменениях.\n\n"
+            "Хотите получать поздравления с днём рождения? Отправьте /birthday и /gender."
+        )
     else:
         text = (
             f"✅ Готово, {name}! Карта закреплена сверху. "
-            "Как только в базе появятся ваши бонусы — увидите их прямо на карте."
+            "Как только в базе появятся ваши бонусы — увидите их прямо на карте.\n\n"
+            "Хотите получать поздравления с днём рождения? Отправьте /birthday и /gender."
         )
     await _send(bot_token, chat_id, text, _remove_keyboard())
 
@@ -297,6 +303,74 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
         await _ensure_card_and_send(bot_token, restaurant_id, restaurant_name, client_doc)
         return
 
+    # /birthday — начинаем диалог: ждём дату в формате YYYY-MM-DD или DD.MM.YYYY
+    if text.startswith("/birthday"):
+        client_doc = await db.loyalty_clients.find_one(
+            {"restaurant_id": restaurant_id, "telegram_chat_id": int(chat_id)}, {"_id": 0}
+        )
+        if not client_doc:
+            await _send(bot_token, chat_id, "Сначала поделитесь номером телефона — нажмите /start.")
+            return
+        await db.loyalty_clients.update_one(
+            {"restaurant_id": restaurant_id, "id": client_doc["id"]},
+            {"$set": {"pending_prompt": "birthday"}},
+        )
+        await _send(bot_token, chat_id, "Пришлите вашу дату рождения в формате <b>ДД.ММ.ГГГГ</b>\n(например, 15.03.1990)")
+        return
+
+    if text.startswith("/gender"):
+        client_doc = await db.loyalty_clients.find_one(
+            {"restaurant_id": restaurant_id, "telegram_chat_id": int(chat_id)}, {"_id": 0}
+        )
+        if not client_doc:
+            await _send(bot_token, chat_id, "Сначала поделитесь номером телефона — нажмите /start.")
+            return
+        await db.loyalty_clients.update_one(
+            {"restaurant_id": restaurant_id, "id": client_doc["id"]},
+            {"$set": {"pending_prompt": "gender"}},
+        )
+        await _send(bot_token, chat_id, "Укажите ваш пол — напишите <b>М</b> или <b>Ж</b>")
+        return
+
+    # Обработка ответа на pending_prompt (birthday / gender)
+    client_doc = await db.loyalty_clients.find_one(
+        {"restaurant_id": restaurant_id, "telegram_chat_id": int(chat_id)}, {"_id": 0}
+    )
+    if client_doc and client_doc.get("pending_prompt"):
+        pending = client_doc["pending_prompt"]
+        if pending == "birthday":
+            import re as _re
+            s = text.strip()
+            m = _re.match(r"^(\d{2})\.(\d{2})\.(\d{4})$", s)
+            if m:
+                bd = f"{m.group(3)}-{m.group(2)}-{m.group(1)}"
+            elif _re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+                bd = s
+            else:
+                await _send(bot_token, chat_id, "Неверный формат. Пример: <b>15.03.1990</b>")
+                return
+            await db.loyalty_clients.update_one(
+                {"restaurant_id": restaurant_id, "id": client_doc["id"]},
+                {"$set": {"birthday": bd, "pending_prompt": None}},
+            )
+            await _send(bot_token, chat_id, f"✅ Спасибо! Дата рождения: {bd}")
+            return
+        if pending == "gender":
+            s = text.strip().lower()
+            if s in ("м", "m", "муж", "мужской"):
+                sex = "M"
+            elif s in ("ж", "f", "жен", "женский"):
+                sex = "F"
+            else:
+                await _send(bot_token, chat_id, "Напишите <b>М</b> или <b>Ж</b>")
+                return
+            await db.loyalty_clients.update_one(
+                {"restaurant_id": restaurant_id, "id": client_doc["id"]},
+                {"$set": {"sex": sex, "pending_prompt": None}},
+            )
+            await _send(bot_token, chat_id, f"✅ Спасибо! Пол: {'Мужской' if sex == 'M' else 'Женский'}")
+            return
+
     if text.startswith("/unlink"):
         res = await db.loyalty_clients.update_one(
             {"restaurant_id": restaurant_id, "telegram_chat_id": int(chat_id)},
@@ -321,7 +395,8 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
     else:
         await _send(
             bot_token, chat_id,
-            "Команды:\n/balance — текущий баланс\n/card — показать карту заново\n/unlink — отвязать Telegram",
+            "Команды:\n/balance — текущий баланс\n/card — показать карту заново\n"
+            "/birthday — указать дату рождения\n/gender — указать пол\n/unlink — отвязать Telegram",
         )
 
 

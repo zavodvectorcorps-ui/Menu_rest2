@@ -65,6 +65,11 @@ class LoyaltyClient(BaseModel):
     # UUID заказа "Карта лояльности" в Caffesta — созданного при авторегистрации.
     # Хранится для отладки: по нему кассир может найти конкретный wait_cashier заказ.
     caffesta_receipt_uuid: Optional[str] = None
+    # Персональные данные, которые клиент присылает боту через /birthday, /gender
+    birthday: Optional[str] = None   # YYYY-MM-DD
+    sex: Optional[str] = None        # M | F
+    # Состояние диалога бота (для многошаговых команд)
+    pending_prompt: Optional[str] = None  # "birthday" | "gender" | None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
