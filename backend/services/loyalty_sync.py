@@ -65,6 +65,64 @@ async def caffesta_get_clients(account_name: str, api_key: str, since_ts: int) -
     return data if isinstance(data, list) else []
 
 
+async def caffesta_register_client(
+    account_name: str,
+    api_key: str,
+    pos_id: str,
+    product_id: str,
+    client_name: str,
+    client_phone: str,
+) -> tuple[Optional[str], str]:
+    """
+    Создать клиента в Caffesta через фиктивный заказ доставки на "Карта лояльности" (цена 0).
+    Возвращает (receipt_uuid, error_or_empty). Если success — receipt_uuid, "" .
+    Если ошибка — None, "текст ошибки".
+    """
+    if not account_name or not api_key or not pos_id or not product_id:
+        return None, "не заданы pos_id / product_id / caffesta ключи"
+    url = f"https://{account_name}.caffesta.com/a/v1.1/draft/receipts"
+    body = {
+        "bill": {
+            "pos_id": int(pos_id) if str(pos_id).isdigit() else pos_id,
+            "app_id": -1,
+            "delivery_type": 1,
+            "discount_sum": 0,
+            "total_sum": 0,
+            "items": [{
+                "title": "Карта лояльности",
+                "count": 1,
+                "price": 0,
+                "origin_price": 0,
+                "discount_sum": 0,
+                "total_sum": 0,
+                "product_id": int(product_id) if str(product_id).isdigit() else product_id,
+            }],
+            "client": {
+                "name": client_name or "Клиент",
+                "phone": client_phone,
+            },
+            "comment": "Автосоздание клиента при регистрации в Telegram-боте",
+        }
+    }
+    try:
+        async with httpx.AsyncClient(timeout=CAFFESTA_TIMEOUT) as client:
+            resp = await client.post(
+                url,
+                headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
+                json=body,
+            )
+    except Exception as exc:
+        return None, f"network: {exc}"
+    try:
+        j = resp.json()
+    except Exception:
+        return None, f"HTTP {resp.status_code}: {resp.text[:300]}"
+    if j.get("success") and (j.get("data") or {}).get("message"):
+        return (j["data"]["message"]), ""
+    err = (j.get("data") or {}).get("message") or j.get("message") or str(j)[:300]
+    return None, err
+
+
 # ─── Telegram sender ───────────────────────────────────────────────────────
 
 async def send_telegram_message(bot_token: str, chat_id: int, text: str) -> tuple[bool, int, str]:

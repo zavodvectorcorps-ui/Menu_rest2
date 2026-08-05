@@ -27,7 +27,7 @@ from services.loyalty_card import (
     send_card_and_pin,
 )
 from services.loyalty_crypto import decrypt
-from services.loyalty_sync import normalize_phone
+from services.loyalty_sync import caffesta_register_client, normalize_phone
 
 logger = logging.getLogger("loyalty.bot")
 
@@ -56,6 +56,64 @@ def _share_phone_keyboard() -> dict:
 
 def _remove_keyboard() -> dict:
     return {"remove_keyboard": True}
+
+
+async def _try_caffesta_auto_register(cfg: dict, client_doc: dict) -> None:
+    """
+    Если в конфиге включено — создаём клиента в Caffesta через фиктивный заказ.
+    Успех/ошибку логируем в общий журнал раздела «Лояльность». Не блокируем регистрацию.
+    """
+    if not cfg.get("caffesta_auto_register"):
+        return
+    if client_doc.get("caffesta_receipt_uuid"):
+        return  # уже регистрировали
+    account = cfg.get("caffesta_account_name") or ""
+    api_key = decrypt(cfg.get("caffesta_api_key_enc") or "")
+    pos_id = cfg.get("pos_id") or ""
+    product_id = cfg.get("caffesta_loyalty_product_id") or ""
+    if not (account and api_key and pos_id and product_id):
+        return
+    phone = client_doc.get("phone_norm") or ""
+    name = client_doc.get("name") or "Клиент"
+    receipt_uuid, err = await caffesta_register_client(
+        account, api_key, pos_id, product_id, name, phone,
+    )
+    now = datetime.now(timezone.utc)
+    if receipt_uuid:
+        await db.loyalty_clients.update_one(
+            {"restaurant_id": cfg["restaurant_id"], "id": client_doc["id"]},
+            {"$set": {"caffesta_receipt_uuid": receipt_uuid}},
+        )
+        await db.loyalty_notifications_log.insert_one({
+            "id": __import__("uuid").uuid4().hex,
+            "restaurant_id": cfg["restaurant_id"],
+            "client_id": client_doc["id"],
+            "phone_norm": phone,
+            "kind": "caffesta_register",
+            "amount": 0.0,
+            "balance_after": 0.0,
+            "message": f"Caffesta receipt: {receipt_uuid}",
+            "sent_at": now,
+            "status": "success",
+            "error_text": "",
+            "http_code": 200,
+        })
+    else:
+        await db.loyalty_notifications_log.insert_one({
+            "id": __import__("uuid").uuid4().hex,
+            "restaurant_id": cfg["restaurant_id"],
+            "client_id": client_doc["id"],
+            "phone_norm": phone,
+            "kind": "caffesta_register",
+            "amount": 0.0,
+            "balance_after": 0.0,
+            "message": f"Не удалось создать клиента в Caffesta: {err}",
+            "sent_at": now,
+            "status": "error",
+            "error_text": err,
+            "http_code": 0,
+        })
+        logger.warning("caffesta auto-register failed for %s: %s", phone, err)
 
 
 async def _ensure_card_and_send(
@@ -144,13 +202,17 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
                 }},
             )
             merged = {**existing, "telegram_chat_id": int(chat_id)}
+            # Авторегистрация в Caffesta (если включена) — до отправки карты,
+            # чтобы клиент в Caffesta успел появиться, если он новый.
+            await _try_caffesta_auto_register(cfg, merged)
             await _welcome_after_link(bot_token, chat_id, merged, cfg)
         else:
             # Клиента с таким телефоном в Caffesta пока нет — создаём заготовку,
             # чтобы при следующей sync-синхронизации сразу привязать.
             import uuid as _uuid
-            await db.loyalty_clients.insert_one({
-                "id": _uuid.uuid4().hex,
+            new_id = _uuid.uuid4().hex
+            new_client = {
+                "id": new_id,
                 "restaurant_id": restaurant_id,
                 "phone_norm": phone_norm,
                 "name": " ".join(x for x in [contact.get("first_name") or "", contact.get("last_name") or ""] if x).strip(),
@@ -162,7 +224,9 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
                 "last_synced_at": None,
                 "linked_at": now,
                 "created_at": now,
-            })
+            }
+            await db.loyalty_clients.insert_one(new_client)
+            await _try_caffesta_auto_register(cfg, new_client)
             await _send(
                 bot_token, chat_id,
                 "Мы пока не нашли карту лояльности по этому номеру. "

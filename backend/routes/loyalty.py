@@ -42,6 +42,8 @@ class LoyaltyConfigUpdate(BaseModel):
     template_accrual: Optional[str] = None
     template_debit: Optional[str] = None
     is_enabled: Optional[bool] = None
+    caffesta_loyalty_product_id: Optional[str] = None
+    caffesta_auto_register: Optional[bool] = None
 
 
 def _public_config_view(doc: dict) -> dict:
@@ -65,6 +67,8 @@ def _public_config_view(doc: dict) -> dict:
         "last_error": doc.get("last_error") or "",
         "last_error_at": doc.get("last_error_at"),
         "last_clients_ts": int(doc.get("last_clients_ts") or 0),
+        "caffesta_loyalty_product_id": doc.get("caffesta_loyalty_product_id") or "",
+        "caffesta_auto_register": bool(doc.get("caffesta_auto_register")),
         "webhook_secret": doc.get("webhook_secret") or "",
     }
 
@@ -110,6 +114,10 @@ async def update_config(
         updates["template_debit"] = payload.template_debit
     if payload.is_enabled is not None:
         updates["is_enabled"] = bool(payload.is_enabled)
+    if payload.caffesta_loyalty_product_id is not None:
+        updates["caffesta_loyalty_product_id"] = payload.caffesta_loyalty_product_id.strip()
+    if payload.caffesta_auto_register is not None:
+        updates["caffesta_auto_register"] = bool(payload.caffesta_auto_register)
 
     # Обработка bot token — при смене нужно обновить webhook в Telegram.
     if payload.telegram_bot_token is not None and payload.telegram_bot_token.strip():

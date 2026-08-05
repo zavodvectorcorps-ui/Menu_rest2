@@ -50,6 +50,8 @@ export default function LoyaltyPage() {
     template_accrual: '',
     template_debit: '',
     is_enabled: false,
+    caffesta_loyalty_product_id: '',
+    caffesta_auto_register: false,
   });
 
   const loadConfig = useCallback(async () => {
@@ -69,6 +71,8 @@ export default function LoyaltyPage() {
         template_accrual: cfgR.data.template_accrual || '',
         template_debit: cfgR.data.template_debit || '',
         is_enabled: !!cfgR.data.is_enabled,
+        caffesta_loyalty_product_id: cfgR.data.caffesta_loyalty_product_id || '',
+        caffesta_auto_register: !!cfgR.data.caffesta_auto_register,
         // Секреты не пре-заполняем — плейсхолдер покажет маску.
         caffesta_api_key: '',
         telegram_bot_token: '',
@@ -343,6 +347,33 @@ export default function LoyaltyPage() {
                   data-testid="loyalty-interval"
                 />
               </Field>
+              <Field label="ID товара «Карта лояльности» в Caffesta">
+                <Input
+                  value={form.caffesta_loyalty_product_id}
+                  onChange={(e) => setForm({ ...form, caffesta_loyalty_product_id: e.target.value })}
+                  placeholder="123"
+                  data-testid="loyalty-cf-product-id"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  ID нулевого товара в Caffesta, который используется для авторегистрации.
+                </p>
+              </Field>
+              <div className="md:col-span-2 rounded-md border p-3 bg-muted/30">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <Switch
+                    checked={form.caffesta_auto_register}
+                    onCheckedChange={(v) => setForm({ ...form, caffesta_auto_register: v })}
+                    data-testid="loyalty-auto-register-switch"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">Авторегистрация клиента в Caffesta</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      При регистрации в боте создаём wait_cashier-заказ с товаром «Карта лояльности».
+                      Требуется включённый модуль «Доставка» в Caffesta. Кассир закрывает заказы вручную.
+                    </p>
+                  </div>
+                </label>
+              </div>
               {config.last_error && (
                 <div className="md:col-span-2 rounded-md border border-red-300 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 text-sm p-3 flex gap-2">
                   <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -469,13 +500,14 @@ export default function LoyaltyPage() {
                   <th className="p-3">Имя</th>
                   <th className="p-3">Telegram</th>
                   <th className="p-3 text-right">Баланс</th>
+                  <th className="p-3">Заказ Caffesta</th>
                   <th className="p-3">Последняя синхр.</th>
                   <th className="p-3"></th>
                 </tr>
               </thead>
               <tbody>
                 {clients.length === 0 && (
-                  <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Пока никого</td></tr>
+                  <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Пока никого</td></tr>
                 )}
                 {clients.map((c) => (
                   <tr key={c.id} className="border-t hover:bg-muted/20">
@@ -494,6 +526,11 @@ export default function LoyaltyPage() {
                       )}
                     </td>
                     <td className="p-3 text-right font-medium">{(c.last_bonus_balance || 0).toFixed(2)}</td>
+                    <td className="p-3 font-mono text-[11px] text-muted-foreground">
+                      {c.caffesta_receipt_uuid
+                        ? c.caffesta_receipt_uuid.slice(0, 8) + '…'
+                        : <span className="opacity-40">—</span>}
+                    </td>
                     <td className="p-3 text-xs text-muted-foreground">{fmtDate(c.last_synced_at)}</td>
                     <td className="p-3">
                       {c.telegram_chat_id && (

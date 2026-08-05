@@ -37,6 +37,9 @@ class LoyaltyConfig(BaseModel):
     last_error: Optional[str] = ""
     last_error_at: Optional[datetime] = None
     last_clients_ts: int = 0  # unix timestamp последнего обработанного clients
+    # Авторегистрация клиента в Caffesta при подписке на бота
+    caffesta_loyalty_product_id: Optional[str] = None
+    caffesta_auto_register: bool = False
     webhook_secret: str = Field(default_factory=lambda: uuid.uuid4().hex[:16])
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -59,6 +62,9 @@ class LoyaltyClient(BaseModel):
     # ID сообщения с фото карты, закреплённого в приватном чате бота.
     # Обновляется через editMessageCaption при изменении баланса.
     pinned_message_id: Optional[int] = None
+    # UUID заказа "Карта лояльности" в Caffesta — созданного при авторегистрации.
+    # Хранится для отладки: по нему кассир может найти конкретный wait_cashier заказ.
+    caffesta_receipt_uuid: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
