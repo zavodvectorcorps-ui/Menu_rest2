@@ -260,13 +260,15 @@ async def update_category(category_id: str, updates: dict) -> dict:
 @mcp.tool()
 async def bulk_rename_categories(mapping: dict[str, str]) -> dict:
     """
-    Массово переименовать категории. mapping = {category_id: new_name, ...}
+    Массово переименовать категории. mapping = {category_id: new_name, ...}.
+    Возвращает {updated, skipped}.
     """
     rid = _need_rid()
+    renames = [{"id": cat_id, "name": name} for cat_id, name in mapping.items()]
     return await _request(
         "POST",
         f"/api/restaurants/{rid}/categories/bulk-rename",
-        json_body={"renames": mapping},
+        json_body=renames,
     )
 
 

@@ -1,0 +1,28 @@
+{
+  "summary": "Backend-only verification of the MCP tool `bulk_rename_categories` payload fix. New suite /app/backend/tests/test_iter31_bulk_rename_mcp.py — 5 tests, 5 passed (100%). Confirmed: (1) POST /api/restaurants/{rid}/categories/bulk-rename accepts a bare JSON array [{id,name}] and returns 200 {updated:1, skipped:0}; (2) the old buggy MCP shape {'renames': {...}} still returns 422 (contract documented); (3) invalid entries (unknown id, blank name) return 200 {updated:0, skipped:2}; (4) MCP source no longer contains '\"renames\": mapping' and posts json_body=renames; (5) end-to-end via fastmcp in-memory Client: select_restaurant -> bulk_rename_categories(mapping with 2 category ids) -> 200 {updated:2, skipped:0}, and GET /categories returns both new names. Original names were restored through the MCP tool itself and re-verified via GET (768fe425... = 'Завтраки до 16.00', 59d4cc5a... = 'Завтраки до 16.00 — Добавки к завтракам'), is_active untouched, no _id leakage. Bug is FIXED.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/restaurants/{rid}/categories/bulk-rename", "issue": "Translation reset hardcodes only name_en/name_zh ($set to \"\"), while background re-translation uses restaurant.enabled_languages. For a restaurant with other langs enabled (e.g. de/ar), the stale name_<lang> is NOT cleared -> outdated translation stays visible; conversely name_zh is wiped even when 'zh' is not enabled and is therefore never regenerated. Suggest clearing/regenerating exactly the enabled_languages set."},
+      {"endpoint": "POST /api/restaurants/{rid}/categories/bulk-rename", "issue": "Unknown restaurant_id (e.g. fake-rid-99999) returns 200 {updated:0, skipped:N} for superadmin instead of 404 — check_restaurant_access does not verify restaurant existence (observed in backend logs from prior iterations; low severity, no data impact)."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter31_bulk_rename_mcp.py",
+    "/app/test_reports/pytest/iter31_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "mcp_server/restmenu_mcp/server.py bulk_rename_categories now matches the backend contract (top-level array). Remaining contract-drift risk elsewhere: worth a one-time audit of every MCP tool body vs its FastAPI signature (list vs model vs dict) since two such mismatches were already found.",
+    "bulk-rename should derive the set of translation fields to reset from restaurant.enabled_languages instead of the hardcoded name_en/name_zh pair."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter31_bulk_rename_mcp.py"],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "None. Used existing restaurant aa25189d-d668-4838-915a-c5d936547f3f and its first two categories; temporary names TEST_MCP_0/TEST_MCP_1 were reverted and original names asserted in module teardown.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin / 220066 (superadmin, /app/memory/test_credentials.md)",
+  "context_for_next_testing_agent": "Two reusable MCP suites now exist: test_iter30_category_toggle_mcp.py (update_category is_active) and test_iter31_bulk_rename_mcp.py (bulk_rename_categories). Both drive real MCP tools in-process via sys.path.insert('/app/mcp_server') + fastmcp.Client(mcp_server.mcp) against the public REACT_APP_BACKEND_URL. Category names/is_active for aa25189d-... are restored; do not leave TEST_ prefixes behind. Note bulk-rename wipes name_en/name_zh and enqueues background translation, so translated fields may lag a few seconds after a rename.",
+  "rca_of_the_issue": "Previous bug: MCP tool posted {'renames': {id: name}} while the route signature is `renames: List[dict]`, so FastAPI/Pydantic rejected the object body with 422 'Input should be a valid list'. Fix converts the mapping into [{'id': k, 'name': v}] and sends it as the top-level array — verified end-to-end (200, updated:2, skipped:0, names persisted, then restored)."
+}
