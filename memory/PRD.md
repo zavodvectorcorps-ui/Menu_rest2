@@ -1,7 +1,14 @@
 # PRD: Личный кабинет ресторана
 
 ## Дата создания: 2026-01-26
-## Последнее обновление: 2026-02-14 (fal.ai video)
+## Последнее обновление: 2026-02-15 (Loyalty bot race-condition fix + UI columns)
+
+### Изменения 2026-02-15 — Loyalty bot race-condition + UI (P0, DONE)
+- **Bug**: при первой регистрации нового клиента (нажимал «Поделиться номером») бот отправлял «Мы пока не нашли карту лояльности…» и клиент видел карту только после повторного `/start`.
+- **Root cause**: в `services/loyalty_bot.py` контактная ветка проверяла `last_log.status == "success"` из журнала `caffesta_register`; если Caffesta авто-регистрация выключена или ответила ошибкой — путь падал в «не найдено», даже если локальная запись клиента уже создана.
+- **Fix**: после `insert_one(new_client)` + `_try_caffesta_auto_register` теперь **всегда** вызывается `_welcome_after_link`, который назначает `card_number`, отправляет PNG-карту и пинует её. Синк-воркер позже дозаполняет `caffesta_uuid` при матче по phone_norm.
+- **UI (LoyaltyPage.jsx)**: во вкладку «Клиенты» добавлены столбцы «День рожд.» и «Пол» (M/F → М/Ж). Пустые значения — em-dash.
+- **Verified**: testing_agent iteration_33 → 8/8 pytest тестов бэкенда pass (list_clients возвращает birthday/sex, webhook new-contact не пишет «не найдено», /birthday и /gender диалоги корректно апдейтят DB), фронтенд-проверка обеих колонок в таблице — 100% pass.
 
 ### Изменения 2026-02-14 — Fix HTTP 400 в /animate-image + доведение fal.ai flow (P0, DONE)
 - **Bug**: `POST /api/restaurants/{rid}/videos/generate` возвращал 400 `image_url обязателен` / 401 без токена — фронтенд `ImageUpload.jsx` не отправлял JWT в `startVideoGeneration` и `pollVideoStatus` (стояли голые `axios.post/get` без `Authorization: Bearer`), а также не валидировал пустой `imgPath`.
