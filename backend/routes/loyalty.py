@@ -25,7 +25,7 @@ from services.loyalty_bot import (
     set_webhook,
 )
 from services.loyalty_crypto import decrypt, encrypt, mask
-from services.loyalty_sync import sync_restaurant
+from services.loyalty_sync import send_telegram_message, sync_restaurant
 
 router = APIRouter()
 logger = logging.getLogger("loyalty")
@@ -155,6 +155,144 @@ async def trigger_sync(restaurant_id: str, current_user: dict = Depends(get_curr
     await ensure_module_access(restaurant_id, "loyalty", current_user, write=True)
     err = await sync_restaurant(restaurant_id)
     return {"ok": err is None, "error": err or ""}
+
+
+# ─── Сообщения и массовая рассылка ─────────────────────────────────────────
+
+class SingleMessageRequest(BaseModel):
+    text: str
+
+
+class BroadcastRequest(BaseModel):
+    text: str
+    # Фильтры (все опциональны). Если ничего не задано — шлём всем привязанным.
+    min_balance: Optional[float] = None
+    max_balance: Optional[float] = None
+    phone_prefixes: Optional[list[str]] = None  # напр. ["375"]
+    dry_run: bool = False  # если true — только считаем получателей, не отправляем
+
+
+async def _log_message(
+    restaurant_id: str,
+    client_id: str,
+    phone_norm: str,
+    text: str,
+    ok: bool,
+    http_code: int,
+    err: str,
+    kind: str = "manual",
+):
+    doc = {
+        "id": __import__("uuid").uuid4().hex,
+        "restaurant_id": restaurant_id,
+        "client_id": client_id or "",
+        "phone_norm": phone_norm or "",
+        "kind": kind,
+        "amount": 0.0,
+        "balance_after": 0.0,
+        "message": text,
+        "sent_at": datetime.now(timezone.utc),
+        "status": "success" if ok else "error",
+        "error_text": err,
+        "http_code": http_code,
+    }
+    await db.loyalty_notifications_log.insert_one(doc)
+
+
+@router.post("/restaurants/{restaurant_id}/loyalty/clients/{client_id}/message")
+async def send_single_message(
+    restaurant_id: str,
+    client_id: str,
+    payload: SingleMessageRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Отправить произвольное сообщение одному клиенту."""
+    await ensure_module_access(restaurant_id, "loyalty", current_user, write=True)
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(400, "Пустое сообщение")
+    client_doc = await db.loyalty_clients.find_one(
+        {"restaurant_id": restaurant_id, "id": client_id}, {"_id": 0}
+    )
+    if not client_doc:
+        raise HTTPException(404, "Клиент не найден")
+    if not client_doc.get("telegram_chat_id"):
+        raise HTTPException(400, "У клиента не привязан Telegram")
+
+    cfg = await db.loyalty_config.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
+    bot_token = decrypt((cfg or {}).get("telegram_bot_token_enc") or "")
+    if not bot_token:
+        raise HTTPException(400, "Токен бота не настроен")
+
+    # Плейсхолдеры {name}, {balance} доступны и в ручных сообщениях.
+    formatted = text.format(
+        name=client_doc.get("name") or "",
+        balance=f"{float(client_doc.get('last_bonus_balance') or 0):.2f}".rstrip("0").rstrip("."),
+    )
+    ok, code, err = await send_telegram_message(bot_token, int(client_doc["telegram_chat_id"]), formatted)
+    await _log_message(
+        restaurant_id, client_doc["id"], client_doc["phone_norm"],
+        formatted, ok, code, err, kind="manual",
+    )
+    if not ok:
+        raise HTTPException(502, f"Ошибка отправки: {err} (HTTP {code})")
+    return {"ok": True}
+
+
+@router.post("/restaurants/{restaurant_id}/loyalty/broadcast")
+async def broadcast(
+    restaurant_id: str,
+    payload: BroadcastRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Массовая рассылка всем привязанным клиентам.
+    dry_run=true — вернуть только количество получателей без отправки.
+    """
+    await ensure_module_access(restaurant_id, "loyalty", current_user, write=True)
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(400, "Пустое сообщение")
+
+    cfg = await db.loyalty_config.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
+    bot_token = decrypt((cfg or {}).get("telegram_bot_token_enc") or "")
+    if not payload.dry_run and not bot_token:
+        raise HTTPException(400, "Токен бота не настроен")
+
+    q: dict[str, Any] = {
+        "restaurant_id": restaurant_id,
+        "telegram_chat_id": {"$ne": None},
+    }
+    if payload.min_balance is not None:
+        q["last_bonus_balance"] = {"$gte": float(payload.min_balance)}
+    if payload.max_balance is not None:
+        q.setdefault("last_bonus_balance", {})
+        q["last_bonus_balance"]["$lte"] = float(payload.max_balance)
+    if payload.phone_prefixes:
+        q["$or"] = [{"phone_norm": {"$regex": f"^{p}"}} for p in payload.phone_prefixes]
+
+    recipients = await db.loyalty_clients.find(q, {"_id": 0}).to_list(50000)
+    if payload.dry_run:
+        return {"recipients": len(recipients), "dry_run": True}
+
+    # Telegram: не более 30 сообщений в секунду. Держим ~30ms между отправками.
+    import asyncio as _asyncio
+    sent, failed = 0, 0
+    for c in recipients:
+        formatted = text.format(
+            name=c.get("name") or "",
+            balance=f"{float(c.get('last_bonus_balance') or 0):.2f}".rstrip("0").rstrip("."),
+        )
+        ok, code, err = await send_telegram_message(bot_token, int(c["telegram_chat_id"]), formatted)
+        await _log_message(
+            restaurant_id, c["id"], c["phone_norm"], formatted, ok, code, err, kind="broadcast",
+        )
+        if ok:
+            sent += 1
+        else:
+            failed += 1
+        await _asyncio.sleep(0.035)
+    return {"recipients": len(recipients), "sent": sent, "failed": failed}
 
 
 # ─── Clients & Logs (read-only, для админки) ───────────────────────────────

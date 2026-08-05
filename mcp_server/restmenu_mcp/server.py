@@ -700,6 +700,61 @@ async def factual_margin(days: int = 30) -> dict:
     )
 
 
+# ─── Лояльность ────────────────────────────────────────────────────────────
+
+@mcp.tool()
+async def loyalty_list_clients(search: str | None = None, linked_only: bool = True, limit: int = 200) -> list[dict]:
+    """Клиенты программы лояльности. По умолчанию — только те, у кого привязан Telegram."""
+    rid = _need_rid()
+    params: dict[str, Any] = {"limit": limit, "linked_only": linked_only}
+    if search:
+        params["search"] = search
+    return await _request("GET", f"/api/restaurants/{rid}/loyalty/clients", params=params)
+
+
+@mcp.tool()
+async def loyalty_send_message(client_id: str, text: str) -> dict:
+    """
+    Отправить сообщение одному клиенту программы лояльности.
+    Поддерживает плейсхолдеры {name}, {balance}. Клиент должен быть привязан к Telegram.
+    """
+    rid = _need_rid()
+    return await _request(
+        "POST",
+        f"/api/restaurants/{rid}/loyalty/clients/{client_id}/message",
+        json_body={"text": text},
+    )
+
+
+@mcp.tool()
+async def loyalty_broadcast(
+    text: str,
+    min_balance: float | None = None,
+    max_balance: float | None = None,
+    dry_run: bool = False,
+) -> dict:
+    """
+    Массовая рассылка всем привязанным клиентам. dry_run=true — сначала посмотреть,
+    сколько получателей, без отправки. Поддерживает {name}, {balance}.
+    """
+    rid = _need_rid()
+    payload: dict[str, Any] = {"text": text, "dry_run": dry_run}
+    if min_balance is not None:
+        payload["min_balance"] = min_balance
+    if max_balance is not None:
+        payload["max_balance"] = max_balance
+    return await _request(
+        "POST", f"/api/restaurants/{rid}/loyalty/broadcast", json_body=payload
+    )
+
+
+@mcp.tool()
+async def loyalty_stats() -> dict:
+    """Сводка по программе лояльности: клиентов всего, привязано TG, уведомлений сегодня."""
+    rid = _need_rid()
+    return await _request("GET", f"/api/restaurants/{rid}/loyalty/stats")
+
+
 # ─── Экспорт ───────────────────────────────────────────────────────────────
 
 @mcp.tool()

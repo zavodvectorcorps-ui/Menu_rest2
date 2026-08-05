@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Gift, Send, Loader2, RefreshCw, CheckCircle2, AlertCircle, Trash2, Search } from 'lucide-react';
+import { Gift, Send, Loader2, RefreshCw, CheckCircle2, AlertCircle, Trash2, Search, MessageCircle, Megaphone } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useApp } from '@/App';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -27,6 +28,17 @@ export default function LoyaltyPage() {
   const [clientSearch, setClientSearch] = useState('');
   const [logs, setLogs] = useState([]);
   const [logFilter, setLogFilter] = useState('all');
+
+  // Индивидуальное сообщение клиенту
+  const [msgClient, setMsgClient] = useState(null); // client obj or null
+  const [msgText, setMsgText] = useState('');
+  const [msgSending, setMsgSending] = useState(false);
+
+  // Массовая рассылка
+  const [broadcastText, setBroadcastText] = useState('');
+  const [broadcastMinBalance, setBroadcastMinBalance] = useState('');
+  const [broadcastRecipients, setBroadcastRecipients] = useState(null); // preview count
+  const [broadcastSending, setBroadcastSending] = useState(false);
 
   // form state
   const [form, setForm] = useState({
@@ -155,6 +167,72 @@ export default function LoyaltyPage() {
     }
   };
 
+  const sendSingleMessage = async () => {
+    if (!msgClient || !msgText.trim()) return;
+    setMsgSending(true);
+    try {
+      await axios.post(
+        `${API}/restaurants/${currentRestaurantId}/loyalty/clients/${msgClient.id}/message`,
+        { text: msgText },
+        authHeaders
+      );
+      toast.success('Сообщение отправлено');
+      setMsgClient(null);
+      setMsgText('');
+      loadLogs();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Ошибка отправки');
+    } finally {
+      setMsgSending(false);
+    }
+  };
+
+  const previewBroadcast = async () => {
+    if (!broadcastText.trim()) {
+      toast.error('Введите текст сообщения');
+      return;
+    }
+    try {
+      const payload = { text: broadcastText, dry_run: true };
+      if (broadcastMinBalance !== '') payload.min_balance = Number(broadcastMinBalance);
+      const r = await axios.post(
+        `${API}/restaurants/${currentRestaurantId}/loyalty/broadcast`,
+        payload,
+        authHeaders
+      );
+      setBroadcastRecipients(r.data.recipients || 0);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Ошибка');
+    }
+  };
+
+  const sendBroadcast = async () => {
+    if (!broadcastText.trim()) return;
+    if (broadcastRecipients === null) {
+      await previewBroadcast();
+      return;
+    }
+    if (!window.confirm(`Отправить сообщение ${broadcastRecipients} получателям?`)) return;
+    setBroadcastSending(true);
+    try {
+      const payload = { text: broadcastText, dry_run: false };
+      if (broadcastMinBalance !== '') payload.min_balance = Number(broadcastMinBalance);
+      const r = await axios.post(
+        `${API}/restaurants/${currentRestaurantId}/loyalty/broadcast`,
+        payload,
+        authHeaders
+      );
+      toast.success(`Отправлено: ${r.data.sent}, ошибок: ${r.data.failed}`);
+      setBroadcastText('');
+      setBroadcastRecipients(null);
+      loadLogs();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Ошибка рассылки');
+    } finally {
+      setBroadcastSending(false);
+    }
+  };
+
   const fmtDate = (iso) => {
     if (!iso) return '—';
     try {
@@ -196,6 +274,7 @@ export default function LoyaltyPage() {
         <TabsList>
           <TabsTrigger value="settings" data-testid="loyalty-tab-settings">Настройки</TabsTrigger>
           <TabsTrigger value="clients" data-testid="loyalty-tab-clients">Клиенты</TabsTrigger>
+          <TabsTrigger value="broadcast" data-testid="loyalty-tab-broadcast">Рассылка</TabsTrigger>
           <TabsTrigger value="logs" data-testid="loyalty-tab-logs">Журнал</TabsTrigger>
         </TabsList>
 
@@ -376,11 +455,12 @@ export default function LoyaltyPage() {
                   <th className="p-3">Telegram</th>
                   <th className="p-3 text-right">Баланс</th>
                   <th className="p-3">Последняя синхр.</th>
+                  <th className="p-3"></th>
                 </tr>
               </thead>
               <tbody>
                 {clients.length === 0 && (
-                  <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Пока никого</td></tr>
+                  <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Пока никого</td></tr>
                 )}
                 {clients.map((c) => (
                   <tr key={c.id} className="border-t hover:bg-muted/20">
@@ -399,11 +479,87 @@ export default function LoyaltyPage() {
                     </td>
                     <td className="p-3 text-right font-medium">{(c.last_bonus_balance || 0).toFixed(2)}</td>
                     <td className="p-3 text-xs text-muted-foreground">{fmtDate(c.last_synced_at)}</td>
+                    <td className="p-3">
+                      {c.telegram_chat_id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 gap-1 text-mint-600 hover:bg-mint-50 dark:hover:bg-mint-950/30"
+                          onClick={() => { setMsgClient(c); setMsgText(''); }}
+                          data-testid={`loyalty-msg-btn-${c.id}`}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          Написать
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        </TabsContent>
+
+        <TabsContent value="broadcast" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Megaphone className="w-5 h-5 text-mint-500" />
+                Массовая рассылка
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Field label="Текст сообщения">
+                <Textarea
+                  rows={5}
+                  value={broadcastText}
+                  onChange={(e) => { setBroadcastText(e.target.value); setBroadcastRecipients(null); }}
+                  placeholder="Например: Новое сезонное меню уже в ресторане! Приходите пробовать 🍽"
+                  data-testid="loyalty-broadcast-text"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Плейсхолдеры: <code>{'{name}'}</code>, <code>{'{balance}'}</code>. Поддерживается HTML.
+                </p>
+              </Field>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <Field label="Только с балансом ≥">
+                  <Input
+                    type="number"
+                    value={broadcastMinBalance}
+                    onChange={(e) => { setBroadcastMinBalance(e.target.value); setBroadcastRecipients(null); }}
+                    placeholder="без ограничений"
+                    data-testid="loyalty-broadcast-min-balance"
+                  />
+                </Field>
+              </div>
+
+              {broadcastRecipients !== null && (
+                <div className="rounded-md bg-mint-500/10 text-mint-700 dark:text-mint-400 px-4 py-3 text-sm flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Получателей: <b>{broadcastRecipients}</b>
+                </div>
+              )}
+
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" onClick={previewBroadcast} disabled={!broadcastText.trim()} data-testid="loyalty-broadcast-preview">
+                  Подсчитать получателей
+                </Button>
+                <Button
+                  onClick={sendBroadcast}
+                  disabled={!broadcastText.trim() || broadcastSending || broadcastRecipients === null || broadcastRecipients === 0}
+                  className="bg-mint-500 hover:bg-mint-600"
+                  data-testid="loyalty-broadcast-send"
+                >
+                  {broadcastSending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                  Отправить рассылку
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Telegram ограничивает 30 сообщений в секунду. Рассылка на 1000 человек займёт ~35 секунд.
+              </p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="logs" className="mt-4">
@@ -475,6 +631,40 @@ export default function LoyaltyPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Диалог отправки индивидуального сообщения клиенту */}
+      <Dialog open={!!msgClient} onOpenChange={(o) => { if (!o) setMsgClient(null); }}>
+        <DialogContent className="max-w-md" data-testid="loyalty-msg-dialog">
+          <DialogHeader>
+            <DialogTitle>
+              Сообщение клиенту{msgClient?.name ? ` — ${msgClient.name}` : ''}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              +{msgClient?.phone_norm} · Баланс: {(msgClient?.last_bonus_balance || 0).toFixed(2)}
+            </div>
+            <Textarea
+              rows={5}
+              value={msgText}
+              onChange={(e) => setMsgText(e.target.value)}
+              placeholder="Ваш ответ..."
+              data-testid="loyalty-msg-text"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              Плейсхолдеры: <code>{'{name}'}</code>, <code>{'{balance}'}</code>
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMsgClient(null)}>Отмена</Button>
+            <Button onClick={sendSingleMessage} disabled={!msgText.trim() || msgSending} data-testid="loyalty-msg-send">
+              {msgSending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+              Отправить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
