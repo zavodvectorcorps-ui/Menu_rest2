@@ -57,9 +57,12 @@ for r in [
     app.include_router(r, prefix="/api")
 
 # CORS
+# ВАЖНО: с allow_credentials=True нельзя использовать allow_origins=["*"] — браузер
+# игнорирует такую комбинацию. Используем allow_origin_regex=".*", чтобы middleware
+# эхо-возвращал конкретный Origin (нужно для кастомных доменов ресторанов).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
