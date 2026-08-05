@@ -430,6 +430,12 @@ async def run_loyalty_sync_job():
                     await _log(rid, "error", status="error", error_text=err, message=err)
                 except Exception:
                     pass
+            else:
+                # Успешный тик — очищаем предыдущую ошибку (даже если "changed": False)
+                await db.loyalty_config.update_one(
+                    {"restaurant_id": rid, "last_error": {"$ne": ""}},
+                    {"$set": {"last_error": "", "last_error_at": None}},
+                )
         except Exception as exc:
             # НИКОГДА не бросаем наверх — иначе APScheduler может отключить job
             logger.exception("loyalty tick: outer catch for %s: %s", rid, exc)
