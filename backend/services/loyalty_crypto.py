@@ -12,30 +12,46 @@ from functools import lru_cache
 from cryptography.fernet import Fernet, InvalidToken
 
 
+import logging as _logging
+_logger = _logging.getLogger("loyalty.crypto")
+
+
 @lru_cache(maxsize=1)
-def _fernet() -> Fernet:
+def _fernet_or_none() -> Fernet | None:
     key = os.environ.get("LOYALTY_ENCRYPTION_KEY")
     if not key:
-        raise RuntimeError(
-            "LOYALTY_ENCRYPTION_KEY не задан в backend/.env. "
+        _logger.warning(
+            "LOYALTY_ENCRYPTION_KEY не задан. Секреты не будут шифроваться/расшифровываться. "
             "Сгенерируй: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
         )
-    return Fernet(key.encode() if isinstance(key, str) else key)
+        return None
+    try:
+        return Fernet(key.encode() if isinstance(key, str) else key)
+    except Exception as exc:
+        _logger.error("LOYALTY_ENCRYPTION_KEY некорректен: %s", exc)
+        return None
 
 
 def encrypt(value: str) -> str:
     """Зашифровать секрет. Возвращает base64-строку. Пустую строку не шифрует."""
     if not value:
         return ""
-    return _fernet().encrypt(value.encode("utf-8")).decode("utf-8")
+    f = _fernet_or_none()
+    if f is None:
+        # Без ключа — не сохраняем секрет в базе.
+        return ""
+    return f.encrypt(value.encode("utf-8")).decode("utf-8")
 
 
 def decrypt(value: str) -> str:
-    """Расшифровать. Возвращает пустую строку при ошибке (или пустом входе)."""
+    """Расшифровать. Возвращает пустую строку при ошибке (или пустом входе/отсутствии ключа)."""
     if not value:
         return ""
+    f = _fernet_or_none()
+    if f is None:
+        return ""
     try:
-        return _fernet().decrypt(value.encode("utf-8")).decode("utf-8")
+        return f.decrypt(value.encode("utf-8")).decode("utf-8")
     except (InvalidToken, ValueError):
         return ""
 
