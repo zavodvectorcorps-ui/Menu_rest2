@@ -72,6 +72,7 @@ async def caffesta_register_client(
     product_id: str,
     client_name: str,
     client_phone: str,
+    card_number: Optional[int] = None,
 ) -> tuple[Optional[str], str]:
     """
     Создать клиента в Caffesta через фиктивный заказ доставки на "Карта лояльности" (цена 0).
@@ -117,6 +118,8 @@ async def caffesta_register_client(
                 "phone": phone_for_caffesta,
                 "address": "—",
                 "email": "",
+                # Явный card_number обходит их автогенерацию (баг с "code, code")
+                "card_number": f"{int(card_number):012d}" if card_number else f"{int(_time.time()) % 10**12:012d}",
             },
             "delivery": {"address": "—"},
             "comment": "Автосоздание клиента при регистрации в Telegram-боте",

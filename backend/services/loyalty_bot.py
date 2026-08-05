@@ -75,8 +75,21 @@ async def _try_caffesta_auto_register(cfg: dict, client_doc: dict) -> None:
         return
     phone = client_doc.get("phone_norm") or ""
     name = client_doc.get("name") or "Клиент"
+
+    # Гарантируем card_number ДО обращения в Caffesta — передаём ей явный номер,
+    # чтобы обойти их баг с автогенерацией "code".
+    from services.loyalty_card import next_card_number
+    card_no = client_doc.get("card_number")
+    if not card_no:
+        card_no = await next_card_number(cfg["restaurant_id"])
+        await db.loyalty_clients.update_one(
+            {"restaurant_id": cfg["restaurant_id"], "id": client_doc["id"]},
+            {"$set": {"card_number": card_no}},
+        )
+        client_doc["card_number"] = card_no
+
     receipt_uuid, err = await caffesta_register_client(
-        account, api_key, pos_id, product_id, name, phone,
+        account, api_key, pos_id, product_id, name, phone, card_number=card_no,
     )
     now = datetime.now(timezone.utc)
     if receipt_uuid:
