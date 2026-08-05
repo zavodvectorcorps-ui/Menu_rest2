@@ -76,17 +76,24 @@ async def caffesta_register_client(
     """
     Создать клиента в Caffesta через фиктивный заказ доставки на "Карта лояльности" (цена 0).
     Возвращает (receipt_uuid, error_or_empty).
+
+    Особый случай: если Caffesta вернул INSERT INTO clients — значит клиент с таким
+    phone уже есть в базе. Возвращаем ("already_exists", "") — это не ошибка.
     """
     if not account_name or not api_key or not pos_id or not product_id:
         return None, "не заданы pos_id / product_id / caffesta ключи"
     import time as _time
+    # Split "Иван Иванов" → first="Иван", last="Иванов"
+    parts = (client_name or "").strip().split(maxsplit=1)
+    first_name = parts[0] if parts else "Клиент"
+    last_name = parts[1] if len(parts) > 1 else ""
     url = f"https://{account_name}.caffesta.com/a/v1.1/draft/receipts"
     body = {
         "bill": {
             "pos_id": int(pos_id) if str(pos_id).isdigit() else pos_id,
             "app_id": -1,
             "date": int(_time.time()),
-            "receipt_type": 3,   # 3 = доставка
+            "receipt_type": 3,
             "service_type": 1,
             "delivery_type": 1,
             "discount_sum": 0,
@@ -101,6 +108,8 @@ async def caffesta_register_client(
                 "product_id": int(product_id) if str(product_id).isdigit() else product_id,
             }],
             "client": {
+                "first_name": first_name,
+                "last_name": last_name,
                 "name": client_name or "Клиент",
                 "phone": client_phone,
             },
@@ -120,14 +129,22 @@ async def caffesta_register_client(
         j = resp.json()
     except Exception:
         return None, f"HTTP {resp.status_code}: {resp.text[:500]}"
+
+    # Успех — вернём receipt_uuid
     if j.get("success") and (j.get("data") or {}).get("message"):
         return (j["data"]["message"]), ""
-    # Возвращаем максимально подробную информацию для диагностики
-    err_msg = (j.get("data") or {}).get("message") or j.get("message") or ""
+
+    # Особый случай: клиент уже существует в Caffesta
+    # (Caffesta не отдаёт человекочитаемо, а падает на SQL INSERT в таблицу clients)
+    err_msg = str((j.get("data") or {}).get("status") or (j.get("data") or {}).get("message") or "")
+    if "INSERT INTO clients" in err_msg or "duplicate" in err_msg.lower() or "unique" in err_msg.lower():
+        return "already_exists", ""
+
+    # Прочая ошибка — с диагностикой
     import json as _json
     body_preview = _json.dumps(body, ensure_ascii=False)[:400]
     resp_preview = _json.dumps(j, ensure_ascii=False)[:400]
-    return None, f"{err_msg} | REQ: {body_preview} | RESP: {resp_preview}"
+    return None, f"{err_msg[:200]} | REQ: {body_preview} | RESP: {resp_preview}"
 
 
 # ─── Telegram sender ───────────────────────────────────────────────────────

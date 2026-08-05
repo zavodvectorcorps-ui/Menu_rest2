@@ -80,10 +80,13 @@ async def _try_caffesta_auto_register(cfg: dict, client_doc: dict) -> None:
     )
     now = datetime.now(timezone.utc)
     if receipt_uuid:
-        await db.loyalty_clients.update_one(
-            {"restaurant_id": cfg["restaurant_id"], "id": client_doc["id"]},
-            {"$set": {"caffesta_receipt_uuid": receipt_uuid}},
-        )
+        # Если клиент уже был в Caffesta — не сохраняем как receipt, только логируем.
+        already = (receipt_uuid == "already_exists")
+        if not already:
+            await db.loyalty_clients.update_one(
+                {"restaurant_id": cfg["restaurant_id"], "id": client_doc["id"]},
+                {"$set": {"caffesta_receipt_uuid": receipt_uuid}},
+            )
         await db.loyalty_notifications_log.insert_one({
             "id": __import__("uuid").uuid4().hex,
             "restaurant_id": cfg["restaurant_id"],
@@ -92,7 +95,10 @@ async def _try_caffesta_auto_register(cfg: dict, client_doc: dict) -> None:
             "kind": "caffesta_register",
             "amount": 0.0,
             "balance_after": 0.0,
-            "message": f"Caffesta receipt: {receipt_uuid}",
+            "message": (
+                "Клиент уже был в Caffesta — заказ не создавался"
+                if already else f"Caffesta receipt: {receipt_uuid}"
+            ),
             "sent_at": now,
             "status": "success",
             "error_text": "",
