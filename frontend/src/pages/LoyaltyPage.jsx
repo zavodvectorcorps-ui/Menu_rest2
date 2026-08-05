@@ -177,7 +177,6 @@ export default function LoyaltyPage() {
   };
 
   const sendSingleMessage = async () => {
-    if (!msgClient || !msgText.trim()) return;
     setMsgSending(true);
     try {
       await axios.post(
@@ -193,6 +192,36 @@ export default function LoyaltyPage() {
       toast.error(e.response?.data?.detail || 'Ошибка отправки');
     } finally {
       setMsgSending(false);
+    }
+  };
+
+  const deleteClient = async (client) => {
+    if (!window.confirm(`Удалить клиента +${client.phone_norm}${client.name ? ' («' + client.name + '»)' : ''}?\n\nВНИМАНИЕ: если он ещё есть в Caffesta, при следующей синхронизации он появится снова (но уже без Telegram-привязки).`)) return;
+    try {
+      await axios.delete(
+        `${API}/restaurants/${currentRestaurantId}/loyalty/clients/${client.id}`,
+        authHeaders
+      );
+      toast.success('Клиент удалён');
+      loadClients();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Ошибка');
+    }
+  };
+
+  const deleteAllClients = async () => {
+    if (!window.confirm('Удалить ВСЕХ клиентов лояльности?\n\nЭто НЕ трогает данные в Caffesta. При следующей синхронизации все клиенты подтянутся заново — без TG-привязок и номеров карт.')) return;
+    if (!window.confirm('Действие необратимо. Точно продолжить?')) return;
+    try {
+      const r = await axios.post(
+        `${API}/restaurants/${currentRestaurantId}/loyalty/clients/delete-all`,
+        {},
+        authHeaders
+      );
+      toast.success(`Удалено клиентов: ${r.data.deleted}`);
+      loadClients();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Ошибка');
     }
   };
 
@@ -489,6 +518,17 @@ export default function LoyaltyPage() {
             <span className="text-sm text-muted-foreground">
               Всего: <b>{clients.length}</b>
             </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-auto text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950/30"
+              onClick={deleteAllClients}
+              disabled={clients.length === 0}
+              data-testid="loyalty-clients-delete-all"
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Удалить всех
+            </Button>
           </div>
 
           <div className="overflow-x-auto rounded-lg border">
@@ -533,18 +573,30 @@ export default function LoyaltyPage() {
                     </td>
                     <td className="p-3 text-xs text-muted-foreground">{fmtDate(c.last_synced_at)}</td>
                     <td className="p-3">
-                      {c.telegram_chat_id && (
+                      <div className="flex gap-1 justify-end">
+                        {c.telegram_chat_id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 gap-1 text-mint-600 hover:bg-mint-50 dark:hover:bg-mint-950/30"
+                            onClick={() => { setMsgClient(c); setMsgText(''); }}
+                            data-testid={`loyalty-msg-btn-${c.id}`}
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            Написать
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 gap-1 text-mint-600 hover:bg-mint-50 dark:hover:bg-mint-950/30"
-                          onClick={() => { setMsgClient(c); setMsgText(''); }}
-                          data-testid={`loyalty-msg-btn-${c.id}`}
+                          size="icon"
+                          className="h-7 w-7 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                          onClick={() => deleteClient(c)}
+                          title="Удалить клиента"
+                          data-testid={`loyalty-delete-btn-${c.id}`}
                         >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                          Написать
+                          <Trash2 className="w-3.5 h-3.5" />
                         </Button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}

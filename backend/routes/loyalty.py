@@ -166,6 +166,46 @@ async def trigger_sync(restaurant_id: str, current_user: dict = Depends(get_curr
     return {"ok": err is None, "error": err or "", "info": info}
 
 
+@router.delete("/restaurants/{restaurant_id}/loyalty/clients/{client_id}")
+async def delete_client(
+    restaurant_id: str,
+    client_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Удалить клиента программы лояльности.
+    При следующей синхронизации Caffesta он МОЖЕТ появиться снова (если ещё есть в POS).
+    Логи уведомлений по клиенту сохраняются, только помечаются как orphan.
+    """
+    await ensure_module_access(restaurant_id, "loyalty", current_user, write=True)
+    doc = await db.loyalty_clients.find_one(
+        {"restaurant_id": restaurant_id, "id": client_id}, {"_id": 0}
+    )
+    if not doc:
+        raise HTTPException(404, "Клиент не найден")
+    await db.loyalty_clients.delete_one({"restaurant_id": restaurant_id, "id": client_id})
+    return {"ok": True, "deleted_id": client_id, "phone": doc.get("phone_norm")}
+
+
+@router.post("/restaurants/{restaurant_id}/loyalty/clients/delete-all")
+async def delete_all_clients(
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Полная очистка списка клиентов лояльности (для повторной синхронизации с нуля).
+    Также сбрасывает last_clients_ts=0 в конфиге, чтобы при следующем тике Caffesta
+    отдала ВСЕХ клиентов заново.
+    """
+    await ensure_module_access(restaurant_id, "loyalty", current_user, write=True)
+    res = await db.loyalty_clients.delete_many({"restaurant_id": restaurant_id})
+    await db.loyalty_config.update_one(
+        {"restaurant_id": restaurant_id},
+        {"$set": {"last_clients_ts": 0}},
+    )
+    return {"ok": True, "deleted": res.deleted_count}
+
+
 # ─── Сообщения и массовая рассылка ─────────────────────────────────────────
 
 class SingleMessageRequest(BaseModel):

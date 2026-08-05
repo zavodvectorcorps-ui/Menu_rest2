@@ -769,6 +769,27 @@ async def loyalty_stats() -> dict:
     return await _request("GET", f"/api/restaurants/{rid}/loyalty/stats")
 
 
+@mcp.tool()
+async def loyalty_delete_client(client_id: str) -> dict:
+    """
+    Удалить клиента программы лояльности. Если он ещё есть в Caffesta,
+    при следующей синхронизации появится снова (без TG-привязки).
+    """
+    rid = _need_rid()
+    return await _request("DELETE", f"/api/restaurants/{rid}/loyalty/clients/{client_id}")
+
+
+@mcp.tool()
+async def loyalty_delete_all_clients() -> dict:
+    """
+    ⚠️ Полная очистка списка клиентов лояльности + сброс last_clients_ts=0,
+    чтобы при следующей синхронизации Caffesta отдала всех клиентов заново.
+    Данные в Caffesta не трогаются. Используй осторожно.
+    """
+    rid = _need_rid()
+    return await _request("POST", f"/api/restaurants/{rid}/loyalty/clients/delete-all")
+
+
 # ─── Экспорт ───────────────────────────────────────────────────────────────
 
 @mcp.tool()
