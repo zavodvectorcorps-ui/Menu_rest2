@@ -16,7 +16,14 @@ from pydantic import BaseModel
 
 from auth import ensure_module_access, get_current_user
 from database import db
-from models_loyalty import DEFAULT_TEMPLATE_ACCRUAL, DEFAULT_TEMPLATE_DEBIT, LoyaltyConfig
+from models_loyalty import (
+    DEFAULT_INVITE_MESSAGE,
+    DEFAULT_START_MESSAGE,
+    DEFAULT_TEMPLATE_ACCRUAL,
+    DEFAULT_TEMPLATE_DEBIT,
+    DEFAULT_WELCOME_MESSAGE,
+    LoyaltyConfig,
+)
 from routes.telegram import _resolve_public_base_url  # переиспользуем — тот же паттерн
 from services.loyalty_bot import (
     delete_webhook,
@@ -41,6 +48,9 @@ class LoyaltyConfigUpdate(BaseModel):
     telegram_bot_token: Optional[str] = None  # plain
     template_accrual: Optional[str] = None
     template_debit: Optional[str] = None
+    start_message_text: Optional[str] = None
+    welcome_message_text: Optional[str] = None
+    invite_message_text: Optional[str] = None
     is_enabled: Optional[bool] = None
     caffesta_loyalty_product_id: Optional[str] = None
     caffesta_auto_register: Optional[bool] = None
@@ -61,6 +71,9 @@ def _public_config_view(doc: dict) -> dict:
         "telegram_bot_username": doc.get("telegram_bot_username") or "",
         "template_accrual": doc.get("template_accrual") or DEFAULT_TEMPLATE_ACCRUAL,
         "template_debit": doc.get("template_debit") or DEFAULT_TEMPLATE_DEBIT,
+        "start_message_text": doc.get("start_message_text") or DEFAULT_START_MESSAGE,
+        "welcome_message_text": doc.get("welcome_message_text") or DEFAULT_WELCOME_MESSAGE,
+        "invite_message_text": doc.get("invite_message_text") or DEFAULT_INVITE_MESSAGE,
         "is_enabled": bool(doc.get("is_enabled")),
         "last_synced_at": doc.get("last_synced_at"),
         "last_polled_at": doc.get("last_polled_at"),
@@ -112,6 +125,12 @@ async def update_config(
         updates["template_accrual"] = payload.template_accrual
     if payload.template_debit is not None:
         updates["template_debit"] = payload.template_debit
+    if payload.start_message_text is not None:
+        updates["start_message_text"] = payload.start_message_text
+    if payload.welcome_message_text is not None:
+        updates["welcome_message_text"] = payload.welcome_message_text
+    if payload.invite_message_text is not None:
+        updates["invite_message_text"] = payload.invite_message_text
     if payload.is_enabled is not None:
         updates["is_enabled"] = bool(payload.is_enabled)
     if payload.caffesta_loyalty_product_id is not None:

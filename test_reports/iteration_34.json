@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 35 scope (file named iteration_34.json as next free slot after iteration_33.json): tested the three new Loyalty features — editable bot message templates (start/welcome/invite) in API + admin UI, and the new reply-keyboard buttons ('Баланс', 'Пригласить друга', 'Моя карта') in the Telegram loyalty bot. Created /app/backend/tests/test_iter35_loyalty_bot_messages.py (13 tests, all pass) covering GET defaults, PUT persistence (full + partial), auth guard, and in-process handle_update with Telegram sendMessage/sendPhoto stubbed via monkeypatch. Frontend: superadmin login -> /admin/loyalty -> 'Настройки' tab -> 'Сообщения бота' card with 3 textareas edited, saved (toast 'Настройки сохранены'), page reloaded and all three values persisted exactly. All test data reverted (config fields unset back to defaults, temp bot token/username and QA client removed).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/restaurants/{rid}/loyalty/clients", "issue": "Not a new-feature bug: previous iteration's test test_iter34_loyalty_bot_and_columns.py now fails (4/8) because loyalty_clients for the test restaurant is empty (0 docs) — the seeded clients 'Иван Иванов'/'Мария Петрова'/'Без данных' no longer exist, so birthday/sex column tests and the /birthday-/gender dialog tests (chat_id 333) have no fixture data. Either re-seed those clients or make the iter34 test self-seeding."},
+      {"endpoint": "PUT /api/restaurants/{rid}/loyalty/config", "issue": "No validation of placeholders in the message templates. If an admin types any other braces (e.g. '{balance}' or a literal '{'), str.format() raises and the bot silently falls back to sending the raw un-substituted template (so '{name}'/'{bot_link}' would be shown verbatim to the client). Consider validating allowed placeholders on save or using safe substitution."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "LoyaltyPage → Настройки → 'Сообщения бота'", "issues": ["Cosmetic: helper text uses <code className=\"mx-1\"> inline right after/before words, rendering as 'Используйте {name}для имени и {bot_link}для ссылки' — missing space before 'для' in both places."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter35_loyalty_bot_messages.py",
+    "/app/test_reports/pytest/iter35.xml"
+  ],
+  "action_items": [
+    "Optional: add a space (or move the code tag inside the sentence) in the 'Сообщения бота' helper text so it reads '{name} для имени' / '{bot_link} для ссылки'.",
+    "Optional: validate/whitelist placeholders on PUT loyalty/config (or use safe formatting) so a bad brace doesn't make the bot send the raw template.",
+    "Re-seed loyalty_clients demo data (Иван Иванов / Мария Петрова / Без данных, chat_id 333) or update /app/backend/tests/test_iter34_loyalty_bot_and_columns.py to seed its own fixtures — it currently fails only due to missing data."
+  ],
+  "critical_code_review_comments": [
+    "loyalty_bot._norm strips only 💰/👥/🎫 emojis; any future keyboard emoji must be added there too — a lookup table of button label -> handler would be more robust than string matching.",
+    "/app/frontend/src/pages/LoyaltyPage.jsx is 849 lines — consider splitting the Настройки / Клиенты / Рассылка / Журнал tabs into separate components.",
+    "handle_update repeats the same 'find client by telegram_chat_id + reply Сначала поделитесь номером' block 5 times — extract a helper (DRY)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter35_loyalty_bot_messages.py"],
+  "success_rate": {"backend": "100% (13/13 new tests)", "frontend": "100% (all assertions of the new settings card + persistence passed)"},
+  "seed_data_creation": "Temporary only, all removed: encrypted fake bot token 123456:FAKE_TEST_TOKEN + telegram_bot_username 'qa_test_bot' on loyalty_config of RID aa25189d-…, and a loyalty client 'QA Тестов' (phone 375299998877, chat 555000111, balance 42.5). Config message fields unset again after the run so GET returns defaults.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin / 220066 (superadmin); RID aa25189d-d668-4838-915a-c5d936547f3f",
+  "context_for_next_testing_agent": "New regression file: /app/backend/tests/test_iter35_loyalty_bot_messages.py. It exercises services.loyalty_bot.handle_update IN-PROCESS with monkeypatched _send/send_card_and_pin, which lets you assert exact reply text and reply_markup — prefer this pattern over hitting the /api/loyalty/webhook endpoint (where outbound Telegram calls to a fake token are swallowed and replies are unobservable). test_iter34_loyalty_bot_and_columns.py currently fails 4/8 purely because loyalty_clients is empty for the test restaurant (0 docs) — not a code regression.",
+  "rca_of_the_issue": "No functional defect found in the three new features. Backend GET returns DEFAULT_START/WELCOME/INVITE when unset, PUT persists partial and full updates, bot matches 'Баланс'/'💰 Баланс'/'Пригласить друга'/'🎫 Моя карта' via the emoji-stripped _norm comparison, /start uses cfg.start_message_text, welcome after contact formats {name}, invite substitutes {bot_link} -> https://t.me/<username> (falls back to 'этому боту' when bot username is unknown, which is the case for this restaurant since no real token is configured)."
+}

@@ -54,6 +54,18 @@ def _share_phone_keyboard() -> dict:
     }
 
 
+def _main_menu_keyboard() -> dict:
+    """Постоянная reply-клавиатура после регистрации."""
+    return {
+        "keyboard": [
+            [{"text": "💰 Баланс"}, {"text": "🎫 Моя карта"}],
+            [{"text": "👥 Пригласить друга"}],
+        ],
+        "resize_keyboard": True,
+        "is_persistent": True,
+    }
+
+
 def _remove_keyboard() -> dict:
     return {"remove_keyboard": True}
 
@@ -174,20 +186,14 @@ async def _welcome_after_link(bot_token: str, chat_id: int, client_doc: dict, cf
 
     await _ensure_card_and_send(bot_token, cfg["restaurant_id"], restaurant_name, client_doc)
 
+    from models_loyalty import DEFAULT_WELCOME_MESSAGE
     name = client_doc.get("name") or "друг"
-    if client_doc.get("last_synced_at"):
-        text = (
-            f"✅ Готово, {name}! Ваша карта закреплена сверху — там всегда актуальный баланс. "
-            "Мы будем уведомлять об изменениях.\n\n"
-            "Хотите получать поздравления с днём рождения? Отправьте /birthday и /gender."
-        )
-    else:
-        text = (
-            f"✅ Готово, {name}! Карта закреплена сверху. "
-            "Как только в базе появятся ваши бонусы — увидите их прямо на карте.\n\n"
-            "Хотите получать поздравления с днём рождения? Отправьте /birthday и /gender."
-        )
-    await _send(bot_token, chat_id, text, _remove_keyboard())
+    tpl = (cfg.get("welcome_message_text") or DEFAULT_WELCOME_MESSAGE)
+    try:
+        text = tpl.format(name=name)
+    except Exception:
+        text = tpl
+    await _send(bot_token, chat_id, text, _main_menu_keyboard())
 
 
 async def handle_update(restaurant_id: str, update: dict) -> None:
@@ -265,16 +271,15 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
     text = (message.get("text") or "").strip()
 
     if text.startswith("/start"):
-        await _send(
-            bot_token, chat_id,
-            "Привет! 👋 Я — бот программы лояльности этого ресторана.\n\n"
-            "Нажмите кнопку ниже, чтобы поделиться номером телефона — и я привяжу "
-            "к нему ваш Telegram, чтобы присылать сюда все начисления и списания бонусов.",
-            _share_phone_keyboard(),
-        )
+        from models_loyalty import DEFAULT_START_MESSAGE
+        start_text = cfg.get("start_message_text") or DEFAULT_START_MESSAGE
+        await _send(bot_token, chat_id, start_text, _share_phone_keyboard())
         return
 
-    if text.startswith("/balance"):
+    # Кнопки главного меню (reply-keyboard) — сравниваем без учёта регистра/эмодзи
+    _norm = text.lower().replace("💰", "").replace("👥", "").replace("🎫", "").strip()
+
+    if text.startswith("/balance") or _norm in ("баланс", "мой баланс"):
         client_doc = await db.loyalty_clients.find_one(
             {"restaurant_id": restaurant_id, "telegram_chat_id": int(chat_id)}, {"_id": 0}
         )
@@ -288,10 +293,30 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
         await _send(
             bot_token, chat_id,
             f"Ваш текущий баланс: <b>{balance:.2f} BYN</b>",
+            _main_menu_keyboard(),
         )
         return
 
-    if text.startswith("/card"):
+    # Пригласить друга — простая шеринг-ссылка на бота, без реферального учёта
+    if _norm in ("пригласить друга", "пригласить", "invite"):
+        client_doc = await db.loyalty_clients.find_one(
+            {"restaurant_id": restaurant_id, "telegram_chat_id": int(chat_id)}, {"_id": 0}
+        )
+        if not client_doc:
+            await _send(bot_token, chat_id, "Сначала поделитесь номером телефона — нажмите /start.")
+            return
+        from models_loyalty import DEFAULT_INVITE_MESSAGE
+        bot_username = cfg.get("telegram_bot_username") or ""
+        bot_link = f"https://t.me/{bot_username}" if bot_username else "этому боту"
+        tpl = cfg.get("invite_message_text") or DEFAULT_INVITE_MESSAGE
+        try:
+            invite_text = tpl.format(bot_link=bot_link, name=client_doc.get("name") or "друг")
+        except Exception:
+            invite_text = tpl
+        await _send(bot_token, chat_id, invite_text, _main_menu_keyboard())
+        return
+
+    if text.startswith("/card") or _norm in ("моя карта", "карта"):
         client_doc = await db.loyalty_clients.find_one(
             {"restaurant_id": restaurant_id, "telegram_chat_id": int(chat_id)}, {"_id": 0}
         )
@@ -397,6 +422,7 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
             bot_token, chat_id,
             "Команды:\n/balance — текущий баланс\n/card — показать карту заново\n"
             "/birthday — указать дату рождения\n/gender — указать пол\n/unlink — отвязать Telegram",
+            _main_menu_keyboard(),
         )
 
 

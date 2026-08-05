@@ -49,6 +49,9 @@ export default function LoyaltyPage() {
     telegram_bot_token: '',
     template_accrual: '',
     template_debit: '',
+    start_message_text: '',
+    welcome_message_text: '',
+    invite_message_text: '',
     is_enabled: false,
     caffesta_loyalty_product_id: '',
     caffesta_auto_register: false,
@@ -70,6 +73,9 @@ export default function LoyaltyPage() {
         sync_interval_min: cfgR.data.sync_interval_min || 2,
         template_accrual: cfgR.data.template_accrual || '',
         template_debit: cfgR.data.template_debit || '',
+        start_message_text: cfgR.data.start_message_text || '',
+        welcome_message_text: cfgR.data.welcome_message_text || '',
+        invite_message_text: cfgR.data.invite_message_text || '',
         is_enabled: !!cfgR.data.is_enabled,
         caffesta_loyalty_product_id: cfgR.data.caffesta_loyalty_product_id || '',
         caffesta_auto_register: !!cfgR.data.caffesta_auto_register,
@@ -475,6 +481,46 @@ export default function LoyaltyPage() {
                   value={form.template_debit}
                   onChange={(e) => setForm({ ...form, template_debit: e.target.value })}
                   data-testid="loyalty-tpl-debit"
+                />
+              </Field>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Сообщения бота</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Текст, который клиент видит при первом обращении к боту. Используйте
+                <code className="mx-1">{'{name}'}</code>для имени и
+                <code className="mx-1">{'{bot_link}'}</code>для ссылки на бота (в приглашении).
+              </p>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <Field label="Приветствие /start (до регистрации)">
+                <Textarea
+                  rows={4}
+                  value={form.start_message_text}
+                  onChange={(e) => setForm({ ...form, start_message_text: e.target.value })}
+                  data-testid="loyalty-start-message"
+                  placeholder="Привет! Я — бот программы лояльности…"
+                />
+              </Field>
+              <Field label="После регистрации (укажите приветственные бонусы)">
+                <Textarea
+                  rows={5}
+                  value={form.welcome_message_text}
+                  onChange={(e) => setForm({ ...form, welcome_message_text: e.target.value })}
+                  data-testid="loyalty-welcome-message"
+                  placeholder={"✅ Готово, {name}! Мы начислили вам 5 приветственных бонусов…"}
+                />
+              </Field>
+              <Field label="Пригласить друга (шаринг-текст)">
+                <Textarea
+                  rows={4}
+                  value={form.invite_message_text}
+                  onChange={(e) => setForm({ ...form, invite_message_text: e.target.value })}
+                  data-testid="loyalty-invite-message"
+                  placeholder={"Расскажите друзьям… Ссылка: {bot_link}"}
                 />
               </Field>
             </CardContent>

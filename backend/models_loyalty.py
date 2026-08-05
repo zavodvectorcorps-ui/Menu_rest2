@@ -20,6 +20,22 @@ import uuid
 DEFAULT_TEMPLATE_ACCRUAL = "Начислено {amount} бонусов. Баланс: {balance} BYN"
 DEFAULT_TEMPLATE_DEBIT = "Списано {amount} бонусов. Баланс: {balance} BYN"
 
+DEFAULT_START_MESSAGE = (
+    "Привет! 👋 Я — бот программы лояльности этого ресторана.\n\n"
+    "Нажмите кнопку ниже, чтобы поделиться номером телефона — и я привяжу "
+    "к нему ваш Telegram, чтобы присылать сюда все начисления и списания бонусов."
+)
+DEFAULT_WELCOME_MESSAGE = (
+    "✅ Готово, {name}! Карта закреплена сверху — там всегда актуальный баланс. "
+    "Мы будем уведомлять об изменениях.\n\n"
+    "Хотите получать поздравления с днём рождения? Отправьте /birthday и /gender."
+)
+DEFAULT_INVITE_MESSAGE = (
+    "Расскажите друзьям о нашем ресторане! 🎁\n\n"
+    "Перешлите им это сообщение или дайте ссылку на бота:\n{bot_link}\n\n"
+    "Спасибо, что делитесь с нами вкусом!"
+)
+
 
 class LoyaltyConfig(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -32,6 +48,9 @@ class LoyaltyConfig(BaseModel):
     telegram_bot_username: str = ""  # cached, безопасно показывать
     template_accrual: str = DEFAULT_TEMPLATE_ACCRUAL
     template_debit: str = DEFAULT_TEMPLATE_DEBIT
+    start_message_text: str = DEFAULT_START_MESSAGE
+    welcome_message_text: str = DEFAULT_WELCOME_MESSAGE
+    invite_message_text: str = DEFAULT_INVITE_MESSAGE
     is_enabled: bool = False
     last_synced_at: Optional[datetime] = None
     last_error: Optional[str] = ""
