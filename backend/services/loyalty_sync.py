@@ -94,13 +94,14 @@ async def caffesta_register_client(
     body = {
         "bill": {
             "pos_id": int(pos_id) if str(pos_id).isdigit() else pos_id,
-            "app_id": -1,
+            "app_id": 26,
             "date": int(_time.time()),
             "receipt_type": 3,
             "service_type": 1,
-            "delivery_type": 1,
+            "delivery_type": 2,
             "discount_sum": 0,
             "total_sum": 0,
+            "payments": [{"payment_id": 2, "value": 0}],
             "items": [{
                 "title": "Карта лояльности",
                 "count": 1,
@@ -111,11 +112,13 @@ async def caffesta_register_client(
                 "product_id": int(product_id) if str(product_id).isdigit() else product_id,
             }],
             "client": {
-                "first_name": first_name,
+                "name": first_name,
                 "last_name": last_name,
-                "name": client_name or "Клиент",
                 "phone": phone_for_caffesta,
+                "address": "—",
+                "email": "",
             },
+            "delivery": {"address": "—"},
             "comment": "Автосоздание клиента при регистрации в Telegram-боте",
         }
     }
