@@ -61,6 +61,7 @@ def _public_config_view(doc: dict) -> dict:
         "template_debit": doc.get("template_debit") or DEFAULT_TEMPLATE_DEBIT,
         "is_enabled": bool(doc.get("is_enabled")),
         "last_synced_at": doc.get("last_synced_at"),
+        "last_polled_at": doc.get("last_polled_at"),
         "last_error": doc.get("last_error") or "",
         "last_error_at": doc.get("last_error_at"),
         "last_clients_ts": int(doc.get("last_clients_ts") or 0),
@@ -153,8 +154,8 @@ async def delete_bot_token(restaurant_id: str, current_user: dict = Depends(get_
 @router.post("/restaurants/{restaurant_id}/loyalty/sync-now")
 async def trigger_sync(restaurant_id: str, current_user: dict = Depends(get_current_user)):
     await ensure_module_access(restaurant_id, "loyalty", current_user, write=True)
-    err = await sync_restaurant(restaurant_id)
-    return {"ok": err is None, "error": err or ""}
+    err, info = await sync_restaurant(restaurant_id)
+    return {"ok": err is None, "error": err or "", "info": info}
 
 
 # ─── Сообщения и массовая рассылка ─────────────────────────────────────────

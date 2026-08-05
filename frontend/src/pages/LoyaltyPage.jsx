@@ -155,7 +155,12 @@ export default function LoyaltyPage() {
         authHeaders
       );
       if (r.data.ok) {
-        toast.success('Синхронизация выполнена');
+        const info = r.data.info || {};
+        if (info.changed) {
+          toast.success(`Синхронизировано: ${info.processed} клиентов, отправлено ${info.notifications_sent || 0} уведомлений`);
+        } else {
+          toast.info('Caffesta пока не сообщает об изменениях');
+        }
       } else {
         toast.error(r.data.error || 'Ошибка синхронизации');
       }
@@ -285,10 +290,15 @@ export default function LoyaltyPage() {
                 <span>Caffesta POS</span>
                 {config.last_synced_at ? (
                   <Badge variant="outline" className="gap-1 border-mint-500 text-mint-600">
-                    <CheckCircle2 className="w-3 h-3" /> Синхр.: {fmtDate(config.last_synced_at)}
+                    <CheckCircle2 className="w-3 h-3" /> Данные: {fmtDate(config.last_synced_at)}
                   </Badge>
                 ) : (
-                  <Badge variant="outline">не запускалась</Badge>
+                  <Badge variant="outline">данные ещё не подтягивались</Badge>
+                )}
+                {config.last_polled_at && (
+                  <Badge variant="outline" className="gap-1 ml-2">
+                    <RefreshCw className="w-3 h-3" /> Опрос: {fmtDate(config.last_polled_at)}
+                  </Badge>
                 )}
               </CardTitle>
             </CardHeader>

@@ -114,8 +114,8 @@ async def _log(
 
 # ─── Один цикл синхронизации на ресторан ───────────────────────────────────
 
-async def _sync_one(restaurant_id: str, config: dict) -> Optional[str]:
-    """Возвращает None при успехе или строку с ошибкой."""
+async def _sync_one(restaurant_id: str, config: dict) -> tuple[Optional[str], dict]:
+    """Возвращает (error_or_None, info_dict)."""
     account_name = config.get("caffesta_account_name") or ""
     api_key = decrypt(config.get("caffesta_api_key_enc") or "")
     pos_id = config.get("pos_id") or ""
@@ -125,27 +125,32 @@ async def _sync_one(restaurant_id: str, config: dict) -> Optional[str]:
     last_clients_ts = int(config.get("last_clients_ts") or 0)
 
     if not account_name or not api_key or not pos_id:
-        return "Не заполнены Caffesta account_name / api_key / pos_id"
+        return "Не заполнены Caffesta account_name / api_key / pos_id", {}
 
     # 1. Есть ли изменения?
     try:
         updates = await caffesta_get_updates(account_name, api_key, pos_id)
     except Exception as exc:
-        return f"get_updates failed: {exc}"
+        return f"get_updates failed: {exc}", {}
     data = updates.get("data") if isinstance(updates, dict) else None
     new_clients_ts = 0
     if isinstance(data, dict):
         new_clients_ts = int(data.get("clients") or 0)
     if new_clients_ts <= last_clients_ts:
-        return None  # ничего нового
+        return None, {
+            "changed": False,
+            "caffesta_clients_ts": new_clients_ts,
+            "last_processed_ts": last_clients_ts,
+        }
 
     # 2. Тянем новых/изменившихся клиентов
     try:
         clients = await caffesta_get_clients(account_name, api_key, last_clients_ts)
     except Exception as exc:
-        return f"get_clients failed: {exc}"
+        return f"get_clients failed: {exc}", {}
 
     processed = 0
+    notifications_sent = 0
     for cli in clients:
         phone_norm = normalize_phone(cli.get("normPhone") or cli.get("phone") or "")
         if not phone_norm:
@@ -214,6 +219,7 @@ async def _sync_one(restaurant_id: str, config: dict) -> Optional[str]:
                 error_text=err,
                 http_code=code,
             )
+            notifications_sent += 1
         processed += 1
 
     # 3. Сохраняем новый ts
@@ -223,24 +229,34 @@ async def _sync_one(restaurant_id: str, config: dict) -> Optional[str]:
     )
     logger.info("loyalty sync %s: processed %d clients (ts %d → %d)",
                 restaurant_id, processed, last_clients_ts, new_clients_ts)
-    return None
+    return None, {
+        "changed": True,
+        "processed": processed,
+        "notifications_sent": notifications_sent,
+        "caffesta_clients_ts": new_clients_ts,
+    }
 
 
-async def sync_restaurant(restaurant_id: str) -> Optional[str]:
-    """Ручной запуск синхронизации на конкретный ресторан (кнопка «Синхронизировать сейчас»)."""
+async def sync_restaurant(restaurant_id: str) -> tuple[Optional[str], dict]:
+    """Ручной запуск синхронизации на конкретный ресторан (кнопка «Синхронизировать сейчас»).
+    Возвращает (error_or_None, info_dict) с диагностикой."""
     cfg = await db.loyalty_config.find_one({"restaurant_id": restaurant_id}, {"_id": 0})
     if not cfg:
-        return "loyalty_config not found"
+        return "loyalty_config not found", {}
     if not cfg.get("is_enabled"):
-        return "sync disabled"
-    err = await _sync_one(restaurant_id, cfg)
+        return "sync disabled", {}
+    await db.loyalty_config.update_one(
+        {"restaurant_id": restaurant_id},
+        {"$set": {"last_polled_at": datetime.now(timezone.utc)}},
+    )
+    err, info = await _sync_one(restaurant_id, cfg)
     if err:
         await db.loyalty_config.update_one(
             {"restaurant_id": restaurant_id},
             {"$set": {"last_error": err, "last_error_at": datetime.now(timezone.utc)}},
         )
         await _log(restaurant_id, "error", status="error", error_text=err, message=err)
-    return err
+    return err, info
 
 
 # ─── Планировщик: раз в минуту проходим по всем ресторанам ─────────────────
@@ -251,14 +267,22 @@ async def run_loyalty_sync_job():
     now = datetime.now(timezone.utc)
     async for cfg in db.loyalty_config.find({"is_enabled": True}, {"_id": 0}):
         interval = int(cfg.get("sync_interval_min") or 2)
-        last = cfg.get("last_synced_at")
+        # Используем last_polled_at (пульс) — реальный признак когда последний
+        # раз воркер трогал этот ресторан. last_synced_at обновляется только
+        # при получении новых данных от Caffesta.
+        last = cfg.get("last_polled_at") or cfg.get("last_synced_at")
         if last and isinstance(last, datetime):
             elapsed_min = (now - last).total_seconds() / 60
-            if elapsed_min < interval:
+            if elapsed_min + 0.05 < interval:  # +0.05 чтобы не пропускать «почти минута»
                 continue
         rid = cfg["restaurant_id"]
+        # Пульс — независимо от того, было ли изменение
+        await db.loyalty_config.update_one(
+            {"restaurant_id": rid},
+            {"$set": {"last_polled_at": datetime.now(timezone.utc)}},
+        )
         try:
-            err = await asyncio.wait_for(_sync_one(rid, cfg), timeout=90)
+            err, _info = await asyncio.wait_for(_sync_one(rid, cfg), timeout=90)
         except asyncio.TimeoutError:
             err = "sync timeout > 90s"
         except Exception as exc:
