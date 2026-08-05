@@ -251,14 +251,14 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
                 "created_at": now,
             }
             await db.loyalty_clients.insert_one(new_client)
+            # Пытаемся создать клиента в Caffesta (если модуль включён).
+            # Не блокируемся на её ответ и не пугаем клиента "карта не найдена":
+            # локальная запись создана, карта уже назначается — синк добавит связь позже.
             await _try_caffesta_auto_register(cfg, new_client)
-            await _send(
-                bot_token, chat_id,
-                "Мы пока не нашли карту лояльности по этому номеру. "
-                "Обратитесь на кассе, чтобы её оформили — как только карта появится, "
-                "вы автоматически начнёте получать уведомления.",
-                _remove_keyboard(),
-            )
+            refreshed = await db.loyalty_clients.find_one(
+                {"restaurant_id": restaurant_id, "id": new_id}, {"_id": 0}
+            ) or new_client
+            await _welcome_after_link(bot_token, chat_id, refreshed, cfg)
         return
 
     # 2. Команды

@@ -1,0 +1,26 @@
+{
+  "summary": "Validated two loyalty changes: (1) loyalty_bot contact-branch race-condition fix and (2) new 'День рожд.' / 'Пол' columns in LoyaltyPage Клиенты table. Backend: 8/8 pytest tests pass (GET /loyalty/clients returns birthday+sex, auth guard, webhook new-contact registration, /birthday and /gender dialogs). Frontend: superadmin login -> /admin/loyalty -> Клиенты tab; both new headers present and all 3 seeded rows render expected values. No blocking issues found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Лояльность → Клиенты", "issues": ["'Заказ Caffesta' UUID cell uses text-[11px] muted foreground on dark bg — very low contrast, hard to read (cosmetic)"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter34_loyalty_bot_and_columns.py", "/app/test_reports/pytest/iter34.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "loyalty_bot.handle_update() returns silently when telegram_bot_token_enc is empty — correct, but this means the webhook path is untestable/no-op until a token is configured; testing required temporarily injecting an encrypted fake token.",
+    "loyalty_bot.py contact branch: new client doc does not initialise birthday/sex/pending_prompt keys, so freshly registered clients lack those fields until /birthday or /gender is used. GET /loyalty/clients therefore omits the keys entirely for such docs (frontend handles it via falsy check, but adding explicit nulls would make the API contract consistent).",
+    "loyalty_bot.py is ~440 lines with mixed responsibilities (send helpers, Caffesta register, command router). Consider splitting the command router from HTTP helpers if it keeps growing."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter34_loyalty_bot_and_columns.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Used existing 3 seeded loyalty clients. Temporarily created client phone_norm=375291234567 via webhook simulation and a fake encrypted bot token in loyalty_config; both cleaned up/restored (verified: token_enc='', client count back to 3, 'Без данных' birthday/sex/pending_prompt reset to null).",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "test_credentials": "admin / 220066 (superadmin) from /app/memory/test_credentials.md — works",
+  "context_for_next_testing_agent": "Loyalty bot webhook can be exercised end-to-end by temporarily setting loyalty_config.telegram_bot_token_enc = encrypt('123456:FAKE_TEST_TOKEN') and POSTing to /api/loyalty/webhook/{rid}/{webhook_secret}. Telegram returns 401 Unauthorized (logged as warning) which is expected; handle_update still completes and DB writes happen. Admin route prefix is /admin (e.g. /admin/loyalty); localStorage key 'currentRestaurantId' selects the restaurant. Reusable test file: /app/backend/tests/test_iter34_loyalty_bot_and_columns.py.",
+  "rca_of_the_issue": "Verified the fix: for an unknown phone the contact branch now inserts the local client, calls _try_caffesta_auto_register (no-op here since caffesta_auto_register=False) and then always calls _welcome_after_link, which assigns card_number via next_card_number and attempts sendPhoto/pin (backend log confirms sendPhoto attempt). No 'карта не найдена'/'не нашли карту' text exists anywhere in executable bot code, and none appeared in backend logs during the simulated registration."
+}

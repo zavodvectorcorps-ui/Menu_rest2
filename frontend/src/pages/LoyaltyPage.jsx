@@ -540,6 +540,8 @@ export default function LoyaltyPage() {
                   <th className="p-3">Имя</th>
                   <th className="p-3">Telegram</th>
                   <th className="p-3 text-right">Баланс</th>
+                  <th className="p-3">День рожд.</th>
+                  <th className="p-3">Пол</th>
                   <th className="p-3">Заказ Caffesta</th>
                   <th className="p-3">Последняя синхр.</th>
                   <th className="p-3"></th>
@@ -547,7 +549,7 @@ export default function LoyaltyPage() {
               </thead>
               <tbody>
                 {clients.length === 0 && (
-                  <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Пока никого</td></tr>
+                  <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">Пока никого</td></tr>
                 )}
                 {clients.map((c) => (
                   <tr key={c.id} className="border-t hover:bg-muted/20">
@@ -566,6 +568,8 @@ export default function LoyaltyPage() {
                       )}
                     </td>
                     <td className="p-3 text-right font-medium">{(c.last_bonus_balance || 0).toFixed(2)}</td>
+                    <td className="p-3 text-xs">{c.birthday || <span className="opacity-40">—</span>}</td>
+                    <td className="p-3 text-xs">{c.sex === 'M' ? 'М' : c.sex === 'F' ? 'Ж' : <span className="opacity-40">—</span>}</td>
                     <td className="p-3 font-mono text-[11px] text-muted-foreground">
                       {c.caffesta_receipt_uuid
                         ? c.caffesta_receipt_uuid.slice(0, 8) + '…'
