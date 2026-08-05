@@ -279,6 +279,9 @@ async def run_loyalty_sync_job():
             interval = int(cfg.get("sync_interval_min") or 2)
             last = cfg.get("last_polled_at") or cfg.get("last_synced_at")
             if last and isinstance(last, datetime):
+                # BSON не хранит tz — приводим naive → aware UTC перед вычитанием.
+                if last.tzinfo is None:
+                    last = last.replace(tzinfo=timezone.utc)
                 elapsed_min = (now - last).total_seconds() / 60
                 if elapsed_min + 0.05 < interval:
                     continue
