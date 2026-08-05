@@ -102,7 +102,6 @@ async def _try_caffesta_auto_register(cfg: dict, client_doc: dict) -> None:
 
     receipt_uuid, err = await caffesta_register_client(
         account, api_key, pos_id, product_id, name, phone, card_number=card_no,
-        birthday=client_doc.get("birthday"), sex=client_doc.get("sex"),
     )
     now = datetime.now(timezone.utc)
     if receipt_uuid:
@@ -146,51 +145,6 @@ async def _try_caffesta_auto_register(cfg: dict, client_doc: dict) -> None:
             "http_code": 0,
         })
         logger.warning("caffesta auto-register failed for %s: %s", phone, err)
-
-
-async def _try_caffesta_update_birthday(cfg: dict, client_doc: dict) -> None:
-    """
-    Отправить в Caffesta повторный "фиктивный" чек, чтобы обновить дату рождения
-    уже существующего клиента (Caffesta не даёт прямого API для update client).
-    Логируем результат в общий журнал раздела «Лояльность».
-    """
-    if not cfg.get("caffesta_auto_register"):
-        return
-    if not client_doc.get("birthday"):
-        return
-    account = cfg.get("caffesta_account_name") or ""
-    api_key = decrypt(cfg.get("caffesta_api_key_enc") or "")
-    pos_id = cfg.get("pos_id") or ""
-    product_id = cfg.get("caffesta_loyalty_product_id") or ""
-    if not (account and api_key and pos_id and product_id):
-        return
-    phone = client_doc.get("phone_norm") or ""
-    name = client_doc.get("name") or "Клиент"
-    card_no = client_doc.get("card_number")
-
-    receipt_uuid, err = await caffesta_register_client(
-        account, api_key, pos_id, product_id, name, phone, card_number=card_no,
-        birthday=client_doc.get("birthday"), sex=client_doc.get("sex"),
-    )
-    now = datetime.now(timezone.utc)
-    status = "success" if receipt_uuid else "error"
-    await db.loyalty_notifications_log.insert_one({
-        "id": __import__("uuid").uuid4().hex,
-        "restaurant_id": cfg["restaurant_id"],
-        "client_id": client_doc["id"],
-        "phone_norm": phone,
-        "kind": "caffesta_birthday_sync",
-        "amount": 0.0,
-        "balance_after": 0.0,
-        "message": (
-            f"Обновлена дата рождения ({client_doc.get('birthday')}) — receipt: {receipt_uuid}"
-            if receipt_uuid else f"Не удалось обновить дату рождения в Caffesta: {err}"
-        ),
-        "sent_at": now,
-        "status": status,
-        "error_text": err or "",
-        "http_code": 200 if receipt_uuid else 0,
-    })
 
 
 async def _ensure_card_and_send(
@@ -410,12 +364,6 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
                 {"$set": {"birthday": bd, "pending_prompt": None}},
             )
             await _send(bot_token, chat_id, f"✅ Спасибо! Дата рождения: {bd}")
-            # Обновляем клиента в Caffesta, если уже был там зарегистрирован через нас
-            refreshed = await db.loyalty_clients.find_one(
-                {"restaurant_id": restaurant_id, "id": client_doc["id"]}, {"_id": 0}
-            )
-            if refreshed:
-                await _try_caffesta_update_birthday(cfg, refreshed)
             return
 
     if text.startswith("/unlink"):
