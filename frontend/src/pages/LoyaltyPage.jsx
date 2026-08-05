@@ -490,9 +490,9 @@ export default function LoyaltyPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Сообщения бота</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
-                Текст, который клиент видит при первом обращении к боту. Используйте
-                <code className="mx-1">{'{name}'}</code>для имени и
-                <code className="mx-1">{'{bot_link}'}</code>для ссылки на бота (в приглашении).
+                Текст, который клиент видит при первом обращении к боту. Используйте{' '}
+                <code>{'{name}'}</code> для имени и{' '}
+                <code>{'{bot_link}'}</code> для ссылки на бота (в приглашении).
               </p>
             </CardHeader>
             <CardContent className="grid gap-4">
