@@ -24,6 +24,7 @@ import httpx
 
 from database import db
 from models_loyalty import LoyaltyNotificationLog
+from services.loyalty_card import edit_card_caption
 from services.loyalty_crypto import decrypt
 
 logger = logging.getLogger("loyalty.sync")
@@ -220,6 +221,25 @@ async def _sync_one(restaurant_id: str, config: dict) -> tuple[Optional[str], di
                 http_code=code,
             )
             notifications_sent += 1
+
+            # Обновляем подпись под закреплённой картой (если она есть).
+            pinned_id = existing.get("pinned_message_id")
+            card_no = existing.get("card_number")
+            chat_id_int = int(existing["telegram_chat_id"])
+            if pinned_id and card_no:
+                edit_ok, edit_err = await edit_card_caption(
+                    bot_token, chat_id_int, int(pinned_id), int(card_no), new_bonus,
+                )
+                if not edit_ok:
+                    # Пользователь мог сам открепить/удалить сообщение.
+                    if "message to edit not found" in (edit_err or "").lower() or "not found" in (edit_err or "").lower():
+                        await db.loyalty_clients.update_one(
+                            {"restaurant_id": restaurant_id, "id": existing["id"]},
+                            {"$set": {"pinned_message_id": None}},
+                        )
+                        logger.info("pinned_message cleared for %s: %s", phone_norm, edit_err)
+                    else:
+                        logger.warning("edit_card_caption failed for %s: %s", phone_norm, edit_err)
         processed += 1
 
     # 3. Сохраняем новый ts

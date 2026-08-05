@@ -21,6 +21,11 @@ from typing import Optional
 import httpx
 
 from database import db
+from services.loyalty_card import (
+    edit_card_caption,
+    next_card_number,
+    send_card_and_pin,
+)
 from services.loyalty_crypto import decrypt
 from services.loyalty_sync import normalize_phone
 
@@ -53,19 +58,51 @@ def _remove_keyboard() -> dict:
     return {"remove_keyboard": True}
 
 
-async def _welcome_after_link(bot_token: str, chat_id: int, client_doc: dict, cfg: dict):
-    """После привязки — сразу показываем баланс, если есть."""
+async def _ensure_card_and_send(
+    bot_token: str,
+    restaurant_id: str,
+    restaurant_name: str,
+    client_doc: dict,
+) -> Optional[int]:
+    """
+    Гарантирует, что у клиента есть card_number, отправляет ему карту и пинует её.
+    Возвращает pinned_message_id (или None при сбое).
+    Обновляет БД (card_number, pinned_message_id).
+    """
+    card_no = client_doc.get("card_number")
+    if not card_no:
+        card_no = await next_card_number(restaurant_id)
+        await db.loyalty_clients.update_one(
+            {"restaurant_id": restaurant_id, "id": client_doc["id"]},
+            {"$set": {"card_number": card_no}},
+        )
     balance = float(client_doc.get("last_bonus_balance") or 0)
+    msg_id = await send_card_and_pin(
+        bot_token, int(client_doc["telegram_chat_id"]), restaurant_name, card_no, balance,
+    )
+    if msg_id:
+        await db.loyalty_clients.update_one(
+            {"restaurant_id": restaurant_id, "id": client_doc["id"]},
+            {"$set": {"pinned_message_id": msg_id}},
+        )
+    return msg_id
+
+
+async def _welcome_after_link(bot_token: str, chat_id: int, client_doc: dict, cfg: dict):
+    """После привязки — сначала фото-карта (запинена), затем текстовое приветствие."""
+    # Получаем название ресторана из БД для «шапки» карты
+    rest = await db.restaurants.find_one({"id": cfg["restaurant_id"]}, {"_id": 0, "name": 1})
+    restaurant_name = (rest or {}).get("name") or "Ресторан"
+
+    await _ensure_card_and_send(bot_token, cfg["restaurant_id"], restaurant_name, client_doc)
+
     name = client_doc.get("name") or "друг"
     if client_doc.get("last_synced_at"):
-        text = (
-            f"✅ Готово, {name}! Мы будем присылать сюда уведомления об изменениях бонусов.\n\n"
-            f"Ваш текущий баланс: <b>{balance:.2f} BYN</b>"
-        )
+        text = f"✅ Готово, {name}! Ваша карта закреплена сверху — там всегда виден актуальный баланс. Мы будем уведомлять об изменениях."
     else:
         text = (
-            f"✅ Готово, {name}! Мы будем присылать сюда уведомления, как только\n"
-            "в базе появятся ваши бонусы."
+            f"✅ Готово, {name}! Карта закреплена сверху. "
+            "Как только в базе появятся ваши бонусы — увидите их прямо на карте."
         )
     await _send(bot_token, chat_id, text, _remove_keyboard())
 
@@ -165,6 +202,18 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
         )
         return
 
+    if text.startswith("/card"):
+        client_doc = await db.loyalty_clients.find_one(
+            {"restaurant_id": restaurant_id, "telegram_chat_id": int(chat_id)}, {"_id": 0}
+        )
+        if not client_doc:
+            await _send(bot_token, chat_id, "Сначала поделитесь номером телефона — нажмите /start.")
+            return
+        rest = await db.restaurants.find_one({"id": restaurant_id}, {"_id": 0, "name": 1})
+        restaurant_name = (rest or {}).get("name") or "Ресторан"
+        await _ensure_card_and_send(bot_token, restaurant_id, restaurant_name, client_doc)
+        return
+
     if text.startswith("/unlink"):
         res = await db.loyalty_clients.update_one(
             {"restaurant_id": restaurant_id, "telegram_chat_id": int(chat_id)},
@@ -189,7 +238,7 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
     else:
         await _send(
             bot_token, chat_id,
-            "Команды:\n/balance — текущий баланс\n/unlink — отвязать Telegram",
+            "Команды:\n/balance — текущий баланс\n/card — показать карту заново\n/unlink — отвязать Telegram",
         )
 
 

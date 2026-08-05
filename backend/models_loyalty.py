@@ -53,6 +53,12 @@ class LoyaltyClient(BaseModel):
     last_point_balance: float = 0.0
     last_synced_at: Optional[datetime] = None
     linked_at: Optional[datetime] = None
+    # Внутренний номер карты клиента (не связан с Caffesta cardNumber).
+    # Присваивается один раз при первой привязке телефона.
+    card_number: Optional[int] = None
+    # ID сообщения с фото карты, закреплённого в приватном чате бота.
+    # Обновляется через editMessageCaption при изменении баланса.
+    pinned_message_id: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

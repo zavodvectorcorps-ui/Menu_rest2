@@ -464,6 +464,7 @@ export default function LoyaltyPage() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                 <tr>
+                  <th className="p-3">Карта №</th>
                   <th className="p-3">Телефон</th>
                   <th className="p-3">Имя</th>
                   <th className="p-3">Telegram</th>
@@ -474,10 +475,11 @@ export default function LoyaltyPage() {
               </thead>
               <tbody>
                 {clients.length === 0 && (
-                  <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Пока никого</td></tr>
+                  <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Пока никого</td></tr>
                 )}
                 {clients.map((c) => (
                   <tr key={c.id} className="border-t hover:bg-muted/20">
+                    <td className="p-3 font-mono text-xs">{c.card_number ? `№${c.card_number}` : <span className="text-muted-foreground">—</span>}</td>
                     <td className="p-3 font-mono text-xs">+{c.phone_norm}</td>
                     <td className="p-3">{c.name || <span className="text-muted-foreground">—</span>}</td>
                     <td className="p-3">
