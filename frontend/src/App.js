@@ -24,6 +24,7 @@ import PriceControlPage from "@/pages/PriceControlPage";
 import RecipeCalculatorPage from "@/pages/RecipeCalculatorPage";
 import CaffestaMappingPage from "@/pages/CaffestaMappingPage";
 import FactualMarginPage from "@/pages/FactualMarginPage";
+import LoyaltyPage from "@/pages/LoyaltyPage";
 import RootRoute from "@/pages/RootRoute";
 import DemoPage from "@/pages/DemoPage";
 
@@ -280,6 +281,7 @@ function App() {
                 <Route path="price-control" element={<PriceControlPage />} />
                 <Route path="recipes" element={<RecipeCalculatorPage />} />
                 <Route path="factual-margin" element={<FactualMarginPage />} />
+                <Route path="loyalty" element={<LoyaltyPage />} />
                 <Route path="users" element={user?.role === 'superadmin' ? <UsersPage /> : <Navigate to="/admin/profile" replace />} />
                 <Route path="restaurant-modules" element={user?.role === 'superadmin' ? <RestaurantModulesPage /> : <Navigate to="/admin/profile" replace />} />
                 <Route path="domains-status" element={user?.role === 'superadmin' ? <DomainsStatusPage /> : <Navigate to="/admin/profile" replace />} />

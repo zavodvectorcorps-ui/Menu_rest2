@@ -24,7 +24,8 @@ import {
   Wrench,
   Volume2,
   VolumeX,
-  Globe
+  Globe,
+  Gift
 } from 'lucide-react';
 import { useApp, useTheme } from '@/App';
 import { Button } from '@/components/ui/button';
@@ -62,6 +63,7 @@ const systemItems = [
   { path: '/admin/telegram-bot', label: 'Telegram-бот', icon: Bot },
   { path: '/admin/caffesta', label: 'Caffesta POS', icon: Coffee },
   { path: '/admin/caffesta-mapping', label: 'Маппинг Caffesta', icon: LinkIcon },
+  { path: '/admin/loyalty', label: 'Лояльность', icon: Gift },
 ];
 
 export default function AdminLayout() {
@@ -161,6 +163,7 @@ export default function AdminLayout() {
     if (it.path === '/admin/telegram-bot') return isModuleEnabled('telegram_bot');
     if (it.path === '/admin/caffesta') return isModuleEnabled('caffesta');
     if (it.path === '/admin/caffesta-mapping') return isModuleEnabled('caffesta_mapping');
+    if (it.path === '/admin/loyalty') return isModuleEnabled('loyalty');
     return true;
   });
 

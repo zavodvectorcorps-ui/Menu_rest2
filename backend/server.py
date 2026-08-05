@@ -30,7 +30,9 @@ from routes.cost_control import run_margin_check_job
 from routes.caffesta_mapping import router as caffesta_mapping_router
 from routes.digest import router as digest_router
 from routes.admin import router as admin_router
+from routes.loyalty import router as loyalty_router
 from services.digest import run_daily_digest_job
+from services.loyalty_sync import run_loyalty_sync_job
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -50,7 +52,7 @@ for r in [
     auth_router, restaurants_router, menu_router, tables_router,
     orders_router, settings_router, public_router, telegram_router,
     caffesta_router, backup_router, seed_router, ws_router, faq_router, splash_router, cost_router,
-    caffesta_mapping_router, digest_router, admin_router,
+    caffesta_mapping_router, digest_router, admin_router, loyalty_router,
 ]:
     app.include_router(r, prefix="/api")
 
@@ -89,6 +91,13 @@ async def startup():
             run_margin_check_job,
             CronTrigger(hour=8, minute=5, timezone=minsk_tz),
             id="margin_check", replace_existing=True,
+        )
+        # Лояльность: тик раз в минуту, внутри воркер учитывает
+        # индивидуальный sync_interval_min каждого ресторана.
+        scheduler.add_job(
+            run_loyalty_sync_job,
+            CronTrigger(minute="*", timezone=minsk_tz),
+            id="loyalty_sync", replace_existing=True,
         )
         scheduler.start()
         # Log next run times so you can verify timezone on first start

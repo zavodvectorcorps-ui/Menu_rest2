@@ -72,6 +72,7 @@ SYSTEM_MODULES = {
     "telegram_bot",
     "cost_control",
     "factual_margin",
+    "loyalty",
 }
 
 
