@@ -700,6 +700,30 @@ async def factual_margin(days: int = 30) -> dict:
     )
 
 
+# ─── Экспорт ───────────────────────────────────────────────────────────────
+
+@mcp.tool()
+async def export_menu_csv(save_to: str | None = None) -> dict:
+    """
+    Экспорт всего меню ресторана в CSV (UTF-8 c BOM, разделитель `;`).
+    Возвращает {rows, csv_text, saved_to?}.
+    Если `save_to` задан — сохраняет файл по этому абсолютному пути и добавляет `saved_to`.
+    """
+    rid = _need_rid()
+    token = await _login()
+    url = f"{API_URL}/api/restaurants/{rid}/menu-items/export.csv"
+    async with httpx.AsyncClient(timeout=120) as client:
+        resp = await client.get(url, headers={"Authorization": f"Bearer {token}"})
+        resp.raise_for_status()
+        text = resp.content.decode("utf-8-sig")
+    result: dict[str, Any] = {"rows": max(0, text.count("\n") - 1), "csv_text": text}
+    if save_to:
+        with open(save_to, "wb") as f:
+            f.write(resp.content)
+        result["saved_to"] = save_to
+    return result
+
+
 # ─── Переводы (RU/EN/ZH) ───────────────────────────────────────────────────
 
 @mcp.tool()

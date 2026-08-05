@@ -1,10 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from typing import List, Optional
 from pathlib import Path
 from pydantic import BaseModel
 import os
+import io
+import csv
 import uuid
 import re as _re
+from datetime import datetime, timezone
 
 from database import db
 from models import (
@@ -991,6 +995,118 @@ def parse_lunchpad_data(raw_data: list) -> dict:
         categories.extend(nested_subcats)
 
     return {"categories": categories}
+
+
+# ============================================================================
+# EXPORT
+# ============================================================================
+
+@router.get("/restaurants/{restaurant_id}/menu-items/export.csv")
+async def export_menu_csv(
+    restaurant_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Экспорт всего меню ресторана в CSV.
+    Включает: секцию, категорию, id блюда, названия (RU/EN/ZH), описания,
+    цену, вес, БЖУ, флаги (is_hit/is_new/is_spicy/...), image_url, labels.
+    Кодировка UTF-8 c BOM (открывается в русском Excel без «крокозябр»).
+    """
+    await check_restaurant_access(current_user, restaurant_id)
+
+    # Тянем всё одним махом
+    sections = await db.menu_sections.find({"restaurant_id": restaurant_id}).to_list(1000)
+    categories = await db.categories.find({"restaurant_id": restaurant_id}).to_list(1000)
+    items = await db.menu_items.find({"restaurant_id": restaurant_id}).to_list(10000)
+    labels_docs = await db.labels.find({"restaurant_id": restaurant_id}).to_list(1000)
+
+    section_by_id = {s["id"]: s.get("name", "") for s in sections}
+    cat_by_id = {c["id"]: c for c in categories}
+    label_name = {l["id"]: l.get("name", "") for l in labels_docs}
+
+    columns = [
+        "section", "category", "category_id",
+        "id", "name", "name_en", "name_zh",
+        "description", "description_en", "description_zh",
+        "price", "weight", "cost_price", "cost_source",
+        "is_available", "is_hit", "is_new", "is_spicy",
+        "is_business_lunch", "is_promotion", "is_takeaway", "is_banner",
+        "labels", "image_url",
+        "nutrition_protein", "nutrition_fat", "nutrition_carbs",
+        "nutrition_kcal", "nutrition_kj",
+        "caffesta_product_id", "sort_order",
+    ]
+
+    buf = io.StringIO()
+    # BOM, чтобы Excel корректно распознал UTF-8
+    buf.write("\ufeff")
+    writer = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(columns)
+
+    # Сортируем: по секции → категории (sort_order) → блюду (sort_order)
+    def _cat_sort_key(item):
+        c = cat_by_id.get(item.get("category_id"), {})
+        return (
+            section_by_id.get(c.get("section_id"), "") or "",
+            c.get("sort_order") or 0,
+            c.get("name", "") or "",
+            item.get("sort_order") or 0,
+            item.get("name", "") or "",
+        )
+
+    for item in sorted(items, key=_cat_sort_key):
+        cat = cat_by_id.get(item.get("category_id"), {})
+        labels_str = ", ".join(
+            label_name.get(lid, "")
+            for lid in (item.get("label_ids") or [])
+            if label_name.get(lid)
+        )
+        row = [
+            section_by_id.get(cat.get("section_id"), ""),
+            cat.get("name", ""),
+            cat.get("id", ""),
+            item.get("id", ""),
+            item.get("name", ""),
+            item.get("name_en", ""),
+            item.get("name_zh", ""),
+            item.get("description", ""),
+            item.get("description_en", ""),
+            item.get("description_zh", ""),
+            item.get("price", 0),
+            item.get("weight", ""),
+            item.get("cost_price") if item.get("cost_price") is not None else "",
+            item.get("cost_source", ""),
+            "1" if item.get("is_available", True) else "0",
+            "1" if item.get("is_hit") else "0",
+            "1" if item.get("is_new") else "0",
+            "1" if item.get("is_spicy") else "0",
+            "1" if item.get("is_business_lunch") else "0",
+            "1" if item.get("is_promotion") else "0",
+            "1" if item.get("is_takeaway") else "0",
+            "1" if item.get("is_banner") else "0",
+            labels_str,
+            item.get("image_url", ""),
+            item.get("nutrition_protein") if item.get("nutrition_protein") is not None else "",
+            item.get("nutrition_fat") if item.get("nutrition_fat") is not None else "",
+            item.get("nutrition_carbs") if item.get("nutrition_carbs") is not None else "",
+            item.get("nutrition_kcal") if item.get("nutrition_kcal") is not None else "",
+            item.get("nutrition_kj") if item.get("nutrition_kj") is not None else "",
+            item.get("caffesta_product_id") or "",
+            item.get("sort_order") or 0,
+        ]
+        writer.writerow(row)
+
+    buf.seek(0)
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    filename = f"menu-{restaurant_id[:8]}-{stamp}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.post("/restaurants/{restaurant_id}/import-menu")

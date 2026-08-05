@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, ImageIcon, Tag, Search, Image, Layers, Loader2, FileJson, Download, Edit3, Zap } from 'lucide-react';
+import { Plus, ImageIcon, Tag, Search, Image, Layers, Loader2, FileJson, Download, Edit3, Zap, FileDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -418,6 +418,30 @@ export default function MenuPage() {
     }
   };
 
+  // Экспорт всего меню в CSV — открывается в Excel/Google Sheets
+  const exportMenuCsv = async () => {
+    try {
+      const resp = await axios.get(
+        `${API}/restaurants/${currentRestaurantId}/menu-items/export.csv`,
+        { ...authHeaders, responseType: 'blob' }
+      );
+      const blob = new Blob([resp.data], { type: 'text/csv;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const cd = resp.headers['content-disposition'] || '';
+      const m = cd.match(/filename="?([^";]+)"?/);
+      a.download = m ? m[1] : `menu-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Меню экспортировано');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Ошибка экспорта');
+    }
+  };
+
   // Download images
   const downloadAllImages = async () => {
     setDownloadingImages(true);
@@ -487,6 +511,14 @@ export default function MenuPage() {
             data-testid="nutrition-import-btn"
           >
             <Zap className="w-4 h-4" />Импорт БЖУ
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2 rounded-full"
+            onClick={exportMenuCsv}
+            data-testid="export-menu-csv-btn"
+          >
+            <FileDown className="w-4 h-4" />Экспорт CSV
           </Button>
           {hasExternalImages && (
             <Button variant="outline" className="gap-2 rounded-full" onClick={downloadAllImages} disabled={downloadingImages} data-testid="download-images-btn">
