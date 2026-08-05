@@ -75,16 +75,19 @@ async def caffesta_register_client(
 ) -> tuple[Optional[str], str]:
     """
     Создать клиента в Caffesta через фиктивный заказ доставки на "Карта лояльности" (цена 0).
-    Возвращает (receipt_uuid, error_or_empty). Если success — receipt_uuid, "" .
-    Если ошибка — None, "текст ошибки".
+    Возвращает (receipt_uuid, error_or_empty).
     """
     if not account_name or not api_key or not pos_id or not product_id:
         return None, "не заданы pos_id / product_id / caffesta ключи"
+    import time as _time
     url = f"https://{account_name}.caffesta.com/a/v1.1/draft/receipts"
     body = {
         "bill": {
             "pos_id": int(pos_id) if str(pos_id).isdigit() else pos_id,
             "app_id": -1,
+            "date": int(_time.time()),
+            "receipt_type": 3,   # 3 = доставка
+            "service_type": 1,
             "delivery_type": 1,
             "discount_sum": 0,
             "total_sum": 0,
@@ -116,11 +119,15 @@ async def caffesta_register_client(
     try:
         j = resp.json()
     except Exception:
-        return None, f"HTTP {resp.status_code}: {resp.text[:300]}"
+        return None, f"HTTP {resp.status_code}: {resp.text[:500]}"
     if j.get("success") and (j.get("data") or {}).get("message"):
         return (j["data"]["message"]), ""
-    err = (j.get("data") or {}).get("message") or j.get("message") or str(j)[:300]
-    return None, err
+    # Возвращаем максимально подробную информацию для диагностики
+    err_msg = (j.get("data") or {}).get("message") or j.get("message") or ""
+    import json as _json
+    body_preview = _json.dumps(body, ensure_ascii=False)[:400]
+    resp_preview = _json.dumps(j, ensure_ascii=False)[:400]
+    return None, f"{err_msg} | REQ: {body_preview} | RESP: {resp_preview}"
 
 
 # ─── Telegram sender ───────────────────────────────────────────────────────
