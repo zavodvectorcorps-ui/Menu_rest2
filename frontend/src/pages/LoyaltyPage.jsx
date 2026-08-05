@@ -588,14 +588,13 @@ export default function LoyaltyPage() {
                   <th className="p-3 text-right">Баланс</th>
                   <th className="p-3">День рожд.</th>
                   <th className="p-3">Пол</th>
-                  <th className="p-3">Заказ Caffesta</th>
                   <th className="p-3">Последняя синхр.</th>
                   <th className="p-3"></th>
                 </tr>
               </thead>
               <tbody>
                 {clients.length === 0 && (
-                  <tr><td colSpan={10} className="p-6 text-center text-muted-foreground">Пока никого</td></tr>
+                  <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Пока никого</td></tr>
                 )}
                 {clients.map((c) => (
                   <tr key={c.id} className="border-t hover:bg-muted/20">
@@ -616,11 +615,6 @@ export default function LoyaltyPage() {
                     <td className="p-3 text-right font-medium">{(c.last_bonus_balance || 0).toFixed(2)}</td>
                     <td className="p-3 text-xs">{c.birthday || <span className="opacity-40">—</span>}</td>
                     <td className="p-3 text-xs">{c.sex === 'M' ? 'М' : c.sex === 'F' ? 'Ж' : <span className="opacity-40">—</span>}</td>
-                    <td className="p-3 font-mono text-[11px] text-muted-foreground">
-                      {c.caffesta_receipt_uuid
-                        ? c.caffesta_receipt_uuid.slice(0, 8) + '…'
-                        : <span className="opacity-40">—</span>}
-                    </td>
                     <td className="p-3 text-xs text-muted-foreground">{fmtDate(c.last_synced_at)}</td>
                     <td className="p-3">
                       <div className="flex gap-1 justify-end">
