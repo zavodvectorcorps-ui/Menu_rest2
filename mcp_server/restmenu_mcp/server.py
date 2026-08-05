@@ -236,12 +236,12 @@ async def create_category(
 @mcp.tool()
 async def update_category(category_id: str, updates: dict) -> dict:
     """
-    Обновить категорию. updates — словарь с любыми полями:
+    Обновить категорию. updates — любые поля:
     name, description, section_id, order, is_visible.
     """
     rid = _need_rid()
     return await _request(
-        "PATCH", f"/api/restaurants/{rid}/categories/{category_id}", json_body=updates
+        "PUT", f"/api/restaurants/{rid}/categories/{category_id}", json_body=updates
     )
 
 
@@ -300,7 +300,7 @@ async def update_menu_item(item_id: str, updates: dict) -> dict:
     """
     rid = _need_rid()
     return await _request(
-        "PATCH", f"/api/restaurants/{rid}/menu-items/{item_id}", json_body=updates
+        "PUT", f"/api/restaurants/{rid}/menu-items/{item_id}", json_body=updates
     )
 
 
@@ -366,6 +366,354 @@ async def list_caffesta_products(search: str | None = None, limit: int = 200) ->
             p for p in products if s in (p.get("name") or "").lower()
         ]
     return products[:limit]
+
+
+@mcp.tool()
+async def caffesta_sales_report(date_from: str, date_to: str) -> dict:
+    """
+    Отчёт по продажам из Caffesta (POS). date_from / date_to в формате YYYY-MM-DD.
+    Возвращает по каждому блюду: количество продаж, сумму, средний чек.
+    """
+    rid = _need_rid()
+    return await _request(
+        "GET",
+        f"/api/restaurants/{rid}/caffesta/sales-report",
+        params={"date_from": date_from, "date_to": date_to},
+    )
+
+
+@mcp.tool()
+async def caffesta_analytics(days: int = 30) -> dict:
+    """
+    Сводная аналитика продаж Caffesta за последние N дней:
+    выручка, топ-блюда, топ-категории, dynamics.
+    """
+    rid = _need_rid()
+    return await _request(
+        "GET", f"/api/restaurants/{rid}/caffesta/analytics", params={"days": days}
+    )
+
+
+# ─── Заказы ─────────────────────────────────────────────────────────────────
+
+@mcp.tool()
+async def list_orders(status: str | None = None, limit: int = 100) -> list[dict]:
+    """
+    Список заказов ресторана. status: `new`, `processing`, `completed`, `cancelled`.
+    """
+    rid = _need_rid()
+    params: dict[str, Any] = {"limit": limit}
+    if status:
+        params["status"] = status
+    return await _request("GET", f"/api/restaurants/{rid}/orders", params=params)
+
+
+@mcp.tool()
+async def update_order_status(order_id: str, status: str) -> dict:
+    """
+    Изменить статус заказа. status: `new` | `processing` | `completed` | `cancelled`.
+    """
+    rid = _need_rid()
+    return await _request(
+        "PUT",
+        f"/api/restaurants/{rid}/orders/{order_id}/status",
+        json_body={"status": status},
+    )
+
+
+@mcp.tool()
+async def complete_all_orders() -> dict:
+    """Пометить все активные заказы как выполненные (bulk)."""
+    rid = _need_rid()
+    return await _request("POST", f"/api/restaurants/{rid}/orders/complete-all")
+
+
+# ─── Вызовы официанта ──────────────────────────────────────────────────────
+
+@mcp.tool()
+async def list_staff_calls(status: str | None = None) -> list[dict]:
+    """История вызовов официанта. status: `pending` | `completed`."""
+    rid = _need_rid()
+    params = {"status": status} if status else None
+    return await _request("GET", f"/api/restaurants/{rid}/staff-calls", params=params)
+
+
+@mcp.tool()
+async def update_staff_call_status(call_id: str, status: str) -> dict:
+    """Изменить статус вызова: `pending` | `completed`."""
+    rid = _need_rid()
+    return await _request(
+        "PUT",
+        f"/api/restaurants/{rid}/staff-calls/{call_id}/status",
+        json_body={"status": status},
+    )
+
+
+@mcp.tool()
+async def complete_all_staff_calls() -> dict:
+    """Пометить все активные вызовы официанта как обработанные."""
+    rid = _need_rid()
+    return await _request("POST", f"/api/restaurants/{rid}/staff-calls/complete-all")
+
+
+# ─── Аналитика & Digest ────────────────────────────────────────────────────
+
+@mcp.tool()
+async def get_analytics(days: int = 30) -> dict:
+    """Внутренняя аналитика (заказы через QR-меню) за последние N дней."""
+    rid = _need_rid()
+    return await _request(
+        "GET", f"/api/restaurants/{rid}/analytics", params={"days": days}
+    )
+
+
+@mcp.tool()
+async def get_digest_preview(date: str | None = None) -> dict:
+    """
+    Превью Telegram-сводки за конкретную дату (YYYY-MM-DD).
+    Без даты — за вчера.
+    """
+    rid = _need_rid()
+    params = {"date": date} if date else None
+    return await _request(
+        "GET", f"/api/restaurants/{rid}/digest/preview", params=params
+    )
+
+
+@mcp.tool()
+async def send_digest_now(date: str | None = None) -> dict:
+    """Отправить Telegram-сводку сейчас (админ-триггер, не ждать 10:00)."""
+    rid = _need_rid()
+    payload = {"date": date} if date else {}
+    return await _request(
+        "POST", f"/api/restaurants/{rid}/digest/send", json_body=payload
+    )
+
+
+# ─── Видео (fal.ai) ────────────────────────────────────────────────────────
+
+@mcp.tool()
+async def generate_video_from_image(
+    image_url: str,
+    prompt: str = "cinematic slow zoom",
+    duration: str = "5",
+) -> dict:
+    """
+    Сгенерировать mp4 из фото блюда через fal.ai (Kling).
+    image_url — публичный HTTP(S) URL картинки.
+    Возвращает {request_id}. Дальше опрашивай check_video_status.
+    """
+    rid = _need_rid()
+    return await _request(
+        "POST",
+        f"/api/restaurants/{rid}/videos/generate",
+        json_body={"image_url": image_url, "prompt": prompt, "duration": duration},
+    )
+
+
+@mcp.tool()
+async def check_video_status(request_id: str) -> dict:
+    """
+    Проверить статус генерации видео: `queued` | `in_progress` | `completed` | `failed`.
+    При completed возвращает `video_url`, который можно сразу подставить в menu_item.
+    """
+    rid = _need_rid()
+    return await _request(
+        "GET", f"/api/restaurants/{rid}/videos/status/{request_id}"
+    )
+
+
+# ─── Столы & QR ────────────────────────────────────────────────────────────
+
+@mcp.tool()
+async def list_tables() -> list[dict]:
+    """Список столов ресторана (с QR-кодами)."""
+    rid = _need_rid()
+    return await _request("GET", f"/api/restaurants/{rid}/tables")
+
+
+@mcp.tool()
+async def create_table(number: int, name: str | None = None) -> dict:
+    """Создать стол с номером `number`."""
+    rid = _need_rid()
+    payload: dict[str, Any] = {"number": number}
+    if name:
+        payload["name"] = name
+    return await _request(
+        "POST", f"/api/restaurants/{rid}/tables", json_body=payload
+    )
+
+
+# ─── Splash-Ads (сториз-заставки) ──────────────────────────────────────────
+
+@mcp.tool()
+async def list_splash_ads() -> list[dict]:
+    """Активные splash-заставки (рекламные попапы) при открытии меню."""
+    rid = _need_rid()
+    return await _request("GET", f"/api/restaurants/{rid}/splash-ads")
+
+
+@mcp.tool()
+async def create_splash_ad(
+    title: str | None = None,
+    text: str | None = None,
+    image_url: str | None = None,
+    is_active: bool = True,
+) -> dict:
+    """Создать splash-заставку. Хотя бы одно из title / text / image_url обязательно."""
+    rid = _need_rid()
+    payload: dict[str, Any] = {"is_active": is_active}
+    if title:
+        payload["title"] = title
+    if text:
+        payload["text"] = text
+    if image_url:
+        payload["image_url"] = image_url
+    return await _request(
+        "POST", f"/api/restaurants/{rid}/splash-ads", json_body=payload
+    )
+
+
+@mcp.tool()
+async def delete_splash_ad(ad_id: str) -> dict:
+    """Удалить splash-заставку."""
+    rid = _need_rid()
+    return await _request(
+        "DELETE", f"/api/restaurants/{rid}/splash-ads/{ad_id}"
+    )
+
+
+# ─── Лейблы (Веган / Острый / Новинка / …) ─────────────────────────────────
+
+@mcp.tool()
+async def list_labels() -> list[dict]:
+    """Каталог кастомных лейблов ресторана."""
+    rid = _need_rid()
+    return await _request("GET", f"/api/restaurants/{rid}/labels")
+
+
+@mcp.tool()
+async def create_label(
+    name: str,
+    icon: str | None = None,
+    color: str | None = None,
+) -> dict:
+    """Создать кастомный лейбл (например «Веган», «Острое»)."""
+    rid = _need_rid()
+    payload: dict[str, Any] = {"name": name}
+    if icon:
+        payload["icon"] = icon
+    if color:
+        payload["color"] = color
+    return await _request(
+        "POST", f"/api/restaurants/{rid}/labels", json_body=payload
+    )
+
+
+# ─── Настройки ресторана ───────────────────────────────────────────────────
+
+@mcp.tool()
+async def get_settings() -> dict:
+    """Настройки: валюта, темы, включённые языки, cart_enabled, staff_call_enabled и т.д."""
+    rid = _need_rid()
+    return await _request("GET", f"/api/restaurants/{rid}/settings")
+
+
+@mcp.tool()
+async def update_settings(updates: dict) -> dict:
+    """
+    Обновить настройки. Примеры полей:
+    - currency: "BYN" | "RUB" | "USD" | ...
+    - theme: "light" | "dark"
+    - enabled_languages: ["ru", "en", "zh"]
+    - cart_enabled: bool
+    - staff_call_enabled: bool
+    """
+    rid = _need_rid()
+    return await _request(
+        "PUT", f"/api/restaurants/{rid}/settings", json_body=updates
+    )
+
+
+@mcp.tool()
+async def update_restaurant(updates: dict) -> dict:
+    """
+    Обновить сам ресторан. Поля: name, description, address, phone, email,
+    logo_url, working_hours, slogan, currency, slug.
+    """
+    rid = _need_rid()
+    return await _request("PUT", f"/api/restaurants/{rid}", json_body=updates)
+
+
+# ─── Рецепты & себестоимость ───────────────────────────────────────────────
+
+@mcp.tool()
+async def get_recipe(item_id: str) -> dict:
+    """Рецепт (тех.карта) блюда с ингредиентами и себестоимостью."""
+    rid = _need_rid()
+    return await _request(
+        "GET", f"/api/restaurants/{rid}/menu-items/{item_id}/recipe"
+    )
+
+
+@mcp.tool()
+async def set_recipe(item_id: str, ingredients: list[dict], yield_g: float | None = None) -> dict:
+    """
+    Установить/обновить рецепт блюда.
+    ingredients — список {"product_id": "...", "quantity_g": 120, "name": "Курица"}.
+    """
+    rid = _need_rid()
+    payload: dict[str, Any] = {"ingredients": ingredients}
+    if yield_g is not None:
+        payload["yield_g"] = yield_g
+    return await _request(
+        "PUT",
+        f"/api/restaurants/{rid}/menu-items/{item_id}/recipe",
+        json_body=payload,
+    )
+
+
+@mcp.tool()
+async def ai_parse_recipe(item_id: str, raw_text: str) -> dict:
+    """
+    AI Chef Assistant: пропарсить свободный текст раскладки блюда
+    (напр. «Курица 120г, соус ткемали 30г, руккола 20г») в структурированный
+    рецепт с fuzzy-матчингом ингредиентов на каталог Caffesta.
+    """
+    rid = _need_rid()
+    return await _request(
+        "POST",
+        f"/api/restaurants/{rid}/recipes/ai-parse",
+        json_body={"item_id": item_id, "raw_text": raw_text},
+    )
+
+
+@mcp.tool()
+async def factual_margin(days: int = 30) -> dict:
+    """
+    Фактическая маржа: сколько заработали / потратили за N дней
+    на основе продаж Caffesta и рецептов.
+    """
+    rid = _need_rid()
+    return await _request(
+        "GET", f"/api/restaurants/{rid}/costs/factual-margin", params={"days": days}
+    )
+
+
+# ─── Переводы (RU/EN/ZH) ───────────────────────────────────────────────────
+
+@mcp.tool()
+async def translate_all_now() -> dict:
+    """Запустить AI-перевод всех текстов меню на включённые языки."""
+    rid = _need_rid()
+    return await _request("POST", f"/api/restaurants/{rid}/translate-all")
+
+
+@mcp.tool()
+async def get_translate_status() -> dict:
+    """Статус фонового перевода: сколько текстов уже готово, сколько в очереди."""
+    rid = _need_rid()
+    return await _request("GET", f"/api/restaurants/{rid}/translate-status")
 
 
 # ─── entrypoint ─────────────────────────────────────────────────────────────
