@@ -221,23 +221,35 @@ async def get_menu_item(item_id: str) -> dict:
 async def create_category(
     name: str,
     section_id: str | None = None,
-    description: str | None = None,
+    display_mode: str | None = None,
+    sort_order: int | None = None,
+    is_active: bool = True,
 ) -> dict:
-    """Создать новую категорию."""
+    """
+    Создать новую категорию.
+    Поля модели: name, section_id, display_mode ('card' | 'compact'), sort_order, is_active.
+    """
     rid = _need_rid()
-    payload: dict[str, Any] = {"name": name}
+    payload: dict[str, Any] = {"name": name, "is_active": is_active}
     if section_id:
         payload["section_id"] = section_id
-    if description:
-        payload["description"] = description
+    if display_mode:
+        payload["display_mode"] = display_mode
+    if sort_order is not None:
+        payload["sort_order"] = sort_order
     return await _request("POST", f"/api/restaurants/{rid}/categories", json_body=payload)
 
 
 @mcp.tool()
 async def update_category(category_id: str, updates: dict) -> dict:
     """
-    Обновить категорию. updates — любые поля:
-    name, description, section_id, order, is_visible.
+    Обновить категорию. Допустимые поля (все опциональные):
+    - name (str)
+    - section_id (str)
+    - display_mode ('card' | 'compact')
+    - sort_order (int)
+    - is_active (bool) — включена ли категория. Скрыть = is_active: false.
+    Прочие поля молча игнорируются сервером.
     """
     rid = _need_rid()
     return await _request(

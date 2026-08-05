@@ -1,0 +1,35 @@
+{
+  "summary": "Backend-only verification of the MCP `update_category` field-name bugfix (is_active, not is_visible). Created /app/backend/tests/test_iter30_category_toggle_mcp.py: 9 tests, 8 passed, 1 failed. Confirmed PUT /api/restaurants/{rid}/categories/{cid} with {\"is_active\": false} really disables the category (response + GET /categories persistence), {\"is_active\": true} re-enables, {\"name\": ...} rename does not touch is_active, unknown category returns 404, and the legacy wrong key {\"is_visible\": ...} is silently ignored (200, is_active unchanged) — which is exactly why the docstring fix was needed. Verified MCP source no longer contains 'is_visible' anywhere, and exercised the real MCP tool via fastmcp in-memory Client (select_restaurant -> update_category {is_active:false} -> list_categories -> update_category {is_active:true}) against the public backend URL — works end to end. Test category 'Завтраки до 16.00' (768fe425-...) restored to is_active=true and original name (asserted in teardown). New unrelated bug found: MCP tool bulk_rename_categories sends an incompatible body and always fails with 422.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/restaurants/{rid}/categories/{cid}", "issue": "CategoryUpdate ignores unknown keys and the route returns 200 even when nothing was updated — an MCP/LLM client sending a wrong field name (is_visible) gets a false success. Consider model_config extra='forbid' for CategoryUpdate (or returning a warning listing ignored keys) so such mistakes surface as 422 instead of a silent no-op."},
+      {"endpoint": "POST /api/restaurants/{rid}/categories/bulk-rename", "issue": "MCP tool bulk_rename_categories posts json_body={'renames': {id: name}} while the endpoint expects a bare JSON list [{id, name}] -> always 422 'Input should be a valid list'. MCP tool must send [{'id': k, 'name': v} for k, v in mapping.items()]."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter30_category_toggle_mcp.py",
+    "/app/test_reports/pytest/iter30_results.xml"
+  ],
+  "action_items": [
+    "Fix MCP bulk_rename_categories body shape: send a list [{id, name}] instead of {'renames': mapping} (currently 422 on every call).",
+    "Optional hardening: make CategoryUpdate reject unknown fields (extra='forbid') so wrong field names from LLM clients return 422 instead of a silent 200."
+  ],
+  "critical_code_review_comments": [
+    "routes/menu.py update_category filters `v is not None`, so is_active=False is correctly persisted — verified. But because the body model ignores extras, an empty effective update still returns 200 with the unchanged doc; that masks client-side field-name errors (the reported Claude Desktop bug class).",
+    "mcp_server/restmenu_mcp/server.py bulk_rename_categories is not aligned with the backend contract (List[dict] body) — same class of contract-drift bug as the is_visible issue; audit other MCP tools' payload shapes against the routes."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter30_category_toggle_mcp.py"],
+  "success_rate": {"backend": "89% (8/9)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "None. Used existing restaurant aa25189d-d668-4838-915a-c5d936547f3f and category 768fe425-3b91-40c4-9df9-0090f2b3ed06; temporary rename to 'TEST_Завтраки до 16.00' reverted and is_active restored to true.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin / 220066 (superadmin, from /app/memory/test_credentials.md)",
+  "context_for_next_testing_agent": "Reusable suite: /app/backend/tests/test_iter30_category_toggle_mcp.py. It shows how to drive MCP tools in-process: sys.path.insert('/app/mcp_server'), import restmenu_mcp.server, override API_URL/USERNAME/PASSWORD, then fastmcp.Client(mcp_server.mcp) and call_tool(...). The bulk_rename_categories MCP test is expected to fail until the payload shape is fixed.",
+  "rca_of_the_issue": "Original bug: MCP docstring advertised `is_visible` while Category model uses `is_active`; CategoryUpdate has extra='ignore', so the PUT succeeded with 200 and no DB change. Docstring/signature fix verified — no 'is_visible' remains in the MCP server, and real is_active toggling works through both the REST API and the MCP tool. Residual risk is the silent-ignore behaviour of the endpoint, plus a separate contract mismatch in bulk_rename_categories."
+}
