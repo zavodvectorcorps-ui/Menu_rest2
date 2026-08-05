@@ -264,32 +264,45 @@ async def sync_restaurant(restaurant_id: str) -> tuple[Optional[str], dict]:
 async def run_loyalty_sync_job():
     """Cron: тикает раз в минуту, обходит все включённые рестораны,
     учитывает индивидуальный `sync_interval_min` каждого."""
-    now = datetime.now(timezone.utc)
-    async for cfg in db.loyalty_config.find({"is_enabled": True}, {"_id": 0}):
-        interval = int(cfg.get("sync_interval_min") or 2)
-        # Используем last_polled_at (пульс) — реальный признак когда последний
-        # раз воркер трогал этот ресторан. last_synced_at обновляется только
-        # при получении новых данных от Caffesta.
-        last = cfg.get("last_polled_at") or cfg.get("last_synced_at")
-        if last and isinstance(last, datetime):
-            elapsed_min = (now - last).total_seconds() / 60
-            if elapsed_min + 0.05 < interval:  # +0.05 чтобы не пропускать «почти минута»
-                continue
-        rid = cfg["restaurant_id"]
-        # Пульс — независимо от того, было ли изменение
-        await db.loyalty_config.update_one(
-            {"restaurant_id": rid},
-            {"$set": {"last_polled_at": datetime.now(timezone.utc)}},
-        )
+    logger.info("loyalty tick @ %s", datetime.now(timezone.utc).isoformat())
+    try:
+        now = datetime.now(timezone.utc)
+        cursor = db.loyalty_config.find({"is_enabled": True}, {"_id": 0})
+        cfgs = await cursor.to_list(1000)
+    except Exception as exc:
+        logger.exception("loyalty tick: failed to list configs: %s", exc)
+        return
+
+    for cfg in cfgs:
+        rid = cfg.get("restaurant_id") or "?"
         try:
-            err, _info = await asyncio.wait_for(_sync_one(rid, cfg), timeout=90)
-        except asyncio.TimeoutError:
-            err = "sync timeout > 90s"
-        except Exception as exc:
-            err = f"unexpected: {exc}"
-        if err:
+            interval = int(cfg.get("sync_interval_min") or 2)
+            last = cfg.get("last_polled_at") or cfg.get("last_synced_at")
+            if last and isinstance(last, datetime):
+                elapsed_min = (now - last).total_seconds() / 60
+                if elapsed_min + 0.05 < interval:
+                    continue
+            # Пульс — независимо от того, было ли изменение
             await db.loyalty_config.update_one(
                 {"restaurant_id": rid},
-                {"$set": {"last_error": err, "last_error_at": datetime.now(timezone.utc)}},
+                {"$set": {"last_polled_at": datetime.now(timezone.utc)}},
             )
-            await _log(rid, "error", status="error", error_text=err, message=err)
+            try:
+                err, _info = await asyncio.wait_for(_sync_one(rid, cfg), timeout=90)
+            except asyncio.TimeoutError:
+                err = "sync timeout > 90s"
+            except Exception as exc:
+                logger.exception("loyalty _sync_one crashed for %s: %s", rid, exc)
+                err = f"unexpected: {exc}"
+            if err:
+                await db.loyalty_config.update_one(
+                    {"restaurant_id": rid},
+                    {"$set": {"last_error": err, "last_error_at": datetime.now(timezone.utc)}},
+                )
+                try:
+                    await _log(rid, "error", status="error", error_text=err, message=err)
+                except Exception:
+                    pass
+        except Exception as exc:
+            # НИКОГДА не бросаем наверх — иначе APScheduler может отключить job
+            logger.exception("loyalty tick: outer catch for %s: %s", rid, exc)

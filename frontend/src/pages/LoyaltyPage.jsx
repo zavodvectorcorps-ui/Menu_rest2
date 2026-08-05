@@ -241,7 +241,11 @@ export default function LoyaltyPage() {
   const fmtDate = (iso) => {
     if (!iso) return '—';
     try {
-      const d = new Date(iso);
+      // Бэкенд/Motor возвращают datetime без явной таймзоны (BSON не хранит tz).
+      // Считаем такие даты UTC — иначе браузер интерпретирует их как локальные
+      // и результат «уезжает» на смещение зоны (для Минска — на 3 часа назад).
+      const hasTz = /[Zz]|[+-]\d{2}:?\d{2}$/.test(iso);
+      const d = new Date(hasTz ? iso : iso + 'Z');
       return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
     } catch { return iso; }
   };
@@ -289,14 +293,14 @@ export default function LoyaltyPage() {
               <CardTitle className="text-base flex items-center justify-between">
                 <span>Caffesta POS</span>
                 {config.last_synced_at ? (
-                  <Badge variant="outline" className="gap-1 border-mint-500 text-mint-600">
+                  <Badge variant="outline" className="gap-1 border-mint-500 text-mint-600" data-testid="loyalty-badge-synced">
                     <CheckCircle2 className="w-3 h-3" /> Данные: {fmtDate(config.last_synced_at)}
                   </Badge>
                 ) : (
                   <Badge variant="outline">данные ещё не подтягивались</Badge>
                 )}
                 {config.last_polled_at && (
-                  <Badge variant="outline" className="gap-1 ml-2">
+                  <Badge variant="outline" className="gap-1 ml-2" data-testid="loyalty-badge-polled">
                     <RefreshCw className="w-3 h-3" /> Опрос: {fmtDate(config.last_polled_at)}
                   </Badge>
                 )}

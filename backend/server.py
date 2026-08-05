@@ -94,10 +94,14 @@ async def startup():
         )
         # Лояльность: тик раз в минуту, внутри воркер учитывает
         # индивидуальный sync_interval_min каждого ресторана.
+        # coalesce=True + max_instances=1 — если тик задержался,
+        # схлопываем пропуски в один, не строим очередь.
+        # misfire_grace_time большой — на случай долгих Caffesta ответов.
         scheduler.add_job(
             run_loyalty_sync_job,
             CronTrigger(minute="*", timezone=minsk_tz),
             id="loyalty_sync", replace_existing=True,
+            coalesce=True, max_instances=1, misfire_grace_time=300,
         )
         scheduler.start()
         # Log next run times so you can verify timezone on first start

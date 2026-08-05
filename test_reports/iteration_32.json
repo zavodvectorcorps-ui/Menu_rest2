@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only verification of the timezone fix for Caffesta badges on /admin/loyalty. Seeded deterministic UTC timestamps (last_synced_at=2026-07-15T19:11Z, last_polled_at=19:25Z) directly in Mongo (loyalty_config), confirmed the API returns naive ISO strings without 'Z' (root cause confirmed), then ran Playwright twice: (1) default container browser (tz=UTC) and (2) an emulated Europe/Minsk (UTC+3) context. In Minsk context badges rendered 'Данные: 15.07, 22:11' and 'Опрос: 15.07, 22:25' = UTC + 3h, i.e. the previous buggy 19:11 output no longer appears. Also unit-verified fmtDate against naive, 'Z', '+03:00' and microsecond ISO variants - all produce identical correct local time. Values are deterministic across 3 reloads. Seeded timestamps were reset to null after testing.",
+  "backend_issues": {"critical": [], "minor": [{"endpoint": "GET /api/restaurants/{rid}/loyalty/config", "issue": "last_synced_at/last_polled_at/last_error_at are serialized as naive ISO strings without timezone suffix (e.g. '2026-07-15T19:11:00'). Frontend now compensates, but storing/returning tz-aware UTC (with 'Z') would be the robust fix and would protect every other consumer."}]},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [{"screen": "/admin/loyalty -> Caffesta POS card header", "issues": ["CardTitle uses justify-between with 3 children (title + 2 badges), so 'Данные' badge sits mid-header and 'Опрос' badge is pushed to the far right - badges look disconnected. Wrap both badges in a single flex container."]}]
+  },
+  "test_report_links": ["/app/tests/seed_loyalty_ts.py"],
+  "action_items": [
+    "Same naive-ISO parsing bug still exists elsewhere: OrdersPage.jsx:132 and :181 (new Date(order.created_at)/call.created_at .toLocaleString('ru')) will show times 3h off for UTC+3 users.",
+    "SettingsPage.jsx:2149-2151 (backup job elapsed time) mixes new Date(job.started_at) (naive parsed as local) with Date.now() -> elapsed will be wrong by the tz offset for running jobs.",
+    "RecipeCalculatorPage.jsx:691 (new Date(p.recorded_at).toLocaleDateString) can show the wrong day for late-evening records.",
+    "Preferred long-term fix: extract fmtDate into a shared util (e.g. src/lib/datetime.js) and/or return tz-aware UTC ISO ('Z') from the backend serializers.",
+    "Cosmetic: group the two Caffesta badges in one flex wrapper."
+  ],
+  "critical_code_review_comments": [
+    "fmtDate logic is correct (regex /[Zz]|[+-]\\d{2}:?\\d{2}$/ + append 'Z'), but it is duplicated logic scoped to LoyaltyPage only - other pages formatting backend datetimes remain buggy. Centralize it.",
+    "Root cause is on the backend (naive datetimes in BSON + no tz on serialization); the frontend workaround is a patch, not a systemic fix."
+  ],
+  "updated_files": ["/app/frontend/src/pages/LoyaltyPage.jsx (added data-testid=loyalty-badge-synced / loyalty-badge-polled only)", "/app/tests/seed_loyalty_ts.py (new test seed helper)"],
+  "success_rate": {"backend": "N/A (not in scope)", "frontend": "100% (timezone badge fix verified)"},
+  "seed_data_creation": "Temporarily set loyalty_config.last_synced_at/last_polled_at for restaurant aa25189d-d668-4838-915a-c5d936547f3f to fixed UTC values; reset to null after test.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin / 220066",
+  "context_for_next_testing_agent": "Timezone fix on /admin/loyalty badges is VERIFIED (UTC 19:11 -> 22:11 in Europe/Minsk emulated browser). The preview container browser runs in UTC, so tz bugs are invisible by default - always create a new Playwright context with timezone_id='Europe/Minsk' to test tz behaviour. Use /app/tests/seed_loyalty_ts.py to seed deterministic timestamps and remember to reset them. Remaining naive-ISO parsing spots: OrdersPage.jsx, SettingsPage.jsx (job elapsed), RecipeCalculatorPage.jsx.",
+  "rca_of_the_issue": "Motor returns naive datetimes from BSON; FastAPI serializes them without a 'Z' suffix, so JS `new Date(iso)` treated them as local time and subtracted the tz offset (22:11 shown as 19:11 for UTC+3). fmtDate now appends 'Z' when no tz indicator is present, forcing UTC interpretation before toLocaleString - verified correct."
+}
