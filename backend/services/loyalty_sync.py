@@ -87,6 +87,9 @@ async def caffesta_register_client(
     parts = (client_name or "").strip().split(maxsplit=1)
     first_name = parts[0] if parts else "Клиент"
     last_name = parts[1] if len(parts) > 1 else ""
+    # Caffesta ожидает phone в формате E.164 (+7…). Мы храним phone_norm — только
+    # цифры, поэтому добавляем префикс + для запроса.
+    phone_for_caffesta = client_phone if client_phone.startswith("+") else f"+{client_phone}"
     url = f"https://{account_name}.caffesta.com/a/v1.1/draft/receipts"
     body = {
         "bill": {
@@ -111,7 +114,7 @@ async def caffesta_register_client(
                 "first_name": first_name,
                 "last_name": last_name,
                 "name": client_name or "Клиент",
-                "phone": client_phone,
+                "phone": phone_for_caffesta,
             },
             "comment": "Автосоздание клиента при регистрации в Telegram-боте",
         }
@@ -135,9 +138,11 @@ async def caffesta_register_client(
         return (j["data"]["message"]), ""
 
     # Особый случай: клиент уже существует в Caffesta
-    # (Caffesta не отдаёт человекочитаемо, а падает на SQL INSERT в таблицу clients)
+    # Ловим только явные признаки unique constraint. INSERT INTO clients сам по себе
+    # может упасть по многим причинам (NOT NULL и т.п.), не считаем это успехом.
     err_msg = str((j.get("data") or {}).get("status") or (j.get("data") or {}).get("message") or "")
-    if "INSERT INTO clients" in err_msg or "duplicate" in err_msg.lower() or "unique" in err_msg.lower():
+    lower = err_msg.lower()
+    if "duplicate" in lower or "unique constraint" in lower or "unique key" in lower:
         return "already_exists", ""
 
     # Прочая ошибка — с диагностикой
