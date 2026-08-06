@@ -18,6 +18,8 @@ from auth import ensure_module_access, get_current_user
 from database import db
 from models_loyalty import (
     DEFAULT_INVITE_MESSAGE,
+    DEFAULT_ONBOARDING_BIRTHDAY_TEXT,
+    DEFAULT_ONBOARDING_GENDER_TEXT,
     DEFAULT_START_MESSAGE,
     DEFAULT_TEMPLATE_ACCRUAL,
     DEFAULT_TEMPLATE_DEBIT,
@@ -49,6 +51,8 @@ class LoyaltyConfigUpdate(BaseModel):
     template_accrual: Optional[str] = None
     template_debit: Optional[str] = None
     start_message_text: Optional[str] = None
+    onboarding_birthday_text: Optional[str] = None
+    onboarding_gender_text: Optional[str] = None
     welcome_message_text: Optional[str] = None
     invite_message_text: Optional[str] = None
     is_enabled: Optional[bool] = None
@@ -72,6 +76,8 @@ def _public_config_view(doc: dict) -> dict:
         "template_accrual": doc.get("template_accrual") or DEFAULT_TEMPLATE_ACCRUAL,
         "template_debit": doc.get("template_debit") or DEFAULT_TEMPLATE_DEBIT,
         "start_message_text": doc.get("start_message_text") or DEFAULT_START_MESSAGE,
+        "onboarding_birthday_text": doc.get("onboarding_birthday_text") or DEFAULT_ONBOARDING_BIRTHDAY_TEXT,
+        "onboarding_gender_text": doc.get("onboarding_gender_text") or DEFAULT_ONBOARDING_GENDER_TEXT,
         "welcome_message_text": doc.get("welcome_message_text") or DEFAULT_WELCOME_MESSAGE,
         "invite_message_text": doc.get("invite_message_text") or DEFAULT_INVITE_MESSAGE,
         "is_enabled": bool(doc.get("is_enabled")),
@@ -127,6 +133,10 @@ async def update_config(
         updates["template_debit"] = payload.template_debit
     if payload.start_message_text is not None:
         updates["start_message_text"] = payload.start_message_text
+    if payload.onboarding_birthday_text is not None:
+        updates["onboarding_birthday_text"] = payload.onboarding_birthday_text
+    if payload.onboarding_gender_text is not None:
+        updates["onboarding_gender_text"] = payload.onboarding_gender_text
     if payload.welcome_message_text is not None:
         updates["welcome_message_text"] = payload.welcome_message_text
     if payload.invite_message_text is not None:

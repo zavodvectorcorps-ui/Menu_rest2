@@ -50,6 +50,8 @@ export default function LoyaltyPage() {
     template_accrual: '',
     template_debit: '',
     start_message_text: '',
+    onboarding_birthday_text: '',
+    onboarding_gender_text: '',
     welcome_message_text: '',
     invite_message_text: '',
     is_enabled: false,
@@ -74,6 +76,8 @@ export default function LoyaltyPage() {
         template_accrual: cfgR.data.template_accrual || '',
         template_debit: cfgR.data.template_debit || '',
         start_message_text: cfgR.data.start_message_text || '',
+        onboarding_birthday_text: cfgR.data.onboarding_birthday_text || '',
+        onboarding_gender_text: cfgR.data.onboarding_gender_text || '',
         welcome_message_text: cfgR.data.welcome_message_text || '',
         invite_message_text: cfgR.data.invite_message_text || '',
         is_enabled: !!cfgR.data.is_enabled,
@@ -503,6 +507,24 @@ export default function LoyaltyPage() {
                   onChange={(e) => setForm({ ...form, start_message_text: e.target.value })}
                   data-testid="loyalty-start-message"
                   placeholder="Привет! Я — бот программы лояльности…"
+                />
+              </Field>
+              <Field label="Шаг 1 — вопрос о дате рождения">
+                <Textarea
+                  rows={3}
+                  value={form.onboarding_birthday_text}
+                  onChange={(e) => setForm({ ...form, onboarding_birthday_text: e.target.value })}
+                  data-testid="loyalty-onboarding-birthday"
+                  placeholder="Шаг 1 из 3 — дата рождения…"
+                />
+              </Field>
+              <Field label="Шаг 2 — вопрос о поле">
+                <Textarea
+                  rows={3}
+                  value={form.onboarding_gender_text}
+                  onChange={(e) => setForm({ ...form, onboarding_gender_text: e.target.value })}
+                  data-testid="loyalty-onboarding-gender"
+                  placeholder="Шаг 2 из 3 — пол…"
                 />
               </Field>
               <Field label="После регистрации (укажите приветственные бонусы)">

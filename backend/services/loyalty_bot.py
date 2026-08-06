@@ -356,16 +356,15 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
             await _send(bot_token, chat_id, text_msg, _main_menu_keyboard())
             return
         # Онбординг с нуля: приветствие + вопрос о дате рождения.
-        from models_loyalty import DEFAULT_START_MESSAGE
+        from models_loyalty import (
+            DEFAULT_ONBOARDING_BIRTHDAY_TEXT,
+            DEFAULT_START_MESSAGE,
+        )
         start_text = cfg.get("start_message_text") or DEFAULT_START_MESSAGE
         await _set_onboarding(restaurant_id, chat_id, {"step": "birthday"})
         await _send(bot_token, chat_id, start_text)
-        await _send(
-            bot_token, chat_id,
-            "Шаг 1 из 3 — <b>дата рождения</b>\nПришлите в формате <b>ДД.ММ.ГГГГ</b> (например, 15.03.1990) "
-            "или нажмите «Пропустить».",
-            _skip_keyboard(),
-        )
+        bday_prompt = cfg.get("onboarding_birthday_text") or DEFAULT_ONBOARDING_BIRTHDAY_TEXT
+        await _send(bot_token, chat_id, bday_prompt, _skip_keyboard())
         return
 
     # 2.5 Онбординг-стейт — приоритетный обработчик
@@ -376,20 +375,20 @@ async def handle_update(restaurant_id: str, update: dict) -> None:
         if step == "birthday":
             if is_skip:
                 await _set_onboarding(restaurant_id, chat_id, {"step": "gender"})
-                await _send(
-                    bot_token, chat_id,
-                    "Шаг 2 из 3 — <b>пол</b>\nВыберите: М (мужской) или Ж (женский), либо «Пропустить».",
-                    _gender_keyboard(),
-                )
+                from models_loyalty import DEFAULT_ONBOARDING_GENDER_TEXT
+                gender_prompt = cfg.get("onboarding_gender_text") or DEFAULT_ONBOARDING_GENDER_TEXT
+                await _send(bot_token, chat_id, gender_prompt, _gender_keyboard())
                 return
             bd = _parse_birthday(text)
             if not bd:
                 await _send(bot_token, chat_id, "Неверный формат. Пример: <b>15.03.1990</b>. Попробуйте ещё раз или нажмите «Пропустить».", _skip_keyboard())
                 return
             await _set_onboarding(restaurant_id, chat_id, {"step": "gender", "birthday": bd})
+            from models_loyalty import DEFAULT_ONBOARDING_GENDER_TEXT
+            gender_prompt = cfg.get("onboarding_gender_text") or DEFAULT_ONBOARDING_GENDER_TEXT
             await _send(
                 bot_token, chat_id,
-                f"✅ Дата рождения: {bd}\n\nШаг 2 из 3 — <b>пол</b>\nВыберите: М или Ж, либо «Пропустить».",
+                f"✅ Дата рождения: {bd}\n\n" + gender_prompt,
                 _gender_keyboard(),
             )
             return

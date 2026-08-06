@@ -25,6 +25,15 @@ DEFAULT_START_MESSAGE = (
     "Нажмите кнопку ниже, чтобы поделиться номером телефона — и я привяжу "
     "к нему ваш Telegram, чтобы присылать сюда все начисления и списания бонусов."
 )
+DEFAULT_ONBOARDING_BIRTHDAY_TEXT = (
+    "Шаг 1 из 3 — <b>дата рождения</b>\n"
+    "Пришлите в формате <b>ДД.ММ.ГГГГ</b> (например, 15.03.1990) "
+    "или нажмите «Пропустить»."
+)
+DEFAULT_ONBOARDING_GENDER_TEXT = (
+    "Шаг 2 из 3 — <b>пол</b>\n"
+    "Выберите: М (мужской) или Ж (женский), либо «Пропустить»."
+)
 DEFAULT_WELCOME_MESSAGE = (
     "✅ Готово, {name}! Карта закреплена сверху — там всегда актуальный баланс. "
     "Мы будем уведомлять об изменениях.\n\n"
@@ -49,6 +58,8 @@ class LoyaltyConfig(BaseModel):
     template_accrual: str = DEFAULT_TEMPLATE_ACCRUAL
     template_debit: str = DEFAULT_TEMPLATE_DEBIT
     start_message_text: str = DEFAULT_START_MESSAGE
+    onboarding_birthday_text: str = DEFAULT_ONBOARDING_BIRTHDAY_TEXT
+    onboarding_gender_text: str = DEFAULT_ONBOARDING_GENDER_TEXT
     welcome_message_text: str = DEFAULT_WELCOME_MESSAGE
     invite_message_text: str = DEFAULT_INVITE_MESSAGE
     is_enabled: bool = False
