@@ -7,6 +7,7 @@ import {
   ShoppingBag, ArrowRight, Zap, Languages, ChefHat, MessageSquare,
   Lock, Rocket, Star, ExternalLink, Copy, User, Eye, Clock,
   CheckCircle2, TrendingUp, Smartphone, Bell, RefreshCcw, ChevronRight, Share2, Download,
+  Gift, Heart, IdCard, UserPlus, PartyPopper, Send,
 } from 'lucide-react';
 
 import { API } from '@/App';
@@ -126,6 +127,7 @@ export default function DemoPage() {
           </a>
           <div className="hidden md:flex items-center gap-6 text-sm text-white/60">
             <a href="#benefits" className="hover:text-white transition-colors">Возможности</a>
+            <a href="#loyalty" className="hover:text-white transition-colors">Лояльность</a>
             <a href="#screens" className="hover:text-white transition-colors">Как выглядит</a>
             <a href="#try" className="hover:text-white transition-colors">Попробовать</a>
           </div>
@@ -379,6 +381,111 @@ export default function DemoPage() {
                 <ArrowRight className="w-5 h-5" />
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== Loyalty program ===== */}
+      <section id="loyalty" className="py-24 relative overflow-hidden border-t border-white/5">
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-0 right-1/4 w-[700px] h-[500px] rounded-full bg-pink-500/8 blur-[160px]" />
+          <div className="absolute bottom-0 left-0 w-[500px] h-[400px] rounded-full bg-amber-500/8 blur-[140px]" />
+        </div>
+        <div className="max-w-6xl mx-auto px-5">
+          <div className="grid lg:grid-cols-[1.1fr_1fr] gap-12 items-start">
+            <div>
+              <div className="inline-flex items-center gap-2 text-pink-300 text-xs font-semibold tracking-wider uppercase mb-4 px-2.5 py-1 rounded-full bg-pink-500/10 border border-pink-500/25">
+                <Gift className="w-3.5 h-3.5" /> Новое · Программа лояльности
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-bold leading-[1.1] mb-5">
+                Возвращайте гостей<br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-300 to-amber-300">через Telegram-бот</span>
+              </h2>
+              <p className="text-white/60 leading-relaxed max-w-xl mb-6">
+                Гость сканирует QR — за 30 секунд получает виртуальную бонусную карту, закреплённую сверху чата.
+                Каждое начисление и списание приходит уведомлением. Никаких SMS, приложений и пластиковых карт.
+              </p>
+
+              <div className="space-y-3 mb-8">
+                <LoyaltyFeature icon={<IdCard />} title="Виртуальная карта в Telegram" text="PNG с номером карты и балансом — закрепляется в чате, обновляется в реальном времени." />
+                <LoyaltyFeature icon={<RefreshCcw />} title="Синхронизация с Caffesta" text="Балансы подтягиваются каждые 1-60 минут, новых клиентов создаём в POS одним пакетом." />
+                <LoyaltyFeature icon={<Send />} title="Массовые и точечные рассылки" text="Пиши одному гостю или всей базе прямо из админки. Все шаблоны редактируются." />
+                <LoyaltyFeature icon={<PartyPopper />} title="Собираем ДР и пол" text="За 3 шага онбординга — данные для персональных поздравлений и сегментированных акций." />
+                <LoyaltyFeature icon={<UserPlus />} title="Реферальный шаринг" text="Кнопка «Пригласить друга» с готовым текстом и ссылкой на бота — гости приводят гостей." />
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <a
+                  href="#try"
+                  className="px-5 h-11 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-pink-400 to-amber-300 text-[#0a0e1a] font-semibold hover:brightness-110 transition-all"
+                  data-testid="loyalty-cta-demo"
+                >
+                  Попробовать <ArrowRight className="w-4 h-4" />
+                </a>
+                <Link
+                  to="/login"
+                  className="px-5 h-11 inline-flex items-center gap-2 rounded-full border border-white/15 text-white/80 hover:bg-white/5 hover:text-white transition-colors"
+                  data-testid="loyalty-cta-login"
+                >
+                  Подключить своему ресторану
+                </Link>
+              </div>
+            </div>
+
+            {/* Right column — 3-step onboarding mock */}
+            <div className="relative">
+              <div className="absolute -inset-4 bg-gradient-to-br from-pink-500/15 via-transparent to-amber-500/10 blur-2xl -z-10 rounded-3xl" />
+              <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-6 backdrop-blur-sm">
+                <div className="flex items-center gap-2 mb-5 text-xs text-white/50">
+                  <span className="w-2 h-2 rounded-full bg-red-400/70" />
+                  <span className="w-2 h-2 rounded-full bg-yellow-400/70" />
+                  <span className="w-2 h-2 rounded-full bg-green-400/70" />
+                  <span className="ml-2 font-mono text-white/40">@myata_bonus_bot</span>
+                </div>
+
+                <div className="space-y-3">
+                  <BotBubble text="Привет! 👋 Я — бот программы лояльности «Мята Спортивная»." />
+                  <BotBubble text={<><b className="text-white">Шаг 1 из 3 — дата рождения</b><br />Пришлите в формате ДД.ММ.ГГГГ или нажмите «Пропустить».</>} />
+                  <UserBubble text="15.03.1990" />
+                  <BotBubble text={<>✅ Дата: 15.03.1990<br /><b className="text-white">Шаг 2 из 3 — пол</b><br />М / Ж / Пропустить</>} />
+                  <UserBubble text="М" />
+                  <BotBubble text={<><b className="text-white">Шаг 3 из 3 — телефон</b><br />Нажмите «📱 Поделиться номером»</>} />
+                  <div className="flex justify-center py-2">
+                    <div className="rounded-2xl bg-gradient-to-br from-pink-500/20 via-amber-500/15 to-transparent border border-pink-400/25 p-4 max-w-[240px]">
+                      <div className="text-[10px] uppercase tracking-widest text-pink-200/80 mb-2 font-semibold">Ваша карта · закреплена</div>
+                      <div className="text-white font-bold text-lg">Мята Спортивная</div>
+                      <div className="text-[11px] text-white/60 font-mono mt-1">№ 000042</div>
+                      <div className="mt-3 pt-3 border-t border-white/10">
+                        <div className="text-[10px] text-white/50 uppercase tracking-wider">Баланс</div>
+                        <div className="text-2xl font-bold text-mint-300">12.50 BYN</div>
+                      </div>
+                    </div>
+                  </div>
+                  <BotBubble text="✅ Готово, Иван! Начислили 5 приветственных бонусов 🎁" />
+                </div>
+
+                <div className="mt-5 pt-4 border-t border-white/5 flex items-center justify-between text-[11px] text-white/40">
+                  <span className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> ~30 сек</span>
+                  <span className="flex items-center gap-1.5"><Heart className="w-3 h-3 text-pink-400" /> без SMS-затрат</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom — how it works quick strip */}
+          <div className="mt-16 grid md:grid-cols-4 gap-4">
+            {[
+              { n: '01', t: 'Гость сканирует QR', d: 'На столе или в чеке.' },
+              { n: '02', t: 'Бот собирает данные', d: 'ДР, пол, телефон — за 3 шага.' },
+              { n: '03', t: 'Автосоздание в Caffesta', d: 'Одним пакетом — без дубликатов.' },
+              { n: '04', t: 'Уведомления навсегда', d: 'Каждое начисление — в Telegram.' },
+            ].map((s) => (
+              <div key={s.n} className="rounded-2xl border border-white/8 bg-white/[0.02] p-5 hover:bg-white/[0.04] transition-colors">
+                <div className="text-pink-300/70 font-mono text-xs font-bold tracking-widest mb-2">{s.n}</div>
+                <div className="text-white font-semibold mb-1">{s.t}</div>
+                <div className="text-white/50 text-sm leading-relaxed">{s.d}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -912,6 +1019,40 @@ function FeatureBullet({ icon, text }) {
       </span>
       <span className="pt-1">{text}</span>
     </li>
+  );
+}
+
+function LoyaltyFeature({ icon, title, text }) {
+  return (
+    <div className="flex gap-3">
+      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-pink-500/20 to-amber-500/15 border border-pink-400/25 text-pink-200 flex items-center justify-center flex-shrink-0 [&>svg]:w-4 [&>svg]:h-4">
+        {icon}
+      </div>
+      <div>
+        <div className="font-semibold text-white text-sm">{title}</div>
+        <div className="text-white/55 text-sm leading-relaxed mt-0.5">{text}</div>
+      </div>
+    </div>
+  );
+}
+
+function BotBubble({ text }) {
+  return (
+    <div className="flex justify-start">
+      <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-white/[0.05] border border-white/8 px-3.5 py-2 text-sm text-white/85 leading-relaxed">
+        {text}
+      </div>
+    </div>
+  );
+}
+
+function UserBubble({ text }) {
+  return (
+    <div className="flex justify-end">
+      <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-gradient-to-br from-sky-500/25 to-sky-500/10 border border-sky-400/25 px-3.5 py-2 text-sm text-white leading-relaxed">
+        {text}
+      </div>
+    </div>
   );
 }
 
